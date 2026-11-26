@@ -1,0 +1,5386 @@
+{
+  "v12_all7_live_king": {
+    "name": "V12实服七强单阵通杀王（保底61.4%/均胜83.2%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        69,
+        20
+      ],
+      [
+        69,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 22000003,
+        "name": "哈迪斯",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "defense"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "defense"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "defense"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "defense"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "defense"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "defense"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "defense"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "defense"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "defense"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "defense"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "defense"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "defense"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "defense"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "defense"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "defense"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "defense"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "defense"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "defense"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "defense"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "defense"
+      },
+      {
+        "id": 19000269,
+        "name": "泥暗魔女",
+        "wash": "defense"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "defense"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "defense"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "defense"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "defense"
+      }
+    ]
+  },
+  "v9_anti_02_15_16": {
+    "name": "V9破02/15/16三强极控王者阵（5王者衰弱·实服最低90.4%/满级最低77.4%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v9_f4_mod9": {
+    "name": "V9阵型4微调版（保留21人仅换9人·改洗王者·实服02/15/16最低78.1%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 88000007,
+        "name": "芙兰朵露·斯卡雷特",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 88000008,
+        "name": "蕾米莉亚·斯卡雷特",
+        "wash": "authority"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v9_f4_keepSpd12": {
+    "name": "V9阵型4零重洗版（留18人先攻不动仅换12人·实服02/15/16最低71.3%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "speed"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "speed"
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "speed"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "speed"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "speed"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v8_all5_70plus": {
+    "name": "V8六强实服全74%+极速破甲阵（5防御衰弱·实服六强最低74.2%/满级五强最低73.6%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 19000267,
+        "name": "军服姬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000255,
+        "name": "爷爷",
+        "wash": "speed"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "speed"
+      },
+      {
+        "id": 19000168,
+        "name": "四魂巫女",
+        "wash": "speed"
+      },
+      {
+        "id": 19000219,
+        "name": "妖精女王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000228,
+        "name": "般若",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 19000274,
+        "name": "辉夜君",
+        "wash": "speed"
+      },
+      {
+        "id": 88000011,
+        "name": "犬娘",
+        "wash": "speed"
+      },
+      {
+        "id": 19000282,
+        "name": "黑翼",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "speed"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000016,
+        "name": "最强咒术师",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      }
+    ]
+  },
+  "v8_all6_balanced_67": {
+    "name": "V8六强双模式均衡阵（5防王衰弱·全12局最低53.0%/满级测试08达60.4%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        67,
+        20
+      ],
+      [
+        67,
+        20
+      ],
+      [
+        67,
+        20
+      ],
+      [
+        67,
+        20
+      ],
+      [
+        67,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "speed"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "speed"
+      },
+      {
+        "id": 19000228,
+        "name": "般若",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 19000267,
+        "name": "军服姬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000255,
+        "name": "爷爷",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000168,
+        "name": "四魂巫女",
+        "wash": "speed"
+      },
+      {
+        "id": 19000219,
+        "name": "妖精女王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "speed"
+      },
+      {
+        "id": 88000008,
+        "name": "蕾米莉亚·斯卡雷特",
+        "wash": "speed"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "speed"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "speed"
+      },
+      {
+        "id": 88000007,
+        "name": "芙兰朵露·斯卡雷特",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "speed"
+      }
+    ]
+  },
+  "v7_anti_t15": {
+    "name": "V7破测试15（4王者衰弱+1王者·对62x5实服90.3%/满级72.6%·对66x5实服98.7%）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      63,
+      63,
+      63,
+      63,
+      62
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v6_anti_t15": {
+    "name": "V6破测试15（95.9%实服/89.9%满级·4王者衰弱+1先王衰弱）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      63,
+      63,
+      63,
+      63,
+      65
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 22000003,
+        "name": "哈迪斯",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v5_anti_t15": {
+    "name": "V5主推破测试15兼顾全池（3王者衰弱+2先王衰弱）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      63,
+      63,
+      63,
+      65,
+      65
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 22000003,
+        "name": "哈迪斯",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 19000177,
+        "name": "大魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v5_balanced_fw": {
+    "name": "V5防王高下限版（4防王+1先王衰弱）",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      65,
+      66,
+      66,
+      66,
+      66
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 22000003,
+        "name": "哈迪斯",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 19000177,
+        "name": "大魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "my_best_balanced": {
+    "name": "主推最优均衡阵（3防王+2先王衰弱）",
+    "weapon_id": 9,
+    "weapon": "宿命王者权杖",
+    "runes": [
+      65,
+      65,
+      66,
+      66,
+      66
+    ],
+    "slots": [
+      {
+        "id": 19000286,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 22000003,
+        "name": "哈迪斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 19000177,
+        "name": "大魔王",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      }
+    ]
+  },
+  "my_best_speed": {
+    "name": "备选高速破甲阵（3防御衰弱+2先王）",
+    "weapon_id": 6,
+    "weapon": "宿命光之长剑",
+    "runes": [
+      59,
+      59,
+      59,
+      64,
+      64
+    ],
+    "slots": [
+      {
+        "id": 19000080,
+        "name": "漂浮者",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "speed"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "speed"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "speed"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 88000014,
+        "name": "鬼妹妹",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000008,
+        "name": "蕾米莉亚·斯卡雷特",
+        "wash": "speed"
+      },
+      {
+        "id": 19000274,
+        "name": "辉夜君",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "speed"
+      },
+      {
+        "id": 19000280,
+        "name": "战意隆",
+        "wash": "speed"
+      },
+      {
+        "id": 19000251,
+        "name": "八翼天使",
+        "wash": "speed"
+      },
+      {
+        "id": 88000007,
+        "name": "芙兰朵露·斯卡雷特",
+        "wash": "speed"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      }
+    ]
+  },
+  "codex_original": {
+    "name": "Codex 原推荐阵（禁重名5符文）",
+    "weapon_id": 4,
+    "weapon": "宿命勇气之剑",
+    "runes": [
+      62,
+      63,
+      64,
+      65,
+      72
+    ],
+    "slots": [
+      {
+        "id": 19000286,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000189,
+        "name": "行星议长",
+        "wash": "speed"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 22000009,
+        "name": "黄金射手",
+        "wash": "authority"
+      },
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 19000163,
+        "name": "齐格飞",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 19000177,
+        "name": "大魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      }
+    ]
+  },
+  "friend_73ID6": {
+    "name": "测试02 (73ID6 · 实服2711万)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        64,
+        20
+      ],
+      [
+        64,
+        20
+      ],
+      [
+        64,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        0
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 26812538,
+      "speed": 962,
+      "defense": 515,
+      "dodge": 86,
+      "authority": 1004
+    },
+    "slots": [
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 88000007,
+        "name": "芙兰朵露·斯卡雷特",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000016,
+        "name": "最强咒术师",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 99200003,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 88000008,
+        "name": "蕾米莉亚·斯卡雷特",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      }
+    ]
+  },
+  "friend_GE0Z2": {
+    "name": "测试03 (GE0Z2 · 实服2900万)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        0,
+        -50
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 29001287,
+      "speed": 1372,
+      "defense": 143,
+      "dodge": 90,
+      "authority": 473
+    },
+    "slots": [
+      {
+        "id": 99200002,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 19000168,
+        "name": "四魂巫女",
+        "wash": "authority"
+      },
+      {
+        "id": 19000267,
+        "name": "军服姬",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 19000219,
+        "name": "妖精女王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 19000251,
+        "name": "八翼天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 19000282,
+        "name": "黑翼",
+        "wash": "authority"
+      },
+      {
+        "id": 19000282,
+        "name": "黑翼",
+        "wash": "authority"
+      },
+      {
+        "id": 19000228,
+        "name": "般若",
+        "wash": "authority"
+      },
+      {
+        "id": 19000255,
+        "name": "爷爷",
+        "wash": "authority"
+      },
+      {
+        "id": 19000264,
+        "name": "破星王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000130,
+        "name": "怪娃娃",
+        "wash": "authority"
+      },
+      {
+        "id": 19000275,
+        "name": "小莫",
+        "wash": "authority"
+      },
+      {
+        "id": 19000274,
+        "name": "辉夜君",
+        "wash": "authority"
+      },
+      {
+        "id": 88000011,
+        "name": "犬娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "authority"
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "authority"
+      },
+      {
+        "id": 19000129,
+        "name": "咸蛋",
+        "wash": "authority"
+      },
+      {
+        "id": 19000242,
+        "name": "爆裂魔法师",
+        "wash": "authority"
+      },
+      {
+        "id": 19000239,
+        "name": "年兽",
+        "wash": "authority"
+      },
+      {
+        "id": 19000229,
+        "name": "大·天狗",
+        "wash": "authority"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      }
+    ]
+  },
+  "friend_DAFKJ": {
+    "name": "测试04 (DAFKJ · 实服2476万)",
+    "weapon_id": 9,
+    "weapon": "宿命王者权杖",
+    "runes": [
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 24766041,
+      "speed": 287,
+      "defense": 513,
+      "dodge": 512,
+      "authority": 799
+    },
+    "slots": [
+      {
+        "id": 19000216,
+        "name": "希娜",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000225,
+        "name": "络新妇",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000220,
+        "name": "星灵魔导士",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000028,
+        "name": "冷冷的冰鱼",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000218,
+        "name": "铃彦姬",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000263,
+        "name": "化野同学",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000285,
+        "name": "小清光",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "dodge"
+      },
+      {
+        "id": 99200011,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "dodge"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000249,
+        "name": "黑化贞德",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "dodge"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "dodge"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "dodge"
+      }
+    ]
+  },
+  "friend_15XYY": {
+    "name": "测试05 (15XYY · 实服1908万)",
+    "weapon_id": 11,
+    "weapon": "胜利契约之枪",
+    "runes": [
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "authority"
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 19000269,
+        "name": "泥暗魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "authority"
+      },
+      {
+        "id": 19000256,
+        "name": "X呆毛",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      }
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 19086763,
+      "speed": 557,
+      "defense": 485,
+      "dodge": 65,
+      "authority": 603
+    }
+  },
+  "friend_4WRU5": {
+    "name": "测试07 (4WRU5 · 实服2809万)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000216,
+        "name": "希娜",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "authority"
+      },
+      {
+        "id": 19000218,
+        "name": "铃彦姬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 19000285,
+        "name": "小清光",
+        "wash": "authority"
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 19000272,
+        "name": "防火女",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 19000263,
+        "name": "化野同学",
+        "wash": "authority"
+      },
+      {
+        "id": 19000220,
+        "name": "星灵魔导士",
+        "wash": "authority"
+      },
+      {
+        "id": 88000028,
+        "name": "冷冷的冰鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      }
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 28093013,
+      "speed": 344,
+      "defense": 725,
+      "dodge": 521,
+      "authority": 833
+    }
+  },
+  "friend_70SXF": {
+    "name": "测试08 (70SXF · 实服2127万)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        58,
+        20
+      ],
+      [
+        58,
+        20
+      ],
+      [
+        74,
+        20
+      ],
+      [
+        58,
+        20
+      ],
+      [
+        58,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 21276583,
+      "speed": 414,
+      "defense": 871,
+      "dodge": 196,
+      "authority": 709
+    },
+    "slots": [
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "defense"
+      },
+      {
+        "id": 19000216,
+        "name": "希娜",
+        "wash": "authority"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "defense"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "defense"
+      },
+      {
+        "id": 19000286,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 19000220,
+        "name": "星灵魔导士",
+        "wash": "defense"
+      },
+      {
+        "id": 19000190,
+        "name": "初代萌王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "defense"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "defense"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "defense"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "defense"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "defense"
+      },
+      {
+        "id": 19000115,
+        "name": "冰女",
+        "wash": "authority"
+      },
+      {
+        "id": 19000116,
+        "name": "半人马",
+        "wash": "defense"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "defense"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "defense"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "defense"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "defense"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "defense"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "defense"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      }
+    ]
+  },
+  "friend_3YPN0": {
+    "name": "测试15 (3YPN0 · 实服2596万·5x防王)",
+    "weapon_id": 12,
+    "weapon": 12,
+    "runes": [
+      [
+        62,
+        20
+      ],
+      [
+        62,
+        20
+      ],
+      [
+        62,
+        20
+      ],
+      [
+        62,
+        20
+      ],
+      [
+        62,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "speed": 667,
+      "defense": 640,
+      "dodge": 106,
+      "authority": 1032
+    },
+    "slots": [
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000269,
+        "name": "泥暗魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000030,
+        "name": "小叔叔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 99200003,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 88000016,
+        "name": "最强咒术师",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      }
+    ],
+    "note": "2026-11-25T15:21 live_sync: BP=29007854, runes=[[62,20],[62,20],[62,20],[62,20],[62,20]]"
+  },
+  "friend_NZVHY": {
+    "name": "测试16 (NZVHY · 实服3090万·10小黑+5x防王)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ],
+      [
+        50,
+        -50
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 30895301,
+      "speed": 405,
+      "defense": 1133,
+      "dodge": 150,
+      "authority": 903
+    },
+    "slots": [
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 19000269,
+        "name": "泥暗魔女",
+        "wash": "defense"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "defense"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "defense"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 88000016,
+        "name": "最强咒术师",
+        "wash": "defense"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "defense"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "defense"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "defense"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "defense"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 99200005,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      },
+      {
+        "id": 19000114,
+        "name": "小黑",
+        "wash": "authority"
+      }
+    ]
+  },
+  "friend_P0PLM": {
+    "name": "测试18 (P0PLM · 实服801万·5x先王)",
+    "weapon_id": 4,
+    "weapon": "宿命勇气之剑",
+    "runes": [
+      [
+        64,
+        20
+      ],
+      [
+        64,
+        20
+      ],
+      [
+        64,
+        20
+      ],
+      [
+        64,
+        20
+      ],
+      [
+        64,
+        20
+      ]
+    ],
+    "cultivation": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "stats_override": {
+      "max_bp": 8009943,
+      "speed": 547,
+      "defense": 415,
+      "dodge": 252,
+      "authority": 640
+    },
+    "slots": [
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000250,
+        "name": "八翼天使·改",
+        "wash": "authority"
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000190,
+        "name": "初代萌王",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 19000220,
+        "name": "星灵魔导士",
+        "wash": "authority"
+      },
+      {
+        "id": 19000276,
+        "name": "小玉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000028,
+        "name": "冷冷的冰鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 19000263,
+        "name": "化野同学",
+        "wash": ""
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": ""
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": ""
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": ""
+      },
+      {
+        "id": 19000285,
+        "name": "小清光",
+        "wash": ""
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v10_recovery_02_15_16": {
+    "name": "V10高闪偏恢复破02/15/16阵（2闪王3王衰·实战闪352·三强全超72%）",
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        68,
+        20
+      ],
+      [
+        68,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000028,
+        "name": "冷冷的冰鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v11_gauntlet_12of13": {
+    "name": "V11全池通杀上限阵（1先王4防衰·13套赢12套均胜88.7%）",
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        64,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 19000267,
+        "name": "军服姬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000255,
+        "name": "爷爷",
+        "wash": "defense"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "speed"
+      },
+      {
+        "id": 19000168,
+        "name": "四魂巫女",
+        "wash": "defense"
+      },
+      {
+        "id": 19000219,
+        "name": "妖精女王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000228,
+        "name": "般若",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 19000274,
+        "name": "辉夜君",
+        "wash": "speed"
+      },
+      {
+        "id": 88000011,
+        "name": "犬娘",
+        "wash": "speed"
+      },
+      {
+        "id": 19000282,
+        "name": "黑翼",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "speed"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000016,
+        "name": "最强咒术师",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      }
+    ]
+  },
+  "v13_all4_60plus_king": {
+    "name": "V13潘多拉四强全60+综合王 (670先·3防王2闪王衰·均胜75.8%)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        66,
+        20
+      ],
+      [
+        69,
+        20
+      ],
+      [
+        69,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "defense"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "defense"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "defense"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "defense"
+      },
+      {
+        "id": 22000003,
+        "name": "哈迪斯",
+        "wash": "defense"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "defense"
+      },
+      {
+        "id": 88000015,
+        "name": "山姆S",
+        "wash": "defense"
+      },
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "defense"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "defense"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "defense"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "defense"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "defense"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "defense"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "defense"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "defense"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "defense"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "defense"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "defense"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "defense"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "defense"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "defense"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "defense"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "defense"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "defense"
+      },
+      {
+        "id": 19000269,
+        "name": "泥暗魔女",
+        "wash": "defense"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v9_dual_shared_runes": {
+    "name": "V9双阵零换符文版 (2防衰+1王衰+2闪王衰·配F4全四友78%+)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        69,
+        20
+      ],
+      [
+        69,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000194,
+        "name": "圣杯少女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 88000003,
+        "name": "⑨",
+        "wash": "authority"
+      }
+    ]
+  },
+  "v14_meiling_all4_single": {
+    "name": "v14 红美铃单套四强通解(3x63+2x69)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        69,
+        20
+      ],
+      [
+        69,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000031,
+        "name": "红美铃",
+        "wash": "authority"
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "speed"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "speed"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "defense"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 19000267,
+        "name": "军服姬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000255,
+        "name": "爷爷",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000168,
+        "name": "四魂巫女",
+        "wash": "speed"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "speed"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "speed"
+      },
+      {
+        "id": 19000219,
+        "name": "妖精女王",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "speed"
+      },
+      {
+        "id": 88000008,
+        "name": "蕾米莉亚·斯卡雷特",
+        "wash": "speed"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "speed"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "speed"
+      },
+      {
+        "id": 88000007,
+        "name": "芙兰朵露·斯卡雷特",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "speed"
+      }
+    ],
+    "note": "server30 单套全通 02/03/15/16：02=78.8%, 03=94.6%, 15=68.9%, 16=71.2% (2000场对称, min=68.9%, avg=78.4%), 纯用背包现有符文3x王者衰弱+2x闪王衰弱"
+  },
+  "v15_anti_t15_max": {
+    "name": "v15 专克现版测试15极限解(99.9%)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ],
+      [
+        59,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000013,
+        "name": "打鬼哥哥",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 19000283,
+        "name": "袭魔王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000012,
+        "name": "压力山大",
+        "wash": "speed"
+      },
+      {
+        "id": 19000212,
+        "name": "果皇",
+        "wash": "speed"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "speed"
+      },
+      {
+        "id": 19000267,
+        "name": "军服姬",
+        "wash": "speed"
+      },
+      {
+        "id": 19000255,
+        "name": "爷爷",
+        "wash": "speed"
+      },
+      {
+        "id": 19000193,
+        "name": "幼年金闪闪",
+        "wash": "speed"
+      },
+      {
+        "id": 19000168,
+        "name": "四魂巫女",
+        "wash": "speed"
+      },
+      {
+        "id": 19000219,
+        "name": "妖精女王",
+        "wash": "speed"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "speed"
+      },
+      {
+        "id": 88000031,
+        "name": "红美铃",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "speed"
+      },
+      {
+        "id": 19000274,
+        "name": "辉夜君",
+        "wash": "speed"
+      },
+      {
+        "id": 88000011,
+        "name": "犬娘",
+        "wash": "speed"
+      },
+      {
+        "id": 19000282,
+        "name": "黑翼",
+        "wash": "speed"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000010,
+        "name": "西行寺幽幽子",
+        "wash": "speed"
+      },
+      {
+        "id": 19000284,
+        "name": "嘻哈手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000021,
+        "name": "植树选手",
+        "wash": "speed"
+      },
+      {
+        "id": 88000016,
+        "name": "最强咒术师",
+        "wash": "speed"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "speed"
+      }
+    ],
+    "note": "server30 专克现版测试15(5x62, 667/640/106/1282) 2000场对称胜率 99.85%, 仅用背包现有符文"
+  },
+  "fair_k0_rec10_anti_fw": {
+    "name": "K0等资源 10绿标恢复流破防王最优解 (4王衰+1闪王)",
+    "weapon_id": 12,
+    "weapon": "曙光女神之剑",
+    "runes": [
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        63,
+        20
+      ],
+      [
+        68,
+        20
+      ]
+    ],
+    "slots": [
+      {
+        "id": 22000010,
+        "name": "潘多拉",
+        "wash": "authority"
+      },
+      {
+        "id": 22000007,
+        "name": "雅典娜",
+        "wash": "authority"
+      },
+      {
+        "id": 99000001,
+        "name": "主角",
+        "wash": ""
+      },
+      {
+        "id": 88000020,
+        "name": "小天使",
+        "wash": "authority"
+      },
+      {
+        "id": 19000240,
+        "name": "吉吉",
+        "wash": "authority"
+      },
+      {
+        "id": 88000006,
+        "name": "爱丽丝",
+        "wash": "authority"
+      },
+      {
+        "id": 22000004,
+        "name": "金身泰坦",
+        "wash": "authority"
+      },
+      {
+        "id": 19000190,
+        "name": "初代萌王",
+        "wash": "speed"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 88000018,
+        "name": "影哥哥",
+        "wash": "authority"
+      },
+      {
+        "id": 22000006,
+        "name": "阿波罗",
+        "wash": "authority"
+      },
+      {
+        "id": 88000019,
+        "name": "旅行魔女",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 22000014,
+        "name": "波塞冬",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 88000002,
+        "name": "御坂美琴",
+        "wash": "authority"
+      },
+      {
+        "id": 19000271,
+        "name": "地牢法师",
+        "wash": "authority"
+      },
+      {
+        "id": 88000001,
+        "name": "C8",
+        "wash": "authority"
+      },
+      {
+        "id": 19000277,
+        "name": "大巴娘",
+        "wash": "authority"
+      },
+      {
+        "id": 19000262,
+        "name": "改造玩偶",
+        "wash": "authority"
+      },
+      {
+        "id": 88000017,
+        "name": "宿大爷",
+        "wash": "authority"
+      },
+      {
+        "id": 88000004,
+        "name": "时崎狂三",
+        "wash": "authority"
+      },
+      {
+        "id": 19000261,
+        "name": "六只耳",
+        "wash": "authority"
+      },
+      {
+        "id": 19000260,
+        "name": "斗神",
+        "wash": "authority"
+      },
+      {
+        "id": 22000001,
+        "name": "魔化吕布",
+        "wash": "authority"
+      },
+      {
+        "id": 88000005,
+        "name": "泉此方",
+        "wash": "authority"
+      },
+      {
+        "id": 22000002,
+        "name": "贝尔菲高尔",
+        "wash": "authority"
+      },
+      {
+        "id": 88000029,
+        "name": "真·闲鱼",
+        "wash": "authority"
+      },
+      {
+        "id": 22000005,
+        "name": "阿瑞斯",
+        "wash": "authority"
+      },
+      {
+        "id": 19000285,
+        "name": "小清光",
+        "wash": "authority"
+      }
+    ],
+    "note": "fair_eq(K=0) 10绿标恢复流: 7套防王2000场均胜94.16%(纯防王6套95.4%~99.65%, 均胜98.33%; 对5x王者测试15 69.15%); 等战力/无符文双诊断全过"
+  }
+}

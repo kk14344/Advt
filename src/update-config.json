@@ -1,0 +1,14 @@
+{
+  "provider": "github",
+  "repoUrl": "https://github.com/kk14344/Advt",
+  "releasePageUrl": "https://github.com/kk14344/Advt/releases",
+  "manifestUrls": [
+    "https://raw.githubusercontent.com/kk14344/Advt/main/updates.json",
+    "https://github.com/kk14344/Advt/releases/latest/download/updates.json"
+  ],
+  "downloadMirrors": [
+    "https://ghfast.top/",
+    "https://gh-proxy.com/",
+    "https://mirror.ghproxy.com/"
+  ]
+}

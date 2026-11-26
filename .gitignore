@@ -1,0 +1,26 @@
+# Ignore everything by default in workspace root, then explicitly track helper & pvp-simulator code
+/*
+!/.gitignore
+!/README.md
+!/.github/
+!/updates.json
+!/src/
+!/tools/
+!/lib/
+!/original/
+!/pvp-simulator/
+
+# Privacy & local agent configs excluded from public repo
+/.agents/
+/pvp-simulator/account_profile.json
+/pvp-simulator/live_bag_runes.json
+/pvp-simulator/exports/
+
+# Build outputs, caches, and temp artifacts
+/dist/
+**/__pycache__/
+*.pyc
+*.bak
+*.log
+*.tmp
+src/AandmAuto.inject.js

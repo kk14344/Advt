@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>冒险与挖矿 · 实服真规则 PvP 模拟器</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --card: #171c26;
+    --card2: #1e2432;
+    --border: #2b3346;
+    --text: #e6edf7;
+    --muted: #8b98b0;
+    --accent: #4f8cff;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); font-size: 13px; }
+  header { padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--card); display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select, input, button, textarea { background: var(--card2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 12px; }
+  button { cursor: pointer; font-weight: 500; transition: 0.15s; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.good { background: #14532d; border-color: #22c55e; color: #dcfce7; }
+  main { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 1600px; margin: 0 auto; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .full-row { grid-column: 1 / -1; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .stat-box { background: var(--card2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+  .stat-box .k { color: var(--muted); font-size: 11px; }
+  .stat-box .v { font-size: 14px; font-weight: 700; margin-top: 2px; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 11px; background: #232c40; border: 1px solid var(--border); margin-right: 4px; }
+  .badge.ok { border-color: #166534; background: #052e16; color: var(--good); }
+  .badge.err { border-color: #991b1b; background: #450a0a; color: var(--bad); }
+  .badge.coop { border-color: #1d4ed8; background: #172554; color: #93c5fd; }
+  .slots-wrap { max-height: 360px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 4px 6px; border-bottom: 1px solid #222938; text-align: left; }
+  th { background: var(--card2); position: sticky; top: 0; color: var(--muted); font-weight: 600; font-size: 11px; }
+  .mini-btn { padding: 2px 6px; font-size: 11px; }
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .log-box { max-height: 360px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; background: #0b0e14; padding: 10px; border-radius: 6px; border: 1px solid var(--border); line-height: 1.55; }
+  .hit { color: var(--text); }
+  .dodge { color: var(--warn); }
+  .coop-line { color: #7dd3fc; }
+  .winrate-big { font-size: 28px; font-weight: 800; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>冒险与挖矿 · 实服真规则 PvP 模拟器</h1>
+    <div class="sub">含：同名符文叠加 · 合体技优先个人技 · 严格 &gt; 封印与敌方行动计数 · GM 复合技/追击回血 · 单雅典娜等上限校验</div>
+  </div>
+  <div class="toolbar">
+    <label>成长模式:
+      <select id="modeSel" onchange="refreshAll()">
+        <option value="max">满配天花板 (Lv100 满觉醒 · ~7300万战力)</option>
+        <option value="server30">实服当前档 (Lv30 五觉醒 · ~2700万战力)</option>
+      </select>
+    </label>
+    <label>单边场次:
+      <input id="runsInput" type="number" value="300" min="10" max="5000" style="width:76px" />
+    </label>
+    <button class="primary" onclick="runVs()">对称模拟对决 (2×N场)</button>
+    <button class="good" onclick="runBench()">阵容 A 全预设基准跑分</button>
+    <button onclick="runTrace()">单局逐回合战报</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="panelA"></section>
+  <section class="panel" id="panelB"></section>
+
+  <section class="panel full-row">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('resultTab', this)">模拟结果 / 基准表</button>
+      <button class="tab-btn" onclick="showTab('traceTab', this)">单局逐回合战报</button>
+      <button class="tab-btn" onclick="showTab('skillsTab', this)">技能概率池对比 (A vs B)</button>
+    </div>
+    <div id="resultTab">
+      <div class="sub">点击上方「对称模拟对决」或「阵容 A 全预设基准跑分」查看结果。</div>
+    </div>
+    <div id="traceTab" style="display:none">
+      <div class="row" style="margin-bottom:8px">
+        <label>Seed: <input id="traceSeed" type="number" value="20261125" style="width:100px" /></label>
+        <label>先手方:
+          <select id="traceFirst">
+            <option value="">按实战先攻自动判定</option>
+            <option value="left">强制 A 先手</option>
+            <option value="right">强制 B 先手</option>
+          </select>
+        </label>
+        <button onclick="runTrace()">重新回放</button>
+      </div>
+      <div id="traceOut" class="log-box">尚未运行单局战报。</div>
+    </div>
+    <div id="skillsTab" style="display:none">
+      <div id="skillsOut"></div>
+    </div>
+  </section>
+</main>
+
+<datalist id="mercList"></datalist>
+
+<script>
+let PRESETS = {};
+let CATALOG = {};
+let STATE = { A: null, B: null };
+let INSPECT = { A: null, B: null };
+
+const deepCopy = (x) => JSON.parse(JSON.stringify(x));
+const pct = (v) => (v * 100).toFixed(2) + '%';
+
+async function api(url, body) {
+  const opt = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {};
+  const r = await fetch(url, opt);
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || '请求失败');
+  return j;
+}
+
+function showTab(id, btn) {
+  for (const t of ['resultTab', 'traceTab', 'skillsTab']) document.getElementById(t).style.display = (t === id) ? '' : 'none';
+  for (const b of document.querySelectorAll('.tab-btn')) b.classList.remove('active');
+  if (btn) btn.classList.add('active');
+}
+
+async function init() {
+  const data = await api('/api/init');
+  PRESETS = data.presets;
+  CATALOG = data.catalog;
+  const dl = document.getElementById('mercList');
+  dl.innerHTML = CATALOG.mercenaries.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join('');
+  STATE.A = deepCopy(PRESETS.v5_anti_t15 || PRESETS.my_best_balanced);
+  STATE.B = deepCopy(PRESETS.friend_3YPN0 || PRESETS.friend_GE0Z2);
+  renderTeamEditor('A');
+  renderTeamEditor('B');
+  await Promise.all([inspectSide('A'), inspectSide('B')]);
+}
+
+function renderTeamEditor(side) {
+  const el = document.getElementById('panel' + side);
+  const team = STATE[side];
+  const presetOpts = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+  const weaponOpts = CATALOG.weapons.map(w => `<option value="${w.id}" ${w.id === team.weapon_id ? 'selected' : ''}>${w.name} (${w.id})</option>`).join('');
+  const runeId = (r) => Array.isArray(r) ? r[0] : (typeof r === 'object' ? r.id : r);
+  const runeLv = (r) => Array.isArray(r) ? r[1] : (typeof r === 'object' ? (r.lv ?? 20) : 20);
+  const runeOpts = (sel) => CATALOG.runes.map(r => `<option value="${r.id}" ${r.id === runeId(sel) ? 'selected' : ''}>${r.name} (${r.id})</option>`).join('');
+
+  el.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <strong>阵容 ${side}：<span id="title${side}">${team.name}</span></strong>
+      <div class="row">
+        <select id="presetSel${side}" onchange="loadPreset('${side}', this.value)">
+          <option value="">-- 载入预设 --</option>
+          ${presetOpts}
+        </select>
+        <button class="good" onclick="exportPng('${side}')">导出阵容图</button>
+        <button onclick="copyJson('${side}')">导出JSON</button>
+        <button onclick="importJson('${side}')">导入JSON</button>
+      </div>
+    </div>
+    <div id="meta${side}" class="sub">计算中...</div>
+    <div id="stats${side}" class="stats-grid"></div>
+    <div class="row">
+      <label>宿命武器: <select onchange="STATE['${side}'].weapon_id=Number(this.value); inspectSide('${side}')">${weaponOpts}</select></label>
+    </div>
+    <div class="row">
+      <span>符文:</span>
+      ${team.runes.map((r, idx) => `<span style="display:inline-flex;gap:2px;align-items:center"><select style="width:118px" onchange="setRune('${side}',${idx},Number(this.value),${runeLv(r)})">${runeOpts(r)}</select><input type="number" min="1" max="20" value="${runeLv(r)}" style="width:44px" title="符文等级" onchange="setRune('${side}',${idx},${runeId(r)},Number(this.value))" /></span>`).join('')}
+      <button class="mini-btn" onclick="fillSameRune('${side}')">一键5同(取槽1)</button>
+    </div>
+    <div class="slots-wrap">
+      <table>
+        <thead><tr><th style="width:36px">#</th><th>佣兵 (名称/ID)</th><th style="width:82px">突破洗练</th><th style="width:66px">调序</th></tr></thead>
+        <tbody>
+          ${team.slots.map((sl, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>
+                <input list="mercList" value="${sl.id}" style="width:82px" onchange="updateSlotId('${side}', ${i}, this.value)" />
+                <span class="sub" id="slotName${side}_${i}">${sl.name || ''}</span>
+              </td>
+              <td>
+                ${sl.id == 99000001 ? '<span class="sub">主角无</span>' : `
+                  <select onchange="STATE['${side}'].slots[${i}].wash=this.value; inspectSide('${side}')">
+                    <option value="authority" ${sl.wash==='authority'?'selected':''}>王者</option>
+                    <option value="speed" ${sl.wash==='speed'?'selected':''}>先攻</option>
+                    <option value="defense" ${sl.wash==='defense'?'selected':''}>防御</option>
+                    <option value="dodge" ${sl.wash==='dodge'?'selected':''}>闪避</option>
+                  </select>`}
+              </td>
+              <td>
+                <button class="mini-btn" onclick="moveSlot('${side}', ${i}, -1)">↑</button>
+                <button class="mini-btn" onclick="moveSlot('${side}', ${i}, 1)">↓</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function loadPreset(side, key) {
+  if (!key || !PRESETS[key]) return;
+  STATE[side] = deepCopy(PRESETS[key]);
+  renderTeamEditor(side);
+  inspectSide(side);
+}
+
+function setRune(side, idx, rid, lv) {
+  const clamped = Math.max(1, Math.min(20, lv || 20));
+  STATE[side].runes[idx] = clamped === 20 ? rid : [rid, clamped];
+  inspectSide(side);
+}
+
+function fillSameRune(side) {
+  const first = deepCopy(STATE[side].runes[0]);
+  STATE[side].runes = [first, deepCopy(first), deepCopy(first), deepCopy(first), deepCopy(first)];
+  renderTeamEditor(side);
+  inspectSide(side);
+}
+
+function updateSlotId(side, idx, val) {
+  const num = Number(val);
+  STATE[side].slots[idx].id = Number.isNaN(num) ? val : num;
+  inspectSide(side).then(() => {
+    const info = INSPECT[side];
+    if (info && info.slots[idx]) {
+      STATE[side].slots[idx].id = info.slots[idx].id;
+      STATE[side].slots[idx].name = info.slots[idx].name;
+      const sp = document.getElementById(`slotName${side}_${idx}`);
+      if (sp) sp.textContent = info.slots[idx].name;
+    }
+  });
+}
+
+function moveSlot(side, idx, delta) {
+  const j = idx + delta;
+  const arr = STATE[side].slots;
+  if (j < 0 || j >= arr.length) return;
+  [arr[idx], arr[j]] = [arr[j], arr[idx]];
+  renderTeamEditor(side);
+  inspectSide(side);
+}
+
+async function inspectSide(side) {
+  const mode = document.getElementById('modeSel').value;
+  try {
+    const info = await api('/api/inspect', { team: STATE[side], mode });
+    INSPECT[side] = info;
+    const ar = info.after_rune_stats;
+    const bs = info.base_stats;
+    const db = info.enemy_rune_debuff;
+    document.getElementById('stats' + side).innerHTML = `
+      <div class="stat-box"><div class="k">总战力</div><div class="v">${(info.max_bp/10000).toFixed(1)}万</div></div>
+      <div class="stat-box"><div class="k">先攻 (含符文)</div><div class="v">${ar.speed} <span class="sub">(${bs.speed})</span></div></div>
+      <div class="stat-box"><div class="k">防御 (含符文)</div><div class="v">${ar.defense} <span class="sub">(${bs.defense})</span></div></div>
+      <div class="stat-box"><div class="k">闪避 (含符文)</div><div class="v">${ar.dodge} <span class="sub">(${bs.dodge})</span></div></div>
+      <div class="stat-box"><div class="k">王者 (含符文)</div><div class="v">${ar.authority} <span class="sub">(${bs.authority})</span></div></div>
+    `;
+    const violHtml = info.violations.length
+      ? `<span class="badge err">违规: ${info.violations.join('; ')}</span>`
+      : `<span class="badge ok">规则合规</span>`;
+    const combosHtml = info.combos.length
+      ? info.combos.map(c => `<span class="badge coop">${c}</span>`).join('')
+      : '<span class="sub">无合体技</span>';
+    document.getElementById('meta' + side).innerHTML =
+      `${violHtml} <span>减敌符文: 先${db.speed} 防${db.defense} 闪${db.dodge} 王${db.authority}</span><div style="margin-top:4px">合体技: ${combosHtml}</div>`;
+    renderSkillsTab();
+  } catch (e) {
+    document.getElementById('meta' + side).innerHTML = `<span class="badge err">错误: ${e.message}</span>`;
+  }
+}
+
+function refreshAll() {
+  inspectSide('A');
+  inspectSide('B');
+}
+
+function renderSkillsTab() {
+  const el = document.getElementById('skillsOut');
+  if (!INSPECT.A || !INSPECT.B) return;
+  const col = (info, label) => `
+    <div style="flex:1;min-width:300px">
+      <h4>阵容 ${label}: ${info.name}</h4>
+      <table>
+        <thead><tr><th>#</th><th>类型</th><th>技能</th><th>概率</th><th>累计</th></tr></thead>
+        <tbody>
+          ${info.skills.map(s => `
+            <tr style="${s.turn1_masked ? 'opacity:0.45' : ''}">
+              <td>${s.order}</td>
+              <td>${s.is_coop ? '<span class="badge coop">合体</span>' : '个人'}</td>
+              <td>${s.name}</td>
+              <td>${s.prob}%</td>
+              <td>${s.cum_total}%${s.turn1_masked ? ' (被挤占)' : ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  el.innerHTML = `<div class="row" style="align-items:flex-start">${col(INSPECT.A, 'A')}${col(INSPECT.B, 'B')}</div>`;
+}
+
+async function runVs() {
+  showTab('resultTab', document.querySelectorAll('.tab-btn')[0]);
+  const out = document.getElementById('resultTab');
+  out.innerHTML = '正在模拟对称对决...';
+  const mode = document.getElementById('modeSel').value;
+  const runs_each = Number(document.getElementById('runsInput').value) || 300;
+  const res = await api('/api/vs', { team_a: STATE.A, team_b: STATE.B, runs_each, mode });
+  const clr = res.winrate >= 0.5 ? 'var(--good)' : 'var(--bad)';
+  out.innerHTML = `
+    <div class="row" style="gap:24px">
+      <div><div class="sub">阵容 A 综合胜率 (${res.total}场对称)</div><div class="winrate-big" style="color:${clr}">${pct(res.winrate)}</div></div>
+      <div>
+        <div><b>${STATE.A.name}</b> vs <b>${STATE.B.name}</b></div>
+        <div class="sub">总战绩: ${res.wins} 胜 / ${res.losses} 负 / ${res.draws} 平</div>
+        <div class="sub">A 在左侧: ${res.a_as_left.wins}W/${res.a_as_left.losses}L/${res.a_as_left.draws}D | A 在右侧: ${res.a_as_right.wins}W/${res.a_as_right.losses}L/${res.a_as_right.draws}D</div>
+      </div>
+    </div>`;
+}
+
+async function runBench() {
+  showTab('resultTab', document.querySelectorAll('.tab-btn')[0]);
+  const out = document.getElementById('resultTab');
+  out.innerHTML = '正在跑全部 12 个预设基准测试，请稍候...';
+  const mode = document.getElementById('modeSel').value;
+  const runs_each = Math.min(500, Number(document.getElementById('runsInput').value) || 150);
+  const res = await api('/api/bench', { team: STATE.A, runs_each, mode });
+  out.innerHTML = `
+    <div class="row" style="gap:20px;margin-bottom:10px">
+      <div><span class="sub">阵容 A 总均胜：</span><b style="font-size:18px;color:var(--good)">${pct(res.mean)}</b></div>
+      <div><span class="sub">最低胜率：</span><b style="font-size:18px;color:var(--warn)">${pct(res.min)}</b> <span class="sub">(vs ${res.min_vs})</span></div>
+    </div>
+    <table>
+      <thead><tr><th>对手</th><th>胜率 (${runs_each*2}场)</th><th>胜 / 负 / 平</th></tr></thead>
+      <tbody>
+        ${res.rows.map(r => `<tr><td>${r.name}</td><td style="font-weight:700;color:${r.winrate>=0.5?'var(--good)':'var(--warn)'}">${pct(r.winrate)}</td><td>${r.wins} / ${r.losses} / ${r.draws}</td></tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function runTrace() {
+  showTab('traceTab', document.querySelectorAll('.tab-btn')[1]);
+  const el = document.getElementById('traceOut');
+  el.textContent = '正在回放单局战斗...';
+  const mode = document.getElementById('modeSel').value;
+  const seed = Number(document.getElementById('traceSeed').value) || 20261125;
+  const first = document.getElementById('traceFirst').value || null;
+  const tr = await api('/api/trace', { team_a: STATE.A, team_b: STATE.B, seed, mode, first });
+  const head = `胜者: ${tr.winner} | 总行动: ${tr.rounds} 回合\n` +
+    `A 实战四维: 战力=${tr.a_effective.max_bp.toLocaleString()} 先=${tr.a_effective.speed} 防=${tr.a_effective.defense} 闪=${tr.a_effective.dodge} 王=${tr.a_effective.authority}\n` +
+    `B 实战四维: 战力=${tr.b_effective.max_bp.toLocaleString()} 先=${tr.b_effective.speed} 防=${tr.b_effective.defense} 闪=${tr.b_effective.dodge} 王=${tr.b_effective.authority}\n` +
+    `${'─'.repeat(84)}\n`;
+  const lines = tr.events.map(ev => {
+    const tag = ev.is_coop ? '[合体] ' : '';
+    const dmg = ev.is_dodge ? '被闪避!' : `伤害:${ev.dmg_to_enemy.toLocaleString()}`;
+    const heal = ev.self_heal > 0 ? ` 自回:${ev.self_heal.toLocaleString()}` : '';
+    const seal = ev.sealed ? ` [封印 ${ev.seal_turn}敌回合, >${ev.seal_cond1}%]` : '';
+    const cls = ev.is_dodge ? 'dodge' : (ev.is_coop ? 'coop-line' : 'hit');
+    return `<div class="${cls}">R${String(ev.round).padStart(2,'0')} T${String(ev.turn).padStart(2,'0')} [${ev.actor}] ${tag}${ev.skill_name} -> ${dmg}${heal}${seal} | A:${ev.a_bp.toLocaleString()} / B:${ev.b_bp.toLocaleString()}</div>`;
+  }).join('');
+  el.innerHTML = `<pre style="margin:0">${head}</pre>${lines}`;
+}
+
+async function exportPng(side) {
+  const mode = document.getElementById('modeSel').value;
+  try {
+    const r = await fetch('/api/export_png', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team: STATE[side], mode }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || '导出失败');
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (STATE[side].name || ('team_' + side)).replace(/[\\/:*?"<>|]/g, '_').slice(0, 48);
+    a.href = url;
+    a.download = `${safeName}_${mode}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch (e) {
+    alert('导出阵容图失败: ' + e.message);
+  }
+}
+
+function copyJson(side) {
+  const txt = JSON.stringify(STATE[side], null, 2);
+  navigator.clipboard?.writeText(txt);
+  prompt('已生成当前阵容 JSON（可直接复制保存）：', txt);
+}
+
+function importJson(side) {
+  const txt = prompt('请粘贴阵容 JSON：');
+  if (!txt) return;
+  try {
+    const obj = JSON.parse(txt);
+    STATE[side] = obj.roster ? { name: '导入阵容', weapon_id: obj.roster.weapon_id || obj.roster.weapon || 9, runes: (obj.runes||[]).map(r=>r.id||r), slots: obj.roster.slots } : obj;
+    renderTeamEditor(side);
+    inspectSide(side);
+  } catch (e) {
+    alert('JSON 解析失败: ' + e.message);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

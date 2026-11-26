@@ -1,0 +1,134 @@
+name: Build & Publish Release
+
+on:
+  push:
+    tags:
+      - 'official-v*'
+      - 'testpvp-v*'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Release channel (official / testpvp / all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - official
+          - testpvp
+      version:
+        description: 'Semantic version (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+      notes:
+        description: 'Release notes shown in updater'
+        required: false
+        default: '版本更新'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Determine channel and version
+        id: meta
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "push") {
+            $tag = "${{ github.ref_name }}"
+            if ($tag -match '^(official|testpvp)-v([0-9]+\.[0-9]+\.[0-9]+)$') {
+              $channel = $Matches[1]
+              $version = $Matches[2]
+              $notes = (git tag -l --format='%(contents)' $tag | Out-String).Trim()
+              if (-not $notes) { $notes = "发布 $channel v$version" }
+            } else {
+              throw "Invalid tag format: $tag (expected official-vX.Y.Z or testpvp-vX.Y.Z)"
+            }
+          } else {
+            $channel = "${{ inputs.channel }}"
+            $version = "${{ inputs.version }}"
+            $notes = "${{ inputs.notes }}"
+          }
+          "channel=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "notes=$notes" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Sync version into source files
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          ver = "${{ steps.meta.outputs.version }}"
+          root = Path('.')
+          # BuildEdition.cs
+          p = root / 'src/AandmAuto/BuildEdition.cs'
+          p.write_text(re.sub(r'internal const string AppVersion = "[^"]+";', f'internal const string AppVersion = "{ver}";', p.read_text('utf-8')), 'utf-8')
+          # AssemblyInfo.cs
+          p = root / 'src/Properties/AssemblyInfo.cs'
+          txt = p.read_text('utf-8')
+          txt = re.sub(r'AssemblyFileVersion\("[^"]+"\)', f'AssemblyFileVersion("{ver}.0")', txt)
+          txt = re.sub(r'AssemblyVersion\("[^"]+"\)', f'AssemblyVersion("{ver}.0")', txt)
+          p.write_text(txt, 'utf-8')
+          # automation.lua & bridge.js & build.py
+          for rel in ['src/automation.lua', 'src/bridge.js', 'tools/build.py']:
+              fp = root / rel
+              t = fp.read_text('utf-8')
+              t = re.sub(r'1\.0\.0', ver, t)
+              fp.write_text(t, 'utf-8')
+
+      - name: Build executables & generate updates.json
+        shell: pwsh
+        run: |
+          python tools/release_manifest.py --channel "${{ steps.meta.outputs.channel }}" --version "${{ steps.meta.outputs.version }}" --notes "${{ steps.meta.outputs.notes }}" --asset-ascii
+          Copy-Item -LiteralPath "dist/冒险与挖矿自动助手-优化版.exe" -Destination "dist/AandmAuto-Official.exe" -Force -ErrorAction SilentlyContinue
+          Copy-Item -LiteralPath "dist/冒险与挖矿自动助手-测试服PvP版.exe" -Destination "dist/AandmAuto-TestPvP.exe" -Force -ErrorAction SilentlyContinue
+
+      - name: Run updater self-test
+        shell: pwsh
+        run: |
+          python tools/test_updater.py --channel "${{ steps.meta.outputs.channel }}"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ch = "${{ steps.meta.outputs.channel }}"
+          $ver = "${{ steps.meta.outputs.version }}"
+          $notes = "${{ steps.meta.outputs.notes }}"
+          $channels = if ($ch -eq 'all') { @('official', 'testpvp') } else { @($ch) }
+          foreach ($c in $channels) {
+            $tag = "$c-v$ver"
+            $asset = if ($c -eq 'testpvp') { 'dist/AandmAuto-TestPvP.exe' } else { 'dist/AandmAuto-Official.exe' }
+            $title = if ($c -eq 'testpvp') { "测试服 PvP 专项版 v$ver" } else { "正式服优化版 v$ver" }
+            if (gh release view $tag 2>$null) {
+              gh release upload $tag $asset updates.json --clobber
+            } else {
+              gh release create $tag $asset updates.json --title $title --notes $notes
+            }
+          }
+
+      - name: Commit updated updates.json to main
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git add updates.json
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "chore(release): update updates.json for ${{ steps.meta.outputs.channel }} v${{ steps.meta.outputs.version }} [skip ci]"
+            git push origin main
+          }

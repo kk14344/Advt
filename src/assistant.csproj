@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <AssemblyName>AandmAuto</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net462</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>5</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="fonts\general.ttf" LogicalName="AandmAuto.fonts.general.ttf" />
+    <EmbeddedResource Include="update-config.json" LogicalName="AandmAuto.update-config.json" />
+    <None Remove="AandmAuto.inject.js" />
+    <None Remove="AandmAuto.icon.ico" />
+    <None Remove="AandmAuto.icon.png" />
+    <None Remove="AandmAuto.WebView2.Core.dll" />
+    <None Remove="AandmAuto.WebView2.WinForms.dll" />
+    <None Remove="AandmAuto.WebView2Loader.dll" />
+    <EmbeddedResource Include="AandmAuto.inject.js" LogicalName="AandmAuto.inject.js" />
+    <EmbeddedResource Include="AandmAuto.icon.ico" LogicalName="AandmAuto.icon.ico" />
+    <EmbeddedResource Include="AandmAuto.icon.png" LogicalName="AandmAuto.icon.png" />
+    <EmbeddedResource Include="AandmAuto.WebView2.Core.dll" LogicalName="AandmAuto.WebView2.Core.dll" />
+    <EmbeddedResource Include="AandmAuto.WebView2.WinForms.dll" LogicalName="AandmAuto.WebView2.WinForms.dll" />
+    <EmbeddedResource Include="AandmAuto.WebView2Loader.dll" LogicalName="AandmAuto.WebView2Loader.dll" />
+    <EmbeddedResource Include="art\game-box_bg.png" LogicalName="AandmAuto.art.game-box_bg.png" />
+    <EmbeddedResource Include="art\game-paper_bg1.png" LogicalName="AandmAuto.art.game-paper_bg1.png" />
+    <EmbeddedResource Include="art\game-ground.png" LogicalName="AandmAuto.art.game-ground.png" />
+    <EmbeddedResource Include="art\game-cave-bg.png" LogicalName="AandmAuto.art.game-cave-bg.png" />
+    <EmbeddedResource Include="mine.png" LogicalName="AandmAuto.mine.png" />
+    <EmbeddedResource Include="art\buttonbg_1.png" LogicalName="AandmAuto.art.buttonbg_1.png" />
+    <EmbeddedResource Include="art\buttonbg_2.png" LogicalName="AandmAuto.art.buttonbg_2.png" />
+    <EmbeddedResource Include="art\buttonbg_3.png" LogicalName="AandmAuto.art.buttonbg_3.png" />
+    <EmbeddedResource Include="art\buttonbg_4.png" LogicalName="AandmAuto.art.buttonbg_4.png" />
+    <EmbeddedResource Include="art\buttonbg_5.png" LogicalName="AandmAuto.art.buttonbg_5.png" />
+    <EmbeddedResource Include="art\buttonbg_7.png" LogicalName="AandmAuto.art.buttonbg_7.png" />
+    <EmbeddedResource Include="art\buttonbg_12.png" LogicalName="AandmAuto.art.buttonbg_12.png" />
+    <EmbeddedResource Include="art\game-buttonbg_1.png" LogicalName="AandmAuto.art.game-buttonbg_1.png" />
+    <EmbeddedResource Include="art\game-buttonbg_2.png" LogicalName="AandmAuto.art.game-buttonbg_2.png" />
+    <EmbeddedResource Include="art\game-buttonbg_3.png" LogicalName="AandmAuto.art.game-buttonbg_3.png" />
+    <EmbeddedResource Include="art\game-buttonbg_4.png" LogicalName="AandmAuto.art.game-buttonbg_4.png" />
+    <EmbeddedResource Include="art\game-buttonbg_5.png" LogicalName="AandmAuto.art.game-buttonbg_5.png" />
+    <EmbeddedResource Include="art\game-buttonbg_6.png" LogicalName="AandmAuto.art.game-buttonbg_6.png" />
+    <EmbeddedResource Include="art\game-buttonbg_7.png" LogicalName="AandmAuto.art.game-buttonbg_7.png" />
+    <EmbeddedResource Include="art\game-buttonbg_8.png" LogicalName="AandmAuto.art.game-buttonbg_8.png" />
+    <EmbeddedResource Include="art\game-buttonbg_9.png" LogicalName="AandmAuto.art.game-buttonbg_9.png" />
+    <EmbeddedResource Include="art\game-buttonbg_10.png" LogicalName="AandmAuto.art.game-buttonbg_10.png" />
+    <EmbeddedResource Include="art\game-buttonbg_11.png" LogicalName="AandmAuto.art.game-buttonbg_11.png" />
+    <EmbeddedResource Include="art\game-buttonbg_12.png" LogicalName="AandmAuto.art.game-buttonbg_12.png" />
+    <EmbeddedResource Include="art\game-headerbar.png" LogicalName="AandmAuto.art.game-headerbar.png" />
+    <EmbeddedResource Include="art\game-maintitle_bg.png" LogicalName="AandmAuto.art.game-maintitle_bg.png" />
+    <EmbeddedResource Include="..\original\void-guide.txt" LogicalName="AandmAuto.guide.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Core" />
+    <Reference Include="Microsoft.Web.WebView2.WinForms">
+      <HintPath>..\lib\Microsoft.Web.WebView2.WinForms.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>..\lib\Microsoft.Web.WebView2.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security" />
+  </ItemGroup>
+</Project>

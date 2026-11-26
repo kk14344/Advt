@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-26T10:28:56Z",
+  "updatedAt": "2026-11-26T10:29:27Z",
   "channels": {
     "official": {
       "version": "1.0.0",
@@ -19,10 +19,10 @@
       "tag": "testpvp-v1.0.0",
       "fileName": "冒险与挖矿自动助手-测试服PvP版.exe",
       "assetName": "AandmAuto-TestPvP.exe",
-      "sha256": "27a6c9c4cbd35d1b48cab96631850e9e6cc9717b7c42c7c967ded96eb918ef7a",
-      "size": 6177280,
-      "publishedAt": "2026-11-26T08:25:57Z",
-      "notes": "v1.0.0 初始发布：双端独立更新通道（静默日志检测、设置页按需一键更新、镜像自动回退、SHA-256 强制校验与原地替换重启）。",
+      "sha256": "b2a3ec76842693a84562efb06e623ee64a0fe12d61b6c9e92baba490b7ff6f1c",
+      "size": 6177792,
+      "publishedAt": "2026-11-26T10:29:27Z",
+      "notes": "fix(ci): force UTF-8 stdout on English windows-latest runners for Chinese exe paths",
       "downloadUrl": "https://github.com/kk14344/Advt/releases/download/testpvp-v1.0.0/AandmAuto-TestPvP.exe",
       "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/testpvp-v1.0.0"
     }

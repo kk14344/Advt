@@ -1,0 +1,23 @@
+{
+  "inspectionDate": "2026-11-12",
+  "publicClientSource": "https://118.195.220.62/assets/main-DUIUgpEd.js",
+  "publicClientSHA256": "c5f2413cb85e40a90fc48096348f8d6e76d0814c760ebdcc097874c7c743e907",
+  "recycle": {
+    "nativeGetMaterialHeat": "resource_config[id].temperature / 5 * count",
+    "nativeCapacity": 10000,
+    "nativeSliderCount": "floor((10000 - current_temperature + 1e-9) / per_material_heat)",
+    "processBlocksNewMaterialsAt": 10000,
+    "authoritativeReplyFields": ["temperature", "process"]
+  },
+  "freeChest": {
+    "blockID": 40,
+    "name": "开口的箱子",
+    "eventID": 6000001,
+    "eventType": 4,
+    "cost": "none",
+    "localOriginalTable": "F:/dsh2/maowa-offline-custom/work/game/data_plain/mining_dig_info.csv and event.csv",
+    "evidenceLimit": "Local original table and user confirmation; actual query cost is validated before opening a route chest"
+  },
+  "nearbyMarkers": "Native golem_coordinates; RequestMiningRegion(position, half_width, half_height, force) reads unloaded visible target rows",
+  "liveTransactionsTested": false
+}

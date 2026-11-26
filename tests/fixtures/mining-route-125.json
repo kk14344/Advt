@@ -1,0 +1,14 @@
+{
+  "source": "https://118.195.220.62/assets/main-DUIUgpEd.js",
+  "inspectionDate": "2026-11-12",
+  "sourceSHA256": "c5f2413cb85e40a90fc48096348f8d6e76d0814c760ebdcc097874c7c743e907",
+  "contract": {
+    "purpleRock": "DigOrCollectBlock permits purple rock directly; native dig handler does not deduct pickaxes for it; rejected TNT inventory produces not_enough_resource",
+    "timedGems": "Select with DigOrCollectBlock, wait dig_block_ret and the real current ore, use_tnt, wait use_tnt_ret, collect_mine x/y, wait collect_mine_ret",
+    "path": "Only native selectable timed ores with positive tnt_count and purple rock qualify; unknown or pickaxe-level-inaccessible tiles do not",
+    "battle": "dig_block_ret prepares monster; solve_adventure_event runs native battle; __mw_pending_monster clears in the native completion callback",
+    "chest": "Native dig_block_ret clears the chest tile",
+    "camera": "Native MoveTo derives viewport anchor from position.y-2; y-1 moves current digging location down on screen by one tile; coordinate label restored to actual position"
+  },
+  "verificationLimits": "Public static client contract and simulated regressions; no live account, resource spending, battle timing or profits tested"
+}

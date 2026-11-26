@@ -24,7 +24,7 @@ const fullLua=fs.readFileSync(path.join(root,'dist/automation.generated.lua'),'u
 if(lauxlib.luaL_loadstring(L,to_luastring(fullLua))!==lua.LUA_OK)throw Error(to_jsstring(lua.lua_tolstring(L,-1)));
 lua.lua_pop(L,1);
 const vm=require('vm');
-const context={window:{},setInterval:()=>0,performance:{now:()=>0}};
+const context={window:{},setInterval:()=>0,clearInterval:()=>{},setTimeout:()=>0,clearTimeout:()=>{},performance:{now:()=>0}};
 vm.runInNewContext(fs.readFileSync(path.join(root,'src/AandmAuto.inject.js'),'utf8'),context);
 if(context.window.__MWA_APP.snapshot().ready!==false)throw Error('Unloaded game must remain waiting');
 const app=context.window.__MWA_APP;

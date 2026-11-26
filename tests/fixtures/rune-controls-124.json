@@ -1,0 +1,14 @@
+{
+  "source": "https://118.195.220.62/assets/main-DUIUgpEd.js",
+  "inspectionDate": "2026-11-12",
+  "access": "Public static client; no login session",
+  "mainSHA256": "c5f2413cb85e40a90fc48096348f8d6e76d0814c760ebdcc097874c7c743e907",
+  "runeModuleSHA256": "5977ae0a9cc8e0f7b447c4537946c630c779111845d8e903a4aa79236ef63dc7",
+  "apis": {
+    "query_rune_info_ret": "Legacy bag/platform; marks rune_query_needed",
+    "query_rune_loadouts_ret": "Numeric result 0; loadout_index; 3 pages with 5 slots; locked and equipped_loadouts",
+    "UpgradeRune": "Native material validation and SendRuneNative; ACK may start QueryRuneLoadouts",
+    "QueryRuneLoadouts": "Waits final login ACK and empty login queue; refuses duplicate queries"
+  },
+  "limits": "Static contract and simulated regressions only; no live account tested"
+}

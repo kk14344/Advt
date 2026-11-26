@@ -1,0 +1,14 @@
+{
+  "url": "https://118.195.220.62/assets/main-B4lPkvWP.js",
+  "sha256": "c1d87ada5adbd2e60d5b9cc086a6bc11c1c40ffcf14d9146eff373b1e011569e",
+  "hasHiddenFrameGuard": true,
+  "hasBackgroundLifecycle": true,
+  "hasNativeSetBackground": true,
+  "checkedMethods": [
+    "engine.requestFrame",
+    "engine.frame",
+    "engine.setBackground",
+    "document visibilitychange to applicationDidEnterBackground"
+  ],
+  "helperPolicy": "Keep the client update loop running in its dedicated WebView; supply frames only when native animation callbacks stall; never restart an intentionally stopped engine."
+}

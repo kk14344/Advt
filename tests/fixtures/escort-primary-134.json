@@ -1,0 +1,137 @@
+{
+  "source": {
+    "url": "https://118.195.220.62/assets-bootstrap/metadata.8af26eb95134384d32fe8b274a00abca7b6589113b6569a38e73662a54b2faad.json",
+    "sha256": "8af26eb95134384d32fe8b274a00abca7b6589113b6569a38e73662a54b2faad"
+  },
+  "sourceSHA256": {
+    "logic.escort": "60c93db149798912c166d74f57c197e67af46b60e9be91bd5ab3bba97e9686ee",
+    "ui.escort_start_rob_panel": "2fc3755bd2fe70419b65ea91e6b84a2c17288f382f6887f594ebe9afaf618eb5",
+    "ui.escort_tramcar_panel": "b6e142e0a32b2fff115ec9e8885faa4870f9d13e33044d53c57cf4b5a890c8cc"
+  },
+  "constants": {
+    "SPECITY_TRAMCAR_ID": 4,
+    "FREE_REFRESH_TRAMCAR_TIMES": 3,
+    "MAX_BUY_ESCORT_TIMES": 15,
+    "MAX_BE_ROBBED_TIMES": 6,
+    "ESCORT_REFRESH_TRAMCAR_SPECIFY_COST": 500,
+    "ESCORT_REFRESH_ROB_TARGET_LIST_IMMEDIATELY_COST": 200
+  },
+  "tables": {
+    "tramcar": [
+      {
+        "ID": 1,
+        "name": "1级矿车",
+        "group_id": 2016062945,
+        "time": 1200,
+        "probability": 1500
+      },
+      {
+        "ID": 2,
+        "name": "2级矿车",
+        "group_id": 2016062946,
+        "time": 1500,
+        "probability": 5000
+      },
+      {
+        "ID": 3,
+        "name": "3级矿车",
+        "group_id": 2016062947,
+        "time": 2100,
+        "probability": 3000
+      },
+      {
+        "ID": 4,
+        "name": "4级矿车",
+        "group_id": 2016062948,
+        "time": 2400,
+        "probability": 500
+      }
+    ],
+    "tramcar_buy_escort": [
+      {
+        "ID": 1,
+        "cost": 400
+      },
+      {
+        "ID": 2,
+        "cost": 400
+      },
+      {
+        "ID": 3,
+        "cost": 400
+      },
+      {
+        "ID": 4,
+        "cost": 400
+      },
+      {
+        "ID": 5,
+        "cost": 400
+      }
+    ],
+    "tramcar_buy_rob": [
+      {
+        "ID": 1,
+        "cost": 10
+      },
+      {
+        "ID": 2,
+        "cost": 20
+      },
+      {
+        "ID": 3,
+        "cost": 30
+      },
+      {
+        "ID": 4,
+        "cost": 40
+      },
+      {
+        "ID": 5,
+        "cost": 50
+      },
+      {
+        "ID": 6,
+        "cost": 60
+      },
+      {
+        "ID": 7,
+        "cost": 70
+      },
+      {
+        "ID": 8,
+        "cost": 80
+      },
+      {
+        "ID": 9,
+        "cost": 90
+      },
+      {
+        "ID": 10,
+        "cost": 100
+      },
+      {
+        "ID": 11,
+        "cost": 110
+      },
+      {
+        "ID": 12,
+        "cost": 120
+      },
+      {
+        "ID": 13,
+        "cost": 130
+      },
+      {
+        "ID": 14,
+        "cost": 140
+      },
+      {
+        "ID": 15,
+        "cost": 150
+      }
+    ]
+  },
+  "nativeEscortLua": "local config_manager = require \"logic.config_manager\"\nlocal network = require \"util.network\"\nlocal graphic = require \"logic.graphic\"\n\nlocal client_constants = require \"util.client_constants\"\nlocal constants = require \"util.constants\"\n\nlocal time_logic\nlocal user_logic\nlocal rune_config\n\nlocal escort = {}\n\n-- 初始化\nfunction escort:Init()\n    user_logic = require \"logic.user\"\n    time_logic = require \"logic.time\"\n\n    self.has_query_target = false\n    self.waiting_refresh_tramcar_ret = false\n\n    self.escort_times = {}\n    self.escort_info = {}\n    self.tramcar_list = {}\n    self.rob_target_list = {}\n\n    self:RegisterMsgHandler()\nend\n\n--剩余运送次数\nfunction escort:GetRemainEscortTimes()\n    return self.escort_times.remain_escort\nend\n\n--购买运送次数的次数\nfunction escort:GetBuyEscortTimes()\n    return self.escort_times.buy_escort\nend\n\n--最多还可以购买的运送次数\nfunction escort:GetCouldBuyEscortTimes()\n    local could_buy_times = 0\n    local cur_buy_escort_times = self.escort_times.buy_escort\n\n    for times = cur_buy_escort_times + 1, #config_manager.tramcar_buy_escort_config do\n        if times > constants[\"MAX_BUY_ESCORT_TIMES\"] then\n            break\n        end\n\n        could_buy_times = could_buy_times + 1\n    end\n\n    return could_buy_times\nend\n\n--购买times次运送次数的消耗\nfunction escort:GetBuyEscortCost(times)\n    times = times or 1\n    \n    local cur_buy_escort_times = self.escort_times.buy_escort\n    if cur_buy_escort_times + times > constants[\"MAX_BUY_ESCORT_TIMES\"] then\n        return false\n    end\n\n    local cost = 0\n    for i=1,times do\n        local next_buy_escort_config = config_manager.tramcar_buy_escort_config[cur_buy_escort_times + i]\n        if next_buy_escort_config then\n            cost = cost + next_buy_escort_config.cost\n        else\n            return false\n        end\n    end\n\n    return true, cost\nend\n\n--剩余拦截次数\nfunction escort:GetRemainRobTimes()\n    return self.escort_times.remain_rob\nend\n\n--购买拦截次数的次数\nfunction escort:GetBuyRobTimes()\n    return self.escort_times.buy_rob\nend\n\n--最多还可以购买的拦截次数\nfunction escort:GetCouldBuyRobTimes()\n    local could_buy_times = 0\n    local cur_buy_rob_times = self.escort_times.buy_rob\n\n    for times = cur_buy_rob_times + 1, #config_manager.tramcar_buy_rob_config do\n        if times > constants[\"MAX_BUY_ROB_TIMES\"] then\n            break\n        end\n\n        could_buy_times = could_buy_times + 1\n    end\n\n    return could_buy_times\nend\n\n--购买times次拦截次数的消耗\nfunction escort:GetBuyRobCost(times)\n    times = times or 1\n    \n    local cur_buy_rob_times = self.escort_times.buy_rob\n    if cur_buy_rob_times + times > constants[\"MAX_BUY_ROB_TIMES\"] then\n        return false\n    end\n\n    local cost = 0\n    for i=1,times do\n        local next_buy_rob_config = config_manager.tramcar_buy_rob_config[cur_buy_rob_times + i]\n        if next_buy_rob_config then\n            cost = cost + next_buy_rob_config.cost\n        else\n            return false\n        end\n    end\n\n    return true, cost\nend\n\n--刷新矿车次数\nfunction escort:GetRefreshTramcarTimes()\n    return self.escort_times.refresh_tramcar\nend\n\n--是否需要自动刷新矿车\nfunction escort:IsAutoRefreshTramcar()\n    return self.escort_info.auto_refresh_tramcar == constants[\"ESCORT_AUTO_REFRESH_TRAMCAR\"][\"TRUE\"]\nend\n\n--获取运送数据\nfunction escort:GetEscortInfo()\n    return self.escort_info\nend\n\n--获取矿车配置列表\nfunction escort:GetTramcarList()\n    return self.tramcar_list or {}\nend\n\n--获取可拦截目标列表\nfunction escort:GetRobTargetList()\n    return self.rob_target_list or {}\nend\n\n--获取可拦截目标列表\nfunction escort:GetBeRobbedList()\n    return self.escort_info.be_robbed_list or {}\nend\n\n--获取被拦截次数\nfunction escort:GetBeRobbedTimes()\n    return self.escort_info.be_robbed_list and #self.escort_info.be_robbed_list or 0\nend\n\n--获取被拦截列表\nfunction escort:GetCurBeRobbedList(escort_beg_time, be_robbed_list)\n    local cur_be_robbed_list = {}\n\n    --只返回拦截时间在本次运送开始时间之后的（本次运送内拦截自己的记录）\n    if escort_beg_time and be_robbed_list then\n        for index,be_robbed_info in ipairs(be_robbed_list) do\n            if be_robbed_info.be_robbed_time >= escort_beg_time then\n                table.insert(cur_be_robbed_list, be_robbed_info)\n            end\n        end\n\n        --根据拦截时间排序\n        table.sort(cur_be_robbed_list,  function(a,b)\n                                        return a.be_robbed_time < b.be_robbed_time\n                                    end)\n    end\n\n    return cur_be_robbed_list\nend\n\nfunction escort:GetBeRobbedSuccessNum(be_robbed_list)\n    local be_robbed_success_num = 0\n    if be_robbed_list then\n        for index,be_robbed_info in ipairs(be_robbed_list) do\n            if be_robbed_info.result == constants[\"ROB_RESULT\"][\"SUCCESS\"] then\n                be_robbed_success_num = be_robbed_success_num + 1\n            end\n        end\n    end\n    return be_robbed_success_num\nend\n\n--根据被拦截列表和矿车ID获取矿车spine动画的名称\nfunction escort:GetTramcarSpineName(tramcar_id, be_robbed_list)\n    local be_robbed_success_num = self:GetBeRobbedSuccessNum(be_robbed_list)\n    local spine_name = string.format(\"kuangche_lv%d_3\", tramcar_id)\n    if be_robbed_success_num >= 4 then\n        spine_name = string.format(\"kuangche_lv%d_1\", tramcar_id)\n    elseif be_robbed_success_num >= 2 then\n        spine_name = string.format(\"kuangche_lv%d_2\", tramcar_id)\n    end\n    return spine_name\nend\n\nfunction escort:DailyClear()\n    local escort_times = self.escort_times\n    escort_times.remain_escort = constants[\"DEFAULT_ESCORT_TIMES\"]\n    escort_times.remain_rob = constants[\"DEFAULT_ROB_TIMES\"]\n    escort_times.refresh_tramcar = 0\n    escort_times.buy_specify_tramcar = 0\n    escort_times.buy_escort = 0\n    escort_times.buy_rob = 0\nend\n\n--回包处理\nfunction escort:RegisterMsgHandler()\n    --查询玩家运送信息\n    network:RegisterEvent(\"query_escort_info_ret\", function(recv_msg)\n        self.escort_info = recv_msg.escort_info or {}\n    end)\n\n    --查询玩家运送相关次数信息\n    network:RegisterEvent(\"query_escort_times_ret\", function(recv_msg)\n        self.escort_times = recv_msg.escort_times\n        graphic:DispatchEvent(\"update_escort_times\")\n    end)\n\n    --查询矿车配置\n    network:RegisterEvent(\"query_tramcar_list_ret\", function(recv_msg)\n        self.tramcar_list = recv_msg.tramcar_list\n        for index,tramcar_conf in ipairs(self.tramcar_list) do\n            if config_manager.tramcar_config[index] then\n                tramcar_conf.name = config_manager.tramcar_config[index].name\n            else\n                tramcar_conf.name = \"\"\n            end\n        end\n    end)\n\n    --查询玩家可拦截目标列表\n    network:RegisterEvent(\"query_rob_target_list_ret\", function(recv_msg)\n        self.has_query_target = true\n        \n        self.rob_target_list = recv_msg.rob_target_list\n        graphic:DispatchEvent(\"show_world_sub_scene\", \"escort_sub_scene\")\n    end)\n\n    --刷新可拦截目标\n    network:RegisterEvent(\"escort_refresh_rob_target_list_ret\", function(recv_msg)\n        if recv_msg.result == \"success\" then\n            self.escort_info.refresh_rob_target_time = recv_msg.refresh_rob_target_time\n            self.rob_target_list = recv_msg.rob_target_list\n            \n            graphic:DispatchEvent(\"update_rob_target_list\", true)\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\n    --刷新可拦截目标\n    network:RegisterEvent(\"escort_update_rob_target_list_ret\", function(recv_msg)\n        for _,new_rob_target_info in ipairs(recv_msg.rob_target_list) do\n            for _,rob_target_info in ipairs(self.rob_target_list) do\n                if rob_target_info.pos == new_rob_target_info.pos then\n                    for key,_ in pairs(rob_target_info) do\n                        rob_target_info[key] = new_rob_target_info[key]\n                    end\n                    rob_target_info.is_update = true\n                    break\n                end\n            end\n        end\n        \n        graphic:DispatchEvent(\"update_rob_target_list\", false)\n    end)\n\n    --购买拦截次数\n    network:RegisterEvent(\"escort_buy_rob_times_ret\", function(recv_msg)\n        if recv_msg.result == \"success\" then\n            self.escort_times.remain_rob = recv_msg.remain_rob\n            self.escort_times.buy_rob = recv_msg.buy_rob\n            \n            graphic:DispatchEvent(\"refresh_remain_rob_times\")\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\n    --购买运送次数\n    network:RegisterEvent(\"escort_buy_escort_times_ret\", function(recv_msg)\n        if recv_msg.result == \"success\" then\n            self.escort_times.remain_escort = recv_msg.remain_escort\n            self.escort_times.buy_escort = recv_msg.buy_escort\n            \n            graphic:DispatchEvent(\"refresh_remain_escort_times\")\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\n    --刷新矿车\n    network:RegisterEvent(\"escort_refresh_tramcar_ret\", function(recv_msg)\n        self.waiting_refresh_tramcar_ret = false\n        if recv_msg.result == \"success\" then\n            if recv_msg.refresh_type == \"random\" then\n                self.escort_times.refresh_tramcar = self.escort_times.refresh_tramcar + 1\n            end\n            self.escort_info.auto_refresh_tramcar = constants[\"ESCORT_AUTO_REFRESH_TRAMCAR\"][\"FALSE\"]\n            self.escort_info.tramcar_id = recv_msg.tramcar_id\n\n            graphic:DispatchEvent(\"refresh_select_tramcar\", recv_msg.refresh_type)\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\n    --开始运送\n    network:RegisterEvent(\"escort_start_ret\", function(recv_msg)\n        if recv_msg.result == \"success\" then\n            self.escort_times.remain_escort = self.escort_times.remain_escort - 1\n            self.escort_info = recv_msg.escort_info\n\n            graphic:DispatchEvent(\"refresh_remain_escort_times\")\n            graphic:DispatchEvent(\"start_escort\", recv_msg.refresh_type)\n        elseif recv_msg.result == \"need_refresh_tramcar\" then\n            self:RefreshTramcar(\"auto\")\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\n    --拦截\n    network:RegisterEvent(\"escort_rob_target_ret\", function(recv_msg)\n        if recv_msg.result == \"success\" then\n            local target_user_id = recv_msg.target_user_id\n            for index,rob_target_info in ipairs(self.rob_target_list or {}) do\n                if rob_target_info.user_id == target_user_id then\n                    graphic:DispatchEvent(\"show_world_sub_panel\", \"escort_start_rob_panel\", rob_target_info, recv_msg.target_info, recv_msg.battle_property, recv_msg.battle_record, recv_msg.is_winner)\n                end\n            end\n\n            self.escort_times.remain_rob = self.escort_times.remain_rob - 1\n            graphic:DispatchEvent(\"refresh_remain_rob_times\")\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\n    --被拦截次数的变化\n    network:RegisterEvent(\"escort_update_be_robbed_list_ret\", function(recv_msg)\n        if user_logic.user_id == recv_msg.rob_target_user_id then\n            self.escort_info.be_robbed_list = recv_msg.be_robbed_list\n\n            graphic:DispatchEvent(\"update_be_robbed_list\")\n        else\n            for _,rob_target_info in ipairs(self.rob_target_list) do\n                if rob_target_info.user_id == recv_msg.rob_target_user_id then\n                    rob_target_info.be_robbed_list = recv_msg.be_robbed_list\n                    break\n                end\n            end\n            \n            graphic:DispatchEvent(\"update_rob_target_list\", false)\n        end\n    end)\n\n    --运送完成\n    network:RegisterEvent(\"escort_finish_ret\", function(recv_msg)\n        self.escort_info = recv_msg.escort_info\n        \n        graphic:DispatchEvent(\"finish_escort\")\n    end)\n\n    --领取奖励\n    network:RegisterEvent(\"escort_receive_reward_ret\", function(recv_msg)\n        if recv_msg.result == \"success\" then\n            self.escort_info = recv_msg.escort_info\n            graphic:DispatchEvent(\"show_world_sub_panel\", \"reward_panel\")\n            graphic:DispatchEvent(\"receive_reward_success\")\n        else\n            graphic:DispatchEvent(\"show_prompt_panel\", recv_msg.result)\n        end\n    end)\n\nend\n\n--查询可拦截目标\nfunction escort:QueryRobTargetList()\n    if self.has_query_target then \n        graphic:DispatchEvent(\"show_world_sub_scene\", \"escort_sub_scene\")\n    else\n        network:Send({ query_rob_target_list = {} })\n    end\nend\n\n--开始运送\nfunction escort:StartEscort()\n    if self:IsAutoRefreshTramcar() then\n        self:RefreshTramcar(\"auto\")\n    else\n        network:Send({ escort_start = {} })\n    end\nend\n\n--刷新可拦截目标\nfunction escort:RefreshRobTarget(refresh_type)\n    if refresh_type == \"immediately\" then\n        --检测资源是否充足\n        if not resource_logic:CheckResourceNum(constants[\"RESOURCE_TYPE\"][\"blood_diamond\"], constants[\"ESCORT_REFRESH_ROB_TARGET_LIST_IMMEDIATELY_COST\"], true) then\n            return\n        end\n    end\n    network:Send({ escort_refresh_rob_target_list = {refresh_type = refresh_type} })\nend\n\n--购买拦截次数\nfunction escort:BuyRobTimes(times)\n    local could_buy, cost = self:GetBuyRobCost(times)\n    if not could_buy then\n        graphic:DispatchEvent(\"show_prompt_panel\", \"has_buy_too_much_rob_times\")\n        return\n    end\n    --检测资源是否充足\n    if not resource_logic:CheckResourceNum(constants[\"RESOURCE_TYPE\"][\"blood_diamond\"], cost, true) then\n        return\n    end\n    network:Send({ escort_buy_rob_times = { times = times } })\nend\n\n--购买运送次数\nfunction escort:BuyEscortTimes(times)\n    local could_buy, cost = self:GetBuyEscortCost(times)\n    if not could_buy then\n        graphic:DispatchEvent(\"show_prompt_panel\", \"has_buy_too_much_escort_times\")\n        return\n    end\n    --检测资源是否充足\n    if not resource_logic:CheckResourceNum(constants[\"RESOURCE_TYPE\"][\"blood_diamond\"], cost, true) then\n        return\n    end\n    network:Send({ escort_buy_escort_times = { times = times } })\nend\n\n--刷新矿车\nfunction escort:RefreshTramcar(refresh_type)\n    --检测资源是否充足\n    if refresh_type == \"random\" then\n        if self.escort_times.refresh_tramcar >= constants[\"FREE_REFRESH_TRAMCAR_TIMES\"] then\n            if not resource_logic:CheckResourceNum(constants[\"RESOURCE_TYPE\"][\"blood_diamond\"], constants[\"ESCORT_REFRESH_TRAMCAR_RANDOM_COST\"], true) then\n                return\n            end\n        end\n    elseif refresh_type == \"specify\" then\n        if not resource_logic:CheckResourceNum(constants[\"RESOURCE_TYPE\"][\"blood_diamond\"], constants[\"ESCORT_REFRESH_TRAMCAR_SPECIFY_COST\"], true) then\n            return\n        end\n    end\n\n    if not self.waiting_refresh_tramcar_ret then\n        self.waiting_refresh_tramcar_ret = true\n        network:Send({ escort_refresh_tramcar = {refresh_type = refresh_type} })\n    end\nend\n\n--拦截目标\nfunction escort:RobTarget(target_user_id)\n    network:Send({ escort_rob_target = {target_user_id = target_user_id}})\nend\n\n--领取奖励\nfunction escort:ReceiveEscortReward()\n    network:Send({ escort_receive_reward = {}})\nend\n\nreturn escort\n",
+  "nativeStartRobLua": "local config_manager = require \"logic.config_manager\"\nlocal resource_logic = require \"logic.resource\"\nlocal constants = require \"util.constants\"\nlocal audio_manager = require \"util.audio_manager\"\nlocal animation_manager = require \"util.animation_manager\"\n\nlocal graphic = require \"logic.graphic\"\n\nlocal panel_prototype = require \"ui.panel\"\nlocal panel_util = require \"ui.panel_util\"\nlocal client_constants = require \"util.client_constants\"\nlocal lang_constants = require \"util.language_constants\"\nlocal spine_manager = require \"util.spine_manager\"\nlocal escort_logic = require \"logic.escort\"\n\n\nlocal escort_start_rob_panel = panel_prototype.New(true)\nfunction escort_start_rob_panel:Init(root_node)\n\tself.root_node = cc.Node:create()\n\n    animation_manager:LoadAnimation(\"start_rob\")\n    self.animation_node = animation_manager:GetAnimationNode(\"start_rob\")\n    self.animation_node:setPosition(320, 568)\n\n    self.spine_node = self.animation_node:getChildByName(\"Panel_1\"):getChildByName(\"Node_spine_car\")\n\n    --矿车动画\n    self.tramcar_spine_node = spine_manager:GetNode(\"kuangche\", 1.0, true)\n    self.tramcar_spine_node:setTimeScale(1.0)\n    self.tramcar_spine_node:setScale(2.0)\n\n    self.spine_node:addChild(self.tramcar_spine_node)\n\n    self.root_node:addChild(self.animation_node)\nend\n\nfunction escort_start_rob_panel:Show(rob_target_info, target_info, battle_property, battle_record, is_winner)\n\tself.rob_target_info = rob_target_info\n\n    local spine_name = escort_logic:GetTramcarSpineName(self.rob_target_info.tramcar_id, escort_logic:GetCurBeRobbedList(self.rob_target_info.escort_beg_time, self.rob_target_info.be_robbed_list))\n    self.tramcar_spine_node:setToSetupPose()\n    self.tramcar_spine_node:setAnimation(0, spine_name, true)\n\n    local time_line_action = animation_manager:GetTimeLine(\"start_rob_timeline\")\n    self.animation_node:stopAllActions()\n    self.animation_node:runAction(time_line_action)\n\n    time_line_action:clearFrameEventCallFunc()\n    time_line_action:setFrameEventCallFunc(function(frame)\n        local event_name = frame:getEvent()\n        if event_name == \"end\" then\n            graphic:DispatchEvent(\"hide_world_sub_panel\", self:GetName())\n\n            local battle_type = client_constants.BATTLE_TYPE[\"vs_escort_target\"]\n            graphic:DispatchEvent(\"show_battle_room\", battle_type, target_info, battle_property, battle_record, is_winner, function()\n                --战斗播放完毕 自动弹出奖励`\n                if is_winner then\n                    graphic:DispatchEvent(\"show_world_sub_panel\", \"reward_panel\")\n                end\n            end)\n\n    \tend\n    end)\n    time_line_action:gotoFrameAndPlay(0, 188, false)\n\n    self.root_node:setVisible(true)\nend\n\nreturn escort_start_rob_panel\n\n"
+}

@@ -23,10 +23,14 @@ on:
       notes:
         description: 'Release notes shown in updater'
         required: false
-        default: '版本更新'
+        default: 'v1.0.0 初始发布：双端独立更新通道（静默日志检测、设置页按需一键更新、镜像自动回退、SHA-256 强制校验与原地替换重启）。'
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
 
 jobs:
   build-and-release:
@@ -61,9 +65,9 @@ jobs:
             $version = "${{ inputs.version }}"
             $notes = "${{ inputs.notes }}"
           }
-          "channel=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "notes=$notes" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "channel=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Set-Content -LiteralPath "$env:RUNNER_TEMP\release_notes.txt" -Value $notes -Encoding utf8
 
       - name: Sync version into source files
         shell: python
@@ -72,16 +76,13 @@ jobs:
           import re
           ver = "${{ steps.meta.outputs.version }}"
           root = Path('.')
-          # BuildEdition.cs
           p = root / 'src/AandmAuto/BuildEdition.cs'
           p.write_text(re.sub(r'internal const string AppVersion = "[^"]+";', f'internal const string AppVersion = "{ver}";', p.read_text('utf-8')), 'utf-8')
-          # AssemblyInfo.cs
           p = root / 'src/Properties/AssemblyInfo.cs'
           txt = p.read_text('utf-8')
           txt = re.sub(r'AssemblyFileVersion\("[^"]+"\)', f'AssemblyFileVersion("{ver}.0")', txt)
           txt = re.sub(r'AssemblyVersion\("[^"]+"\)', f'AssemblyVersion("{ver}.0")', txt)
           p.write_text(txt, 'utf-8')
-          # automation.lua & bridge.js & build.py
           for rel in ['src/automation.lua', 'src/bridge.js', 'tools/build.py']:
               fp = root / rel
               t = fp.read_text('utf-8')
@@ -91,9 +92,14 @@ jobs:
       - name: Build executables & generate updates.json
         shell: pwsh
         run: |
-          python tools/release_manifest.py --channel "${{ steps.meta.outputs.channel }}" --version "${{ steps.meta.outputs.version }}" --notes "${{ steps.meta.outputs.notes }}" --asset-ascii
-          Copy-Item -LiteralPath "dist/冒险与挖矿自动助手-优化版.exe" -Destination "dist/AandmAuto-Official.exe" -Force -ErrorAction SilentlyContinue
-          Copy-Item -LiteralPath "dist/冒险与挖矿自动助手-测试服PvP版.exe" -Destination "dist/AandmAuto-TestPvP.exe" -Force -ErrorAction SilentlyContinue
+          $notes = (Get-Content -LiteralPath "$env:RUNNER_TEMP\release_notes.txt" -Raw -Encoding utf8).Trim()
+          python tools/release_manifest.py --channel "${{ steps.meta.outputs.channel }}" --version "${{ steps.meta.outputs.version }}" --notes $notes --asset-ascii
+          if (Test-Path -LiteralPath "dist/冒险与挖矿自动助手-优化版.exe") {
+            Copy-Item -LiteralPath "dist/冒险与挖矿自动助手-优化版.exe" -Destination "dist/AandmAuto-Official.exe" -Force
+          }
+          if (Test-Path -LiteralPath "dist/冒险与挖矿自动助手-测试服PvP版.exe") {
+            Copy-Item -LiteralPath "dist/冒险与挖矿自动助手-测试服PvP版.exe" -Destination "dist/AandmAuto-TestPvP.exe" -Force
+          }
 
       - name: Run updater self-test
         shell: pwsh
@@ -107,28 +113,53 @@ jobs:
         run: |
           $ch = "${{ steps.meta.outputs.channel }}"
           $ver = "${{ steps.meta.outputs.version }}"
-          $notes = "${{ steps.meta.outputs.notes }}"
+          $notesFile = "$env:RUNNER_TEMP\release_notes.txt"
           $channels = if ($ch -eq 'all') { @('official', 'testpvp') } else { @($ch) }
           foreach ($c in $channels) {
             $tag = "$c-v$ver"
             $asset = if ($c -eq 'testpvp') { 'dist/AandmAuto-TestPvP.exe' } else { 'dist/AandmAuto-Official.exe' }
             $title = if ($c -eq 'testpvp') { "测试服 PvP 专项版 v$ver" } else { "正式服优化版 v$ver" }
-            if (gh release view $tag 2>$null) {
+            $prevPref = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            gh release view $tag *> $null
+            $exists = ($LASTEXITCODE -eq 0)
+            $ErrorActionPreference = $prevPref
+            if ($exists) {
               gh release upload $tag $asset updates.json --clobber
             } else {
-              gh release create $tag $asset updates.json --title $title --notes $notes
+              gh release create $tag $asset updates.json --title $title --notes-file $notesFile
             }
           }
 
       - name: Commit updated updates.json to main
         shell: pwsh
         run: |
+          Copy-Item -LiteralPath "updates.json" -Destination "$env:RUNNER_TEMP\updates.json" -Force
+          git reset --hard
+          git clean -fd
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-          git checkout main
+          git checkout -B main origin/main
+          python -c "
+          import json
+          from pathlib import Path
+          dst = Path('updates.json')
+          new_data = json.loads(Path(r'$env:RUNNER_TEMP\updates.json').read_text('utf-8'))
+          cur = json.loads(dst.read_text('utf-8')) if dst.exists() else {'schemaVersion': 1, 'channels': {}}
+          ch = '${{ steps.meta.outputs.channel }}'
+          chs = ['official', 'testpvp'] if ch == 'all' else [ch]
+          cur['schemaVersion'] = 1
+          cur['updatedAt'] = new_data.get('updatedAt', '')
+          cur.setdefault('channels', {})
+          for c in chs:
+              if c in new_data.get('channels', {}):
+                  cur['channels'][c] = new_data['channels'][c]
+          dst.write_text(json.dumps(cur, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          "
           git add updates.json
-          if (-not (git diff --cached --quiet)) {
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
             git commit -m "chore(release): update updates.json for ${{ steps.meta.outputs.channel }} v${{ steps.meta.outputs.version }} [skip ci]"
             git push origin main
           }

@@ -54,8 +54,8 @@ def main():
         'updatedAt': '2026-11-26T00:00:00Z',
         'channels': {
             'official': {
-                'version': '1.0.2',
-                'tag': 'official-v1.0.2',
+                'version': '99.0.2',
+                'tag': 'official-v99.0.2',
                 'fileName': '冒险与挖矿自动助手-优化版.exe',
                 'sha256': PAYLOAD_SHA,
                 'size': len(PAYLOAD),
@@ -65,8 +65,8 @@ def main():
                 'releaseUrl': f'{base}/releases/official',
             },
             'testpvp': {
-                'version': '1.0.5',
-                'tag': 'testpvp-v1.0.5',
+                'version': '99.0.5',
+                'tag': 'testpvp-v99.0.5',
                 'fileName': '冒险与挖矿自动助手-测试服PvP版.exe',
                 'sha256': PAYLOAD_SHA,
                 'size': len(PAYLOAD),
@@ -93,7 +93,7 @@ def main():
                 subprocess.run([str(exe), '--updater-smoke', tmp], env=env, check=True)
                 report_path = Path(tmp) / f'updater-smoke-{ch}.json'
                 report = json.loads(report_path.read_text(encoding='utf-8-sig'))
-                expected_ver = '1.0.5' if ch == 'testpvp' else '1.0.2'
+                expected_ver = '99.0.5' if ch == 'testpvp' else '99.0.2'
                 assert report['channel'] == ch, report
                 assert report['semverOk'] is True, report
                 assert report['mirrorOrderOk'] is True, report

@@ -1,0 +1,28 @@
+{
+  "metadata": "https://118.195.220.62/assets-bootstrap/metadata.8af26eb95134384d32fe8b274a00abca7b6589113b6569a38e73662a54b2faad.json",
+  "metadataSHA256": "8af26eb95134384d32fe8b274a00abca7b6589113b6569a38e73662a54b2faad",
+  "resourceIds": [
+    25,
+    26,
+    27
+  ],
+  "resourceFields": [
+    "junior_tool",
+    "intermediate_tool",
+    "senior_tool"
+  ],
+  "nativeBatchButtonCount": 5,
+  "command": "use_mining_tool",
+  "payloadFields": [
+    "resource_id",
+    "num"
+  ],
+  "inventoryQuery": "query_resource_list",
+  "sourceModules": {
+    "ui.ore_bag_panel": "0053f50062210b203b6be050e9222368032397e6909b8bcedde96b309cb49b17",
+    "logic.mining": "ff05d6ee98445b708e76211a17bd52fc9901745e5cde8b66644b29462053ef1a",
+    "logic.resource": "45f6aacd9fe62ad6040f159a276d316332b460598aa30e0f77fcf0ce15655b20",
+    "util.constants": "2f1f278569572df2989f61a845313b1c38743259380f39f8c4cbcd73f093d2f3"
+  },
+  "limitation": "Client contract checked; no live account resource consumption exercised."
+}

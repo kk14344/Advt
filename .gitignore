@@ -2,10 +2,12 @@
 /*
 !/.gitignore
 !/README.md
+!/ROADMAP.md
 !/.github/
 !/updates.json
 !/src/
 !/tools/
+!/tests/
 !/lib/
 !/original/
 !/pvp-simulator/

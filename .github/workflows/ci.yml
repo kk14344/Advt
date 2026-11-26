@@ -1,0 +1,44 @@
+name: Dual-Edition CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build official & testpvp editions
+        shell: pwsh
+        run: python tools/build.py --all
+
+      - name: Verify embedded assets and version markers
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File tools/verify_embedded.ps1 -Edition all
+
+      - name: Run updater end-to-end smoke test
+        shell: pwsh
+        run: python tools/test_updater.py --channel all
+
+      - name: Run Lua task & background regression suites
+        shell: pwsh
+        run: |
+          node tools/test_tasks.cjs
+          node tools/test_background_133.cjs

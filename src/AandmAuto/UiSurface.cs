@@ -26,6 +26,26 @@ namespace AandmAuto
         }
         internal const TextFormatFlags TextFlags=TextFormatFlags.PreserveGraphicsClipping | TextFormatFlags.PreserveGraphicsTranslateTransform;
 
+        private sealed class PaintLayerCache
+        {
+            internal Bitmap Image;
+            internal int W;
+            internal int H;
+            internal float DpiX;
+            internal float DpiY;
+
+            internal void Release()
+            {
+                if (Image != null) Image.Dispose();
+                Image = null;
+                W = 0;
+                H = 0;
+            }
+        }
+
+        private static readonly ConditionalWeakTable<Control, PaintLayerCache> paintLayers =
+            new ConditionalWeakTable<Control, PaintLayerCache>();
+
         internal static void PaintWhole(Control control,PaintEventArgs e,Action<Graphics> paint)
         {
             if(control.Width<1 || control.Height<1)return;
@@ -60,13 +80,32 @@ namespace AandmAuto
                 finally { e.Graphics.Restore(state); }
                 return;
             }
-            // Render corners, shadows and text against one complete backdrop.
-            // Copying a finished opaque image makes partial invalidations equal
-            // to a full repaint, including when the parent DC is translated.
-            using(var layer=new Bitmap(control.Width,control.Height)) {
-                using(var g=Graphics.FromImage(layer))paint(g);
-                e.Graphics.DrawImageUnscaled(layer,Point.Empty);
+            // Reuse a per-control Format32bppPArgb offscreen buffer (zero per-frame heap allocation,
+            // zero 32bppArgb -> 32bppPArgb software conversion, and 100% partial/tiled repaint equivalence).
+            PaintLayerCache cache = paintLayers.GetValue(control, c =>
+            {
+                var value = new PaintLayerCache();
+                c.Disposed += delegate { value.Release(); };
+                return value;
+            });
+            float dpiX = e.Graphics.DpiX;
+            float dpiY = e.Graphics.DpiY;
+            if (cache.Image == null || cache.W != control.Width || cache.H != control.Height
+                || Math.Abs(cache.DpiX - dpiX) > 0.1f || Math.Abs(cache.DpiY - dpiY) > 0.1f)
+            {
+                cache.Release();
+                cache.Image = new Bitmap(control.Width, control.Height, PixelFormat.Format32bppPArgb);
+                cache.Image.SetResolution(dpiX, dpiY);
+                cache.W = control.Width;
+                cache.H = control.Height;
+                cache.DpiX = dpiX;
+                cache.DpiY = dpiY;
             }
+            using (var g = Graphics.FromImage(cache.Image))
+            {
+                paint(g);
+            }
+            e.Graphics.DrawImageUnscaled(cache.Image, Point.Empty);
         }
 
         private sealed class FrameBackdrop
@@ -140,7 +179,21 @@ namespace AandmAuto
 
             Rectangle clip = Rectangle.Intersect(owner.ClientRectangle, Rectangle.Ceiling(graphics.VisibleClipBounds));
             if (clip.Width > 0 && clip.Height > 0)
-                graphics.DrawImage(cache.Image, clip, clip, GraphicsUnit.Pixel);
+            {
+                CompositingMode prevComp = graphics.CompositingMode;
+                graphics.CompositingMode = CompositingMode.SourceCopy;
+                try
+                {
+                    if (clip == owner.ClientRectangle)
+                        graphics.DrawImageUnscaled(cache.Image, Point.Empty);
+                    else
+                        graphics.DrawImage(cache.Image, clip, clip, GraphicsUnit.Pixel);
+                }
+                finally
+                {
+                    graphics.CompositingMode = prevComp;
+                }
+            }
         }
 
         internal static void PaintBackdrop(Control control,Graphics graphics)

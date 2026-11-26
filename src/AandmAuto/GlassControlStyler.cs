@@ -508,9 +508,10 @@ namespace AandmAuto
 	}
 
 	/// <summary>
-	/// Silky Apple sheet fade + subtle vertical float entrance (~190ms) and fade-out (~115ms)
-	/// for Settings & Dialog forms. Automatically bypassed when ExtremePerformanceMode,
-	/// !MotionEnabled, or PreviewStaticMode is active.
+	/// Hardware-composited pure DWM fade-in (~140ms) and fade-out (~100ms) for Settings & Dialog forms.
+	/// Avoids moving form.Top (zero WM_MOVE child invalidations) and pre-paints once while invisible
+	/// so all fade frames update only DWM layered alpha at 60-120fps. Automatically bypassed when
+	/// ExtremePerformanceMode, !MotionEnabled, or PreviewStaticMode is active.
 	/// </summary>
 	internal static class GlassFormTransition
 	{
@@ -521,8 +522,6 @@ namespace AandmAuto
 
 			bool closingAnimated = false;
 			bool fadingOut = false;
-			int targetTop = 0;
-			int startTop = 0;
 			float t = 0f;
 			Func<float, bool> animStep = null;
 
@@ -539,25 +538,23 @@ namespace AandmAuto
 					if (!form.IsDisposed) form.Opacity = 1.0;
 					return;
 				}
-				targetTop = form.Top;
-				startTop = targetTop + 14;
-				form.Top = startTop;
+				// Paint all controls & warm glass caches ONCE while opacity is 0 so fade frames are pure GPU DWM alpha.
+				try { form.Update(); } catch { }
+				if (form.IsDisposed) return;
+				form.Opacity = 0.02;
 				t = 0f;
 				animStep = delegate(float dt)
 				{
 					if (form.IsDisposed || fadingOut) return false;
-					t += dt / 0.19f;
+					t += dt / 0.14f;
 					if (t >= 1f)
 					{
 						form.Opacity = 1.0;
-						form.Top = targetTop;
 						return false;
 					}
-					// Cubic ease-out
 					float inv = 1f - t;
 					float ease = 1f - inv * inv * inv;
-					form.Opacity = ease;
-					form.Top = startTop + (int)Math.Round((targetTop - startTop) * ease);
+					form.Opacity = Math.Max(0.02, Math.Min(0.995, ease));
 					return true;
 				};
 				GlassAnimator.Add(animStep);
@@ -579,7 +576,7 @@ namespace AandmAuto
 				outStep = delegate(float dt)
 				{
 					if (form.IsDisposed) return false;
-					outT += dt / 0.115f;
+					outT += dt / 0.10f;
 					if (outT >= 1f)
 					{
 						closingAnimated = true;
@@ -588,7 +585,8 @@ namespace AandmAuto
 						if (savedResult == DialogResult.None) form.Close();
 						return false;
 					}
-					form.Opacity = Math.Max(0.0, startOp * (1f - outT));
+					float inv = 1f - outT;
+					form.Opacity = Math.Max(0.0, startOp * inv * inv);
 					return true;
 				};
 				GlassAnimator.Add(outStep);

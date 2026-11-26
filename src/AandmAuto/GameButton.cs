@@ -574,21 +574,21 @@ namespace AandmAuto
 
 			if (Math.Abs(hoverT - targetH) > 0.005f)
 			{
-				float rate = Math.Min(1f, dt * 5.2f);
+				float rate = Math.Min(1f, dt * (hovered ? 15.0f : 12.5f));
 				hoverT += (targetH - hoverT) * rate;
-				if (Math.Abs(hoverT - targetH) <= 0.01f) hoverT = targetH;
+				if (Math.Abs(hoverT - targetH) <= 0.015f) hoverT = targetH;
 				dirty = true;
 			}
 			if (Math.Abs(pressT - targetP) > 0.005f)
 			{
-				float rate = Math.Min(1f, dt * 11.5f);
+				float rate = Math.Min(1f, dt * 22.0f);
 				pressT += (targetP - pressT) * rate;
-				if (Math.Abs(pressT - targetP) <= 0.01f) pressT = targetP;
+				if (Math.Abs(pressT - targetP) <= 0.015f) pressT = targetP;
 				dirty = true;
 			}
 			if (sheenActive)
 			{
-				sheenT += dt * 2.15f;
+				sheenT += dt * 3.1f;
 				if (sheenT >= 1f)
 				{
 					sheenT = 0f;
@@ -631,7 +631,7 @@ namespace AandmAuto
 		{
 			hovered = true;
 			StartGlassAnim();
-			Invalidate();
+			if (!GlassAnimator.Enabled) Invalidate();
 			base.OnMouseEnter(e);
 		}
 
@@ -639,7 +639,7 @@ namespace AandmAuto
 		{
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && hovered && GlassAnimator.Enabled)
 			{
-				if (Math.Abs(pointerLocal.X - e.X) >= 3 || Math.Abs(pointerLocal.Y - e.Y) >= 3)
+				if (Math.Abs(pointerLocal.X - e.X) >= 6 || Math.Abs(pointerLocal.Y - e.Y) >= 6)
 				{
 					pointerLocal = e.Location;
 					Invalidate();
@@ -654,7 +654,7 @@ namespace AandmAuto
 			pressed = false;
 			pointerLocal = new Point(-999, -999);
 			StartGlassAnim();
-			Invalidate();
+			if (!GlassAnimator.Enabled) Invalidate();
 			base.OnMouseLeave(e);
 		}
 
@@ -670,7 +670,7 @@ namespace AandmAuto
 					sheenT = 0.02f;
 				}
 				StartGlassAnim();
-				Invalidate();
+				if (!GlassAnimator.Enabled) Invalidate();
 			}
 			base.OnMouseDown(e);
 		}
@@ -679,7 +679,7 @@ namespace AandmAuto
 		{
 			pressed = false;
 			StartGlassAnim();
-			Invalidate();
+			if (!GlassAnimator.Enabled) Invalidate();
 			base.OnMouseUp(e);
 		}
 		protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }

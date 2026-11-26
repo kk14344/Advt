@@ -248,19 +248,19 @@ namespace AandmAuto
 			float tp = pressed ? 1f : 0f;
 			if (Math.Abs(hoverT - th) > 0.005f)
 			{
-				hoverT += (th - hoverT) * Math.Min(1f, dt * 5.8f);
-				if (Math.Abs(hoverT - th) <= 0.01f) hoverT = th;
+				hoverT += (th - hoverT) * Math.Min(1f, dt * (hovered ? 15.0f : 12.5f));
+				if (Math.Abs(hoverT - th) <= 0.015f) hoverT = th;
 				dirty = true;
 			}
 			if (Math.Abs(pressT - tp) > 0.005f)
 			{
-				pressT += (tp - pressT) * Math.Min(1f, dt * 12f);
-				if (Math.Abs(pressT - tp) <= 0.01f) pressT = tp;
+				pressT += (tp - pressT) * Math.Min(1f, dt * 22.0f);
+				if (Math.Abs(pressT - tp) <= 0.015f) pressT = tp;
 				dirty = true;
 			}
 			if (sheenActive)
 			{
-				sheenT += dt * 2.4f;
+				sheenT += dt * 3.1f;
 				if (sheenT >= 1f) { sheenT = 0f; sheenActive = false; }
 				dirty = true;
 			}
@@ -278,7 +278,7 @@ namespace AandmAuto
 		{
 			hovered = true;
 			StartGlassAnim();
-			Invalidate();
+			if (!GlassAnimator.Enabled) Invalidate();
 			base.OnMouseEnter(e);
 		}
 
@@ -287,7 +287,7 @@ namespace AandmAuto
 			hovered = false;
 			pressed = false;
 			StartGlassAnim();
-			Invalidate();
+			if (!GlassAnimator.Enabled) Invalidate();
 			base.OnMouseLeave(e);
 		}
 
@@ -303,7 +303,7 @@ namespace AandmAuto
 				}
 				Focus();
 				StartGlassAnim();
-				Invalidate();
+				if (!GlassAnimator.Enabled) Invalidate();
 			}
 			base.OnMouseDown(e);
 		}
@@ -312,7 +312,7 @@ namespace AandmAuto
 		{
 			pressed = false;
 			StartGlassAnim();
-			Invalidate();
+			if (!GlassAnimator.Enabled) Invalidate();
 			base.OnMouseUp(e);
 		}
 

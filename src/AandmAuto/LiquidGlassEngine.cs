@@ -1,19 +1,28 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace AandmAuto
 {
 	/// <summary>
-	/// 60fps on-demand animation driver for Liquid Glass micro-interactions.
-	/// Stops its single shared timer the moment all active animations settle (strict 0% idle CPU).
+	/// High-precision 60-120fps on-demand animation driver for Liquid Glass micro-interactions.
+	/// Uses Stopwatch sub-millisecond timing and on-demand 1ms multimedia timer resolution
+	/// ONLY while animations are active, releasing immediately when settled (strict 0% idle CPU).
 	/// </summary>
 	internal static class GlassAnimator
 	{
+		[DllImport("winmm.dll")]
+		private static extern uint timeBeginPeriod(uint uPeriod);
+
+		[DllImport("winmm.dll")]
+		private static extern uint timeEndPeriod(uint uPeriod);
+
 		private sealed class Entry
 		{
 			internal Func<float, bool> Step;
@@ -21,7 +30,13 @@ namespace AandmAuto
 
 		private static readonly List<Entry> entries = new List<Entry>();
 		private static Timer timer;
-		private static long lastTicks;
+		private static long lastTimestamp;
+		private static bool highResTimerActive;
+
+		static GlassAnimator()
+		{
+			AppDomain.CurrentDomain.ProcessExit += delegate { EndHighResTimer(); };
+		}
 
 		internal static bool Enabled
 		{
@@ -32,6 +47,34 @@ namespace AandmAuto
 					&& LiquidGlassEngine.MotionEnabled
 					&& !LiquidGlassEngine.PreviewStaticMode;
 			}
+		}
+
+		internal static bool IsAnimating
+		{
+			get { return entries.Count > 0; }
+		}
+
+		private static void BeginHighResTimer()
+		{
+			if (!highResTimerActive)
+			{
+				try { timeBeginPeriod(1); highResTimerActive = true; } catch { }
+			}
+		}
+
+		private static void EndHighResTimer()
+		{
+			if (highResTimerActive)
+			{
+				highResTimerActive = false;
+				try { timeEndPeriod(1); } catch { }
+			}
+		}
+
+		private static void StopTimer()
+		{
+			if (timer != null && timer.Enabled) timer.Stop();
+			EndHighResTimer();
 		}
 
 		internal static void Add(Func<float, bool> step)
@@ -57,29 +100,30 @@ namespace AandmAuto
 			{
 				if (entries[i].Step == step) entries.RemoveAt(i);
 			}
-			if (entries.Count == 0 && timer != null && timer.Enabled) timer.Stop();
+			if (entries.Count == 0) StopTimer();
 		}
 
 		private static void EnsureRunning()
 		{
 			if (timer == null)
 			{
-				timer = new Timer { Interval = 16 };
+				timer = new Timer { Interval = 8 };
 				timer.Tick += OnTick;
 			}
 			if (!timer.Enabled)
 			{
-				lastTicks = Environment.TickCount;
+				BeginHighResTimer();
+				lastTimestamp = Stopwatch.GetTimestamp();
 				timer.Start();
 			}
 		}
 
 		private static void OnTick(object sender, EventArgs e)
 		{
-			long now = Environment.TickCount;
-			float dt = (now - lastTicks) / 1000f;
-			lastTicks = now;
-			if (dt <= 0.001f || dt > 0.05f) dt = 1f / 60f;
+			long now = Stopwatch.GetTimestamp();
+			float dt = (float)((now - lastTimestamp) / (double)Stopwatch.Frequency);
+			lastTimestamp = now;
+			if (dt <= 0.001f || dt > 0.045f) dt = 1f / 60f;
 
 			if (!Enabled)
 			{
@@ -88,7 +132,7 @@ namespace AandmAuto
 					try { entries[i].Step(1f); } catch { }
 				}
 				entries.Clear();
-				if (timer != null) timer.Stop();
+				StopTimer();
 				return;
 			}
 
@@ -100,9 +144,9 @@ namespace AandmAuto
 				if (!keep && i < entries.Count) entries.RemoveAt(i);
 			}
 
-			if (entries.Count == 0 && timer != null && timer.Enabled)
+			if (entries.Count == 0)
 			{
-				timer.Stop();
+				StopTimer();
 			}
 		}
 	}
@@ -128,9 +172,37 @@ namespace AandmAuto
 		private static Image cachedLumaSource;
 		private static float cachedGlobalLuma = 0.25f;
 
+		[StructLayout(LayoutKind.Sequential)]
+		private struct BlendFunction
+		{
+			public byte BlendOp;
+			public byte BlendFlags;
+			public byte SourceConstantAlpha;
+			public byte AlphaFormat;
+		}
+
+		[DllImport("msimg32.dll", SetLastError = true)]
+		private static extern bool AlphaBlend(
+			IntPtr hdcDest, int xoriginDest, int yoriginDest, int wDest, int hDest,
+			IntPtr hdcSrc, int xoriginSrc, int yoriginSrc, int wSrc, int hSrc,
+			BlendFunction ftn);
+
+		[DllImport("gdi32.dll", SetLastError = true)]
+		private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+		[DllImport("gdi32.dll", SetLastError = true)]
+		private static extern bool DeleteDC(IntPtr hdc);
+
+		[DllImport("gdi32.dll", SetLastError = true)]
+		private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hObject);
+
+		[DllImport("gdi32.dll", SetLastError = true)]
+		private static extern bool DeleteObject(IntPtr hObject);
+
 		private sealed class PillCache
 		{
 			internal Bitmap Image;
+			internal IntPtr HBitmap;
 			internal int W, H, Radius;
 			internal int Ox, Oy, CanvasW, CanvasH;
 			internal long Seq;
@@ -145,12 +217,183 @@ namespace AandmAuto
 
 			internal void Release()
 			{
+				if (HBitmap != IntPtr.Zero) { try { DeleteObject(HBitmap); } catch { } HBitmap = IntPtr.Zero; }
+				if (Image != null) { Image.Dispose(); Image = null; }
+			}
+		}
+
+		private sealed class ShellCache
+		{
+			internal Bitmap Image;
+			internal IntPtr HBitmap;
+			internal int W, H, Radius;
+			internal int Preset;
+			internal int TintArgb;
+			internal int TintAlpha;
+			internal bool Selected;
+			internal bool Enabled;
+			internal bool IsLight;
+
+			internal void Release()
+			{
+				if (HBitmap != IntPtr.Zero) { try { DeleteObject(HBitmap); } catch { } HBitmap = IntPtr.Zero; }
 				if (Image != null) { Image.Dispose(); Image = null; }
 			}
 		}
 
 		private static readonly ConditionalWeakTable<Control, PillCache> pillCaches =
 			new ConditionalWeakTable<Control, PillCache>();
+
+		private static readonly ConditionalWeakTable<Control, ShellCache> shellCaches =
+			new ConditionalWeakTable<Control, ShellCache>();
+
+		private static Bitmap[] glowSprites;
+
+		private static unsafe Bitmap GetHoverGlowSprite(float effectiveHover)
+		{
+			if (glowSprites == null)
+			{
+				var bank = new Bitmap[8];
+				const int sz = 64;
+				const float half = (sz - 1) * 0.5f;
+				for (int level = 0; level < 8; level++)
+				{
+					float maxAlpha = (level + 1) * (44f / 8f);
+					var bmp = new Bitmap(sz, sz, PixelFormat.Format32bppPArgb);
+					BitmapData bd = bmp.LockBits(new Rectangle(0, 0, sz, sz), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+					try
+					{
+						byte* scan = (byte*)bd.Scan0;
+						int stride = bd.Stride;
+						for (int y = 0; y < sz; y++)
+						{
+							byte* row = scan + y * stride;
+							float dy = (y - half) / half;
+							for (int x = 0; x < sz; x++)
+							{
+								float dx = (x - half) / half;
+								float r2 = dx * dx + dy * dy;
+								if (r2 >= 1f)
+								{
+									row[x * 4 + 0] = 0;
+									row[x * 4 + 1] = 0;
+									row[x * 4 + 2] = 0;
+									row[x * 4 + 3] = 0;
+								}
+								else
+								{
+									float f = 1f - r2;
+									float a = f * f * maxAlpha;
+									byte ab = (byte)(a + 0.5f);
+									row[x * 4 + 0] = ab;
+									row[x * 4 + 1] = ab;
+									row[x * 4 + 2] = ab;
+									row[x * 4 + 3] = ab;
+								}
+							}
+						}
+					}
+					finally { bmp.UnlockBits(bd); }
+					bank[level] = bmp;
+				}
+				glowSprites = bank;
+			}
+			int idx = (int)Math.Round(Math.Max(0f, Math.Min(1f, effectiveHover)) * 7f);
+			return glowSprites[idx];
+		}
+
+		private static void DrawPremultipliedAlpha(Graphics g, Bitmap bmp, ref IntPtr hBitmap, Rectangle rect, float alpha, bool allowCacheHBitmap)
+		{
+			if (bmp == null) return;
+			if (alpha >= 0.992f)
+			{
+				g.DrawImageUnscaled(bmp, rect.X, rect.Y);
+				return;
+			}
+			byte alphaByte = (byte)Math.Max(1, Math.Min(254, (int)Math.Round(alpha * 255f)));
+			bool blitted = false;
+			try
+			{
+				if (g.IsClipEmpty && rect.Width == bmp.Width && rect.Height == bmp.Height)
+				{
+					float tx = 0f, ty = 0f;
+					bool pureTranslate = false;
+					using (Matrix m = g.Transform)
+					{
+						float[] el = m.Elements;
+						if (Math.Abs(el[0] - 1f) < 0.001f && Math.Abs(el[1]) < 0.001f
+							&& Math.Abs(el[2]) < 0.001f && Math.Abs(el[3] - 1f) < 0.001f)
+						{
+							tx = el[4];
+							ty = el[5];
+							pureTranslate = true;
+						}
+					}
+					if (pureTranslate)
+					{
+						IntPtr hb = hBitmap;
+						bool tempHb = false;
+						if (hb == IntPtr.Zero)
+						{
+							hb = bmp.GetHbitmap(Color.FromArgb(0));
+							if (allowCacheHBitmap) hBitmap = hb;
+							else tempHb = true;
+						}
+						if (hb != IntPtr.Zero)
+						{
+							IntPtr dstHdc = g.GetHdc();
+							IntPtr memDc = IntPtr.Zero;
+							IntPtr prevObj = IntPtr.Zero;
+							try
+							{
+								memDc = CreateCompatibleDC(dstHdc);
+								if (memDc != IntPtr.Zero)
+								{
+									prevObj = SelectObject(memDc, hb);
+									var bf = new BlendFunction
+									{
+										BlendOp = 0, // AC_SRC_OVER
+										BlendFlags = 0,
+										SourceConstantAlpha = alphaByte,
+										AlphaFormat = 1 // AC_SRC_ALPHA
+									};
+									blitted = AlphaBlend(
+										dstHdc,
+										rect.X + (int)Math.Round(tx),
+										rect.Y + (int)Math.Round(ty),
+										bmp.Width,
+										bmp.Height,
+										memDc, 0, 0, bmp.Width, bmp.Height, bf);
+								}
+							}
+							finally
+							{
+								if (memDc != IntPtr.Zero)
+								{
+									if (prevObj != IntPtr.Zero) SelectObject(memDc, prevObj);
+									DeleteDC(memDc);
+								}
+								g.ReleaseHdc(dstHdc);
+								if (tempHb) DeleteObject(hb);
+							}
+						}
+					}
+				}
+			}
+			catch
+			{
+				blitted = false;
+			}
+			if (!blitted)
+			{
+				using (var ia = new ImageAttributes())
+				{
+					var cm = new ColorMatrix { Matrix33 = alpha };
+					ia.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+					g.DrawImage(bmp, rect, 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, ia);
+				}
+			}
+		}
 
 		internal static bool IsBrightBackdrop()
 		{
@@ -375,7 +618,8 @@ namespace AandmAuto
 			float pressT,
 			float sheenT,
 			Point pointerLocal,
-			bool quietAtRest = false)
+			bool quietAtRest = false,
+			bool fastMotion = false)
 		{
 			if (rect.Width < 4 || rect.Height < 4) return;
 			int radius = Math.Max(3, Math.Min(cornerRadius, Math.Min(rect.Width, rect.Height) / 2));
@@ -414,48 +658,6 @@ namespace AandmAuto
 				Bitmap source = ctrl != null ? ResolvePillBackdropSample(ctrl) : null;
 				long seq = UiTheme.WallpaperFrameSequence;
 
-				Bitmap rendered = null;
-				bool disposeRendered = false;
-				if (ctrl != null)
-				{
-					PillCache cache = pillCaches.GetValue(ctrl, c =>
-					{
-						var pc = new PillCache();
-						c.Disposed += delegate { pc.Release(); };
-						return pc;
-					});
-					bool match = cache.Image != null
-						&& cache.W == rect.Width && cache.H == rect.Height && cache.Radius == radius
-						&& cache.Ox == ox && cache.Oy == oy && cache.CanvasW == canvasW && cache.CanvasH == canvasH
-						&& cache.Seq == seq && cache.Preset == Preset && cache.Blur == UiTheme.GlassBlur
-						&& cache.TintArgb == tintColor.ToArgb() && cache.TintAlpha == tintAlpha
-						&& cache.Selected == selected && cache.Enabled == enabled && cache.IsLight == bright
-						&& cache.HasSource == (source != null);
-					if (!match)
-					{
-						cache.Release();
-						cache.Image = BakeRefractedPillBitmap(
-							rect.Width, rect.Height, radius,
-							source, canvasW, canvasH, ox, oy,
-							tintColor, tintAlpha, selected, enabled, bright);
-						cache.W = rect.Width; cache.H = rect.Height; cache.Radius = radius;
-						cache.Ox = ox; cache.Oy = oy; cache.CanvasW = canvasW; cache.CanvasH = canvasH;
-						cache.Seq = seq; cache.Preset = Preset; cache.Blur = UiTheme.GlassBlur;
-						cache.TintArgb = tintColor.ToArgb(); cache.TintAlpha = tintAlpha;
-						cache.Selected = selected; cache.Enabled = enabled; cache.IsLight = bright;
-						cache.HasSource = (source != null);
-					}
-					rendered = cache.Image;
-				}
-				else
-				{
-					rendered = BakeRefractedPillBitmap(
-						rect.Width, rect.Height, radius,
-						source, canvasW, canvasH, ox, oy,
-						tintColor, tintAlpha, selected, enabled, bright);
-					disposeRendered = true;
-				}
-
 				// Grounded tight contact shadow scaled by awaken (zero muddy float)
 				int shA = (int)((bright ? 20f : 44f) * awaken);
 				if (shA > 2)
@@ -467,26 +669,111 @@ namespace AandmAuto
 					}
 				}
 
-				if (rendered != null)
+				// Dual-stage optical pipeline:
+				// - During active sliding/dragging OR live Wallpaper Engine frames: <0.25ms shifted backdrop slice + cached optical glass shell!
+				// - When settled on static backdrop: full 4-tap chromatic convex-lens rim refraction cached per control!
+				bool useFastMotion = fastMotion || UiTheme.EngineFrame != null;
+				if (useFastMotion)
 				{
-					if (awaken >= 0.99f)
+					if (source != null && awaken >= 0.85f)
 					{
-						g.DrawImageUnscaled(rendered, rect.X, rect.Y);
+						using (GraphicsPath clipPath = UiTheme.RoundedRect(rect, radius))
+						{
+							GraphicsState stClip = g.Save();
+							try
+							{
+								g.SetClip(clipPath, CombineMode.Intersect);
+								UiTheme.DrawGlassSamplePublic(g, source, rect, canvasW, canvasH, ox, oy);
+							}
+							finally { g.Restore(stClip); }
+						}
+					}
+
+					Bitmap shell = null;
+					bool disposeShell = false;
+					if (ctrl != null)
+					{
+						ShellCache sc = shellCaches.GetValue(ctrl, c =>
+						{
+							var v = new ShellCache();
+							c.Disposed += delegate { v.Release(); };
+							return v;
+						});
+						bool match = sc.Image != null
+							&& sc.W == rect.Width && sc.H == rect.Height && sc.Radius == radius
+							&& sc.Preset == Preset && sc.TintArgb == tintColor.ToArgb() && sc.TintAlpha == tintAlpha
+							&& sc.Selected == selected && sc.Enabled == enabled && sc.IsLight == bright;
+						if (!match)
+						{
+							sc.Release();
+							sc.Image = BakeGlassShellBitmap(
+								rect.Width, rect.Height, radius,
+								tintColor, tintAlpha, selected, enabled, bright);
+							sc.W = rect.Width; sc.H = rect.Height; sc.Radius = radius;
+							sc.Preset = Preset; sc.TintArgb = tintColor.ToArgb(); sc.TintAlpha = tintAlpha;
+							sc.Selected = selected; sc.Enabled = enabled; sc.IsLight = bright;
+						}
+						DrawPremultipliedAlpha(g, sc.Image, ref sc.HBitmap, rect, awaken, true);
 					}
 					else
 					{
-						using (var ia = new ImageAttributes())
+						shell = BakeGlassShellBitmap(
+							rect.Width, rect.Height, radius,
+							tintColor, tintAlpha, selected, enabled, bright);
+						disposeShell = true;
+						IntPtr tmpHb = IntPtr.Zero;
+						DrawPremultipliedAlpha(g, shell, ref tmpHb, rect, awaken, false);
+						if (disposeShell && shell != null) shell.Dispose();
+					}
+				}
+				else
+				{
+					if (ctrl != null)
+					{
+						PillCache cache = pillCaches.GetValue(ctrl, c =>
 						{
-							var cm = new ColorMatrix { Matrix33 = awaken };
-							ia.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-							g.DrawImage(rendered, rect, 0, 0, rendered.Width, rendered.Height, GraphicsUnit.Pixel, ia);
+							var pc = new PillCache();
+							c.Disposed += delegate { pc.Release(); };
+							return pc;
+						});
+						bool match = cache.Image != null
+							&& cache.W == rect.Width && cache.H == rect.Height && cache.Radius == radius
+							&& cache.Ox == ox && cache.Oy == oy && cache.CanvasW == canvasW && cache.CanvasH == canvasH
+							&& cache.Seq == seq && cache.Preset == Preset && cache.Blur == UiTheme.GlassBlur
+							&& cache.TintArgb == tintColor.ToArgb() && cache.TintAlpha == tintAlpha
+							&& cache.Selected == selected && cache.Enabled == enabled && cache.IsLight == bright
+							&& cache.HasSource == (source != null);
+						if (!match)
+						{
+							cache.Release();
+							cache.Image = BakeRefractedPillBitmap(
+								rect.Width, rect.Height, radius,
+								source, canvasW, canvasH, ox, oy,
+								tintColor, tintAlpha, selected, enabled, bright);
+							cache.W = rect.Width; cache.H = rect.Height; cache.Radius = radius;
+							cache.Ox = ox; cache.Oy = oy; cache.CanvasW = canvasW; cache.CanvasH = canvasH;
+							cache.Seq = seq; cache.Preset = Preset; cache.Blur = UiTheme.GlassBlur;
+							cache.TintArgb = tintColor.ToArgb(); cache.TintAlpha = tintAlpha;
+							cache.Selected = selected; cache.Enabled = enabled; cache.IsLight = bright;
+							cache.HasSource = (source != null);
+						}
+						DrawPremultipliedAlpha(g, cache.Image, ref cache.HBitmap, rect, awaken, true);
+					}
+					else
+					{
+						using (Bitmap rendered = BakeRefractedPillBitmap(
+							rect.Width, rect.Height, radius,
+							source, canvasW, canvasH, ox, oy,
+							tintColor, tintAlpha, selected, enabled, bright))
+						{
+							IntPtr tmpHb = IntPtr.Zero;
+							DrawPremultipliedAlpha(g, rendered, ref tmpHb, rect, awaken, false);
 						}
 					}
-					if (disposeRendered) rendered.Dispose();
 				}
 			}
 
-			// Fast dynamic interactive overlays (subtle cursor specular spot, press depth, soft liquid sheen)
+			// Fast dynamic interactive overlays (pre-baked radial glow sprite, press depth, soft liquid sheen)
 			if (effectiveHover > 0.01f || effectivePress > 0.01f || sheenGlow > 0.01f)
 			{
 				using (GraphicsPath path = UiTheme.RoundedRect(rect, radius))
@@ -501,7 +788,7 @@ namespace AandmAuto
 							using (var hb = new SolidBrush(Color.FromArgb(ha, Color.White)))
 								g.FillRectangle(hb, rect);
 
-							// Cursor-tracked delicate optical reflection
+							// Cursor-tracked delicate optical reflection via pre-baked 64x64 PArgb sprite (zero PathGradientBrush!)
 							if (pointerLocal.X >= 0 && pointerLocal.Y >= 0 && pointerLocal.X <= rect.Width + 20)
 							{
 								int spotR = Math.Max(32, Math.Min(86, rect.Width / 2));
@@ -509,16 +796,9 @@ namespace AandmAuto
 									rect.X + pointerLocal.X - spotR,
 									rect.Y + pointerLocal.Y - spotR,
 									spotR * 2, spotR * 2);
-								using (var gp = new GraphicsPath())
-								{
-									gp.AddEllipse(spotRect);
-									using (var pgb = new PathGradientBrush(gp))
-									{
-										pgb.CenterColor = Color.FromArgb((int)(effectiveHover * 42f), Color.White);
-										pgb.SurroundColors = new[] { Color.FromArgb(0, Color.White) };
-										g.FillPath(pgb, gp);
-									}
-								}
+								Bitmap sprite = GetHoverGlowSprite(effectiveHover);
+								g.InterpolationMode = InterpolationMode.Low;
+								g.DrawImage(sprite, spotRect);
 							}
 						}
 						if (effectivePress > 0.01f && enabled)
@@ -546,6 +826,166 @@ namespace AandmAuto
 					finally { g.Restore(st); }
 				}
 			}
+		}
+
+		/// <summary>
+		/// Position-independent Direction C optical lens shell (dark cut-edge absorption + directional
+		/// Fresnel highlight + corner caustics + restrained tint) cached once per pill size/style so
+		/// sliding segmented controls and live wallpapers render at 60-120fps (<0.25ms/frame).
+		/// </summary>
+		private static unsafe Bitmap BakeGlassShellBitmap(
+			int pw, int ph, int radius,
+			Color tintColor, int tintAlpha,
+			bool selected, bool enabled, bool bright)
+		{
+			var result = new Bitmap(pw, ph, PixelFormat.Format32bppPArgb);
+			bool isBigHero = ph >= 42;
+			float rad = Math.Max(3f, Math.Min(radius, Math.Min(pw, ph) * 0.5f));
+			float rimThick = isBigHero ? Math.Min(rad * 0.85f, 10.5f) : Math.Min(rad * 0.85f, 8.8f);
+			float halfBoxW = Math.Max(0f, pw * 0.5f - rad);
+			float halfBoxH = Math.Max(0f, ph * 0.5f - rad);
+			float cx = pw * 0.5f;
+			float cy = ph * 0.5f;
+
+			float tintA = 0f;
+			if (!enabled)
+			{
+				tintA = bright ? 0.12f : 0.08f;
+			}
+			else if (tintAlpha > 0 && tintColor != Color.White)
+			{
+				tintA = Math.Max(0.16f, Math.Min(0.48f, tintAlpha / 255f));
+			}
+			else if (selected)
+			{
+				tintA = bright ? 0.36f : 0.13f;
+			}
+			else if (Preset == PresetDeep)
+			{
+				tintA = 0.24f;
+			}
+			float tR = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 10f : tintColor.R;
+			float tG = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 16f : tintColor.G;
+			float tB = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 28f : tintColor.B;
+			float specGain = !enabled ? 0.50f : (isBigHero ? 1.12f : 1.0f);
+
+			BitmapData dstData = result.LockBits(new Rectangle(0, 0, pw, ph), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+			try
+			{
+				byte* dstBase = (byte*)dstData.Scan0;
+				int dstStride = dstData.Stride;
+
+				for (int y = 0; y < ph; y++)
+				{
+					byte* row = dstBase + y * dstStride;
+					float py = y + 0.5f - cy;
+					float yNorm = (y + 0.5f) / ph;
+					float groundDark = yNorm * (bright ? 0.03f : 0.08f);
+
+					for (int x = 0; x < pw; x++)
+					{
+						float px = x + 0.5f - cx;
+						float absPx = px < 0f ? -px : px;
+						float absPy = py < 0f ? -py : py;
+						float qx = absPx > halfBoxW ? absPx - halfBoxW : 0f;
+						float qy = absPy > halfBoxH ? absPy - halfBoxH : 0f;
+						float distCore = (float)Math.Sqrt(qx * qx + qy * qy);
+						float distToEdge = rad - distCore;
+
+						if (distToEdge < -0.85f)
+						{
+							row[x * 4 + 0] = 0;
+							row[x * 4 + 1] = 0;
+							row[x * 4 + 2] = 0;
+							row[x * 4 + 3] = 0;
+							continue;
+						}
+
+						float edgeAlpha = distToEdge >= 0.85f ? 1f : (distToEdge + 0.85f) / 1.70f;
+						if (edgeAlpha < 0f) edgeAlpha = 0f;
+						else if (edgeAlpha > 1f) edgeAlpha = 1f;
+
+						float absA = 0f, rimSpec = 0f, caustic = 0f;
+						if (distToEdge < rimThick)
+						{
+							float d = distToEdge > 0f ? distToEdge : 0f;
+							float nx = distCore > 0.001f ? ((px < 0f ? -qx : qx) / distCore) : 0f;
+							float ny = distCore > 0.001f ? ((py < 0f ? -qy : qy) / distCore) : 0f;
+
+							if (d < 0.95f) absA = (1f - d / 0.95f) * (bright ? 0.16f : 0.30f);
+
+							float dirTL = -(nx * 0.65f + ny * 0.76f);
+							if (dirTL < 0f) dirTL = 0f;
+							float dirBR = (nx * 0.65f + ny * 0.76f);
+							if (dirBR < 0f) dirBR = 0f;
+
+							float u = (d - 1.05f) / 0.52f;
+							float glint = (float)Math.Exp(-(u * u));
+							float dirGain = (float)Math.Pow(dirTL, 2.15) + (float)Math.Pow(dirBR, 3.0) * 0.42f;
+							rimSpec = glint * dirGain * (bright ? 155f : 138f) * specGain;
+
+							float cu = (d - 3.6f) / 1.8f;
+							caustic = (float)Math.Exp(-(cu * cu)) * (dirTL * dirTL * 14f + dirBR * dirBR * 18f) * specGain;
+						}
+
+						// Premultiplied Porter-Duff composite: base tint/grounding -> dark cut-edge -> Fresnel glint + caustic
+						float pr, pg, pb, pa;
+						if (tintA > 0f)
+						{
+							pa = tintA;
+							pr = tR * tintA;
+							pg = tG * tintA;
+							pb = tB * tintA;
+						}
+						else
+						{
+							pa = groundDark;
+							pr = 0f; pg = 0f; pb = 0f;
+						}
+
+						if (absA > 0f)
+						{
+							float invAbs = 1f - absA;
+							pr *= invAbs;
+							pg *= invAbs;
+							pb *= invAbs;
+							pa = absA + pa * invAbs;
+						}
+
+						float specA = (rimSpec + caustic) / 255f;
+						if (specA > 1f) specA = 1f;
+						if (specA > 0f)
+						{
+							float invS = 1f - specA;
+							float s255 = 255f * specA;
+							pr = s255 + pr * invS;
+							pg = s255 + pg * invS;
+							pb = s255 + pb * invS;
+							pa = specA + pa * invS;
+						}
+
+						pr *= edgeAlpha;
+						pg *= edgeAlpha;
+						pb *= edgeAlpha;
+						pa *= edgeAlpha;
+
+						if (pr > 255f) pr = 255f; else if (pr < 0f) pr = 0f;
+						if (pg > 255f) pg = 255f; else if (pg < 0f) pg = 0f;
+						if (pb > 255f) pb = 255f; else if (pb < 0f) pb = 0f;
+						if (pa > 1f) pa = 1f; else if (pa < 0f) pa = 0f;
+
+						row[x * 4 + 0] = (byte)(pb + 0.5f);
+						row[x * 4 + 1] = (byte)(pg + 0.5f);
+						row[x * 4 + 2] = (byte)(pr + 0.5f);
+						row[x * 4 + 3] = (byte)(pa * 255f + 0.5f);
+					}
+				}
+			}
+			finally
+			{
+				result.UnlockBits(dstData);
+			}
+			return result;
 		}
 
 		/// <summary>

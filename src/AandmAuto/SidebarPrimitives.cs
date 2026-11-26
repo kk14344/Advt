@@ -1006,7 +1006,9 @@ namespace AandmAuto
 		private int hoverIndex = -1;
 		private bool pointerDown;
 		private bool dragging;
+		private bool isSpringActive;
 		private int downX;
+		private int lastDragPaintX = int.MinValue;
 		private float dragStartPos;
 		private Func<float, bool> animStep;
 
@@ -1056,6 +1058,7 @@ namespace AandmAuto
 			{
 				pos = clamped;
 				velocity = 0f;
+				isSpringActive = false;
 				Invalidate();
 			}
 			else
@@ -1072,21 +1075,23 @@ namespace AandmAuto
 		private void StartSpring()
 		{
 			if (animStep == null) animStep = StepSpring;
+			isSpringActive = true;
 			GlassAnimator.Add(animStep);
 		}
 
 		private bool StepSpring(float dt)
 		{
-			if (IsDisposed || !Visible) return false;
-			if (dragging) return false;
-			// Cushioned Apple iOS 26 spring: stiffness=145, damping=17.5 (~400ms smooth glide)
-			float force = (targetPos - pos) * 145f;
-			velocity += (force - velocity * 17.5f) * dt;
+			if (IsDisposed || !Visible) { isSpringActive = false; return false; }
+			if (dragging) { isSpringActive = false; return false; }
+			// Crisp Apple iOS 26 spring: stiffness=195, damping=21.5 (~280-320ms smooth cushioned glide)
+			float force = (targetPos - pos) * 195f;
+			velocity += (force - velocity * 21.5f) * dt;
 			pos += velocity * dt;
-			if (Math.Abs(targetPos - pos) < 0.002f && Math.Abs(velocity) < 0.01f)
+			if (Math.Abs(targetPos - pos) < 0.0025f && Math.Abs(velocity) < 0.015f)
 			{
 				pos = targetPos;
 				velocity = 0f;
+				isSpringActive = false;
 				Invalidate();
 				return false;
 			}
@@ -1138,13 +1143,14 @@ namespace AandmAuto
 			Rectangle thumbRect = new Rectangle(thumbX, pad, thumbW, Math.Max(8, track.Height - pad * 2));
 			int thumbRad = Math.Max(5, thumbRect.Height / 2);
 
-			// Sliding crystal lens thumb (live wallpaper refraction while sliding, cached when settled!)
+			// Dual-stage sliding lens: <0.25ms optical shell + backdrop blit during glide/drag, full pixel refraction when settled!
 			Color thumbTint = bright ? Color.White : Color.FromArgb(235, 245, 255);
 			int thumbAlpha = bright ? 92 : 34;
 			UiTheme.DrawLiquidGlassPill(
 				g, this, thumbRect, thumbRad,
 				thumbTint, thumbAlpha, Color.White,
-				dragging, false, true, Enabled);
+				dragging, false, true, Enabled,
+				dragging ? 1f : 0f, 0f, 0f, new Point(-100, -100), false, dragging || isSpringActive);
 
 			// Labels
 			Color activeInk = LiquidGlassEngine.GlassInk(Enabled);
@@ -1203,10 +1209,14 @@ namespace AandmAuto
 				}
 				if (dragging)
 				{
-					float segW = Math.Max(1f, (Width - 7) / (float)items.Length);
-					float delta = (e.X - downX) / segW;
-					pos = Math.Max(-0.08f, Math.Min(items.Length - 0.92f, dragStartPos + delta));
-					Invalidate();
+					if (e.X != lastDragPaintX)
+					{
+						lastDragPaintX = e.X;
+						float segW = Math.Max(1f, (Width - 7) / (float)items.Length);
+						float delta = (e.X - downX) / segW;
+						pos = Math.Max(-0.08f, Math.Min(items.Length - 0.92f, dragStartPos + delta));
+						Invalidate();
+					}
 				}
 			}
 			else

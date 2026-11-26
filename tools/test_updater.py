@@ -11,6 +11,10 @@ import os
 import subprocess
 import tempfile
 import threading
+import sys
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 ROOT = Path(__file__).resolve().parents[1]
 PAYLOAD = b'AANDM-MOCK-EXE-BINARY-CONTENT-' * 2048

@@ -354,6 +354,7 @@ namespace AandmAuto
 
 		private void ClearSidebarDynamicRefs()
 		{
+			if (hints != null) hints.RemoveAll();
 			optionChecks.Clear();
 			statLabels.Clear();
 			statValueLabels.Clear();
@@ -832,12 +833,12 @@ namespace AandmAuto
 		{
 			var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, BackColor = Color.Transparent, Margin = Padding.Empty };
 			layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 16f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 16f));
 			layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
 			// Row 0: title + detail side by side
@@ -1425,10 +1426,13 @@ namespace AandmAuto
 
 			layout.Controls.Add(BuildKpiTiles(false), 0, 1);
 
-			var infoBox = new InsetPanel { Dock = DockStyle.Fill, Padding = new Padding(8, 3, 8, 3), Margin = new Padding(0, 3, 0, 0) };
-			var infoStack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent, Margin = Padding.Empty };
+			var infoBox = new InsetPanel { Dock = DockStyle.Fill, Padding = new Padding(8, 4, 8, 4), Margin = new Padding(0, 3, 0, 0) };
+			var infoStack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, BackColor = Color.Transparent, Margin = Padding.Empty };
 			infoStack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			for (int i = 0; i < 3; i++) infoStack.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
+			infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
+			infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
+			infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
+			infoStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			lblMinePlan = LineInfoLabel("推荐矿层：等待游戏数据", GoldColor);
 			lblStatusSchedule = LineInfoLabel("自动续跑与签到：等待读取", MutedColor);
 			lblStatusSchedShort = LineInfoLabel("定时：--", TextColor);

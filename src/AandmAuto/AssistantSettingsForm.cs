@@ -89,8 +89,12 @@ namespace AandmAuto
 		private ComboBox cmbAuditRetention;
 		private readonly Action<string, Color> onLog;
 		private readonly Func<string> getLogText;
-		private SmoothLabel lblUpdateStatus;
+		private readonly Action<int> onPreviewTheme;
 		private SmoothLabel lblFooterVersion;
+		private readonly Dictionary<string, Panel> miningSubPages = new Dictionary<string, Panel>();
+		private readonly Dictionary<string, GameButton> miningSubTabs = new Dictionary<string, GameButton>();
+		private readonly Dictionary<string, Panel> workshopSubPages = new Dictionary<string, Panel>();
+		private readonly Dictionary<string, GameButton> workshopSubTabs = new Dictionary<string, GameButton>();
 
 		// 定时任务子页控件
 		private ListBox plansList;
@@ -111,7 +115,12 @@ namespace AandmAuto
 		private NumericUpDown schedWait;
 		private NumericUpDown schedDuration;
 		private readonly CheckBox[] schedDays = new CheckBox[7];
-		private DateTimePicker schedAnchor;
+		private TextBox schedAnchor;
+		private Control[] schedTimesRow;
+		private Control[] schedDaysRow;
+		private Control[] schedDatesRow;
+		private Control[] schedIntervalRow;
+		private Control[] schedWindowRow;
 		private int selectedPlan = -1;
 		private bool loadingPlan;
 		private bool initializing = true;
@@ -142,10 +151,11 @@ namespace AandmAuto
 			string dataRootPath = "",
 			string currentCustomBgLabel = "",
 			string currentWeDir = "",
-			Size ownerWindowSize = default(Size), string currentEngineProject = "", string currentPlaybackStatus = "", Image currentPlaybackSnapshot = null, Action<string, Color> onLogCallback = null, Func<string> getLogTextCallback = null)
+			Size ownerWindowSize = default(Size), string currentEngineProject = "", string currentPlaybackStatus = "", Image currentPlaybackSnapshot = null, Action<string, Color> onLogCallback = null, Func<string> getLogTextCallback = null, Action<int> onPreviewThemeCallback = null)
 		{
 			onLog = onLogCallback;
 			getLogText = getLogTextCallback;
+			onPreviewTheme = onPreviewThemeCallback;
 			customBgPath = currentCustomBgPath ?? "";
 			this.dataRootPath = dataRootPath ?? "";
 			customBgLabel = currentCustomBgLabel ?? "";
@@ -240,15 +250,12 @@ namespace AandmAuto
 
 			string[,] categories =
 			{
-				{ "mining", "矿洞策略" },
-				{ "resources", "资源与宝箱" },
+				{ "mining", "挖矿与宝箱" },
 				{ "daily", "日常清单" },
-				{ "workshop", "工坊与工会" },
-				{ "growth", "符文与宿命" },
-				{ "mine", "矿山研究" },
+				{ "workshop", "工坊与矿山" },
 				{ "schedule", "定时任务" },
-				{ "game", "游戏偏好" },
-				{ "advanced", "高级策略" }
+				{ "game", "界面与壁纸" },
+				{ "advanced", "高级与治理" }
 			};
 
 			bool glassUi = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
@@ -258,8 +265,8 @@ namespace AandmAuto
 				var navBtn = new GameButton
 				{
 					Text = categories[i, 1],
-					Size = glassUi ? new Size(134, 44) : new Size(126, 42),
-					Margin = glassUi ? new Padding(0, 0, 0, 8) : new Padding(1, 0, 1, 10),
+					Size = glassUi ? new Size(134, 48) : new Size(126, 46),
+					Margin = glassUi ? new Padding(0, 0, 0, 10) : new Padding(1, 0, 1, 12),
 					Skin = GameButtonSkin.Stone,
 					Font = UiTheme.GameFont(glassUi ? 9.5f : 9f, FontStyle.Bold)
 				};
@@ -273,12 +280,9 @@ namespace AandmAuto
 			}
 			navCard.Controls.Add(navFlow);
 
-			BuildMiningPage(pages["mining"]);
-			BuildResourcesPage(pages["resources"]);
+			BuildMiningCombinedPage(pages["mining"]);
 			BuildDailyPage(pages["daily"]);
-			BuildWorkshopPage(pages["workshop"]);
-			BuildGrowthPage(pages["growth"]);
-			BuildMineResearchPage(pages["mine"]);
+			BuildWorkshopCombinedPage(pages["workshop"]);
 			BuildSchedulePage(pages["schedule"]);
 			BuildGamePage(pages["game"]);
 			BuildAdvancedPage(pages["advanced"]);
@@ -427,7 +431,50 @@ namespace AandmAuto
 			return check;
 		}
 
-		// ---------------- 1. 矿洞策略 ----------------
+		// ---------------- 1. 挖矿与宝箱（合并原矿洞策略 + 资源与宝箱） ----------------
+		private void BuildMiningCombinedPage(Panel page)
+		{
+			var subNav = new FlowLayoutPanel
+			{
+				Location = new Point(8, 4),
+				Size = new Size(792, 44),
+				Margin = Padding.Empty,
+				WrapContents = false,
+				BackColor = Color.Transparent
+			};
+			var subHost = new Panel { Location = new Point(0, 52), Size = new Size(808, 540), BackColor = ContentBg };
+			string[,] subs = { { "mining", "矿洞探索与层数" }, { "resources", "宝箱与炼化保留" } };
+			for (int i = 0; i < subs.GetLength(0); i++)
+			{
+				string sk = subs[i, 0];
+				var btn = new GameButton { Text = subs[i, 1], Size = new Size(176, 36), Margin = new Padding(0, 2, 10, 0), Skin = GameButtonSkin.Stone, Font = UiTheme.GameFont(8.75f, FontStyle.Bold) };
+				btn.Click += delegate { SetMiningSubCategory(sk); };
+				miningSubTabs[sk] = btn;
+				subNav.Controls.Add(btn);
+				var sp = new Panel { Dock = DockStyle.Fill, BackColor = ContentBg, Visible = false };
+				miningSubPages[sk] = sp;
+				subHost.Controls.Add(sp);
+			}
+			BuildMiningPage(miningSubPages["mining"]);
+			BuildResourcesPage(miningSubPages["resources"]);
+			page.Controls.Add(subNav);
+			page.Controls.Add(subHost);
+			SetMiningSubCategory("mining");
+		}
+
+		private void SetMiningSubCategory(string key)
+		{
+			if (!miningSubPages.ContainsKey(key)) key = "mining";
+			foreach (var p in miningSubPages) p.Value.Visible = p.Key == key;
+			foreach (var b in miningSubTabs)
+			{
+				bool on = b.Key == key;
+				b.Value.Selected = on;
+				b.Value.Skin = on ? GameButtonSkin.Gold : GameButtonSkin.Stone;
+			}
+		}
+
+		// ---------------- 1a. 矿洞策略 ----------------
 		private void BuildMiningPage(Panel page)
 		{
 			page.Controls.Add(SectionTitle("矿洞探索与战斗", 8, 8));
@@ -775,6 +822,53 @@ namespace AandmAuto
 					: "60 血钻 · 炼金等级 +2";
 		}
 
+		// ---------------- 3. 工坊与矿山（合并工坊/工会/符文 + 矿山研究） ----------------
+		private void BuildWorkshopCombinedPage(Panel page)
+		{
+			var subNav = new FlowLayoutPanel
+			{
+				Location = new Point(8, 4),
+				Size = new Size(792, 44),
+				Margin = Padding.Empty,
+				WrapContents = false,
+				BackColor = Color.Transparent
+			};
+			var subHost = new Panel { Location = new Point(0, 52), Size = new Size(808, 548), BackColor = ContentBg };
+			string[,] subs = { { "workshop", "工坊 · 工会 · 符文" }, { "mine", "矿山 12 项研究" } };
+			for (int i = 0; i < subs.GetLength(0); i++)
+			{
+				string sk = subs[i, 0];
+				var btn = new GameButton { Text = subs[i, 1], Size = new Size(184, 36), Margin = new Padding(0, 2, 10, 0), Skin = GameButtonSkin.Stone, Font = UiTheme.GameFont(8.75f, FontStyle.Bold) };
+				btn.Click += delegate { SetWorkshopSubCategory(sk); };
+				workshopSubTabs[sk] = btn;
+				subNav.Controls.Add(btn);
+				var sp = new Panel { Dock = DockStyle.Fill, BackColor = ContentBg, Visible = false };
+				workshopSubPages[sk] = sp;
+				subHost.Controls.Add(sp);
+			}
+			BuildWorkshopPage(workshopSubPages["workshop"]);
+			// 将原单开关的「符文强化材料」自然并入工坊/养成页底部
+			workshopSubPages["workshop"].Controls.Add(SectionTitle("符文强化材料", 8, 336));
+			OptionCheck(workshopSubPages["workshop"], "runeUseFlashGold", "强化材料加入未锁定的闲置闪金符文", 12, 372, 620);
+
+			BuildMineResearchPage(workshopSubPages["mine"]);
+			page.Controls.Add(subNav);
+			page.Controls.Add(subHost);
+			SetWorkshopSubCategory("workshop");
+		}
+
+		private void SetWorkshopSubCategory(string key)
+		{
+			if (!workshopSubPages.ContainsKey(key)) key = "workshop";
+			foreach (var p in workshopSubPages) p.Value.Visible = p.Key == key;
+			foreach (var b in workshopSubTabs)
+			{
+				bool on = b.Key == key;
+				b.Value.Selected = on;
+				b.Value.Skin = on ? GameButtonSkin.Gold : GameButtonSkin.Stone;
+			}
+		}
+
 		// ---------------- 4. 工坊与工会 ----------------
 		private void BuildWorkshopPage(Panel page)
 		{
@@ -918,8 +1012,8 @@ namespace AandmAuto
 
 			var grid = new TableLayoutPanel
 			{
-				Location = new Point(8, 64),
-				Size = new Size(790, 520),
+				Location = new Point(8, 60),
+				Size = new Size(790, 476),
 				ColumnCount = 2,
 				RowCount = 6,
 				Margin = Padding.Empty,
@@ -1079,14 +1173,16 @@ namespace AandmAuto
 			};
 			page.Controls.Add(schedKind);
 
-			SchedLabel(page, "最长等待（分钟）", 432, 74, 150);
+			SchedLabel(page, "超时放弃（分）", 432, 74, 150);
 			schedWait = SchedNumber(page, 1, 10080, 586, 72, 96);
 
-			SchedLabel(page, "每日时间", 198, 108, 82);
+			var lblTimes = SchedLabelRef(page, "每日时间", 198, 108, 82);
 			schedTimes = SchedInput(page, 284, 106, 512);
+			schedTimesRow = new Control[] { lblTimes, schedTimes };
 
-			SchedLabel(page, "星期", 198, 142, 82);
+			var lblDays = SchedLabelRef(page, "星期", 198, 142, 82);
 			string[] dayLabels = { "日", "一", "二", "三", "四", "五", "六" };
+			var daysRowList = new List<Control> { lblDays };
 			for (int i = 0; i < 7; i++)
 			{
 				var dayBox = new GameCheckBox
@@ -1099,33 +1195,31 @@ namespace AandmAuto
 				};
 				dayBox.CheckedChanged += delegate { if (!loadingPlan && !initializing) ScheduleTouched = true; };
 				schedDays[i] = dayBox;
+				daysRowList.Add(dayBox);
 				page.Controls.Add(dayBox);
 			}
+			schedDaysRow = daysRowList.ToArray();
 
-			SchedLabel(page, "指定日期", 198, 176, 82);
-			schedDates = SchedInput(page, 284, 174, 512);
+			var lblDates = SchedLabelRef(page, "指定日期", 198, 142, 82);
+			schedDates = SchedInput(page, 284, 140, 512);
+			schedDatesRow = new Control[] { lblDates, schedDates };
 
-			SchedLabel(page, "间隔分钟", 198, 208, 82);
-			schedInterval = SchedNumber(page, 1, 10080, 284, 208, 78);
-			SchedLabel(page, "生效日期", 374, 208, 82);
-			schedStart = SchedInput(page, 460, 208, 148);
-			SchedLabel(page, "-", 614, 208, 14);
-			schedEnd = SchedInput(page, 632, 208, 164);
+			var lblInt = SchedLabelRef(page, "间隔分钟", 198, 108, 82);
+			schedInterval = SchedNumber(page, 1, 10080, 284, 106, 78);
+			schedIntervalRow = new Control[] { lblInt, schedInterval };
 
-			SchedLabel(page, "间隔时段", 198, 244, 82);
-			schedWindowStart = SchedInput(page, 284, 242, 74);
-			SchedLabel(page, "至", 362, 244, 22);
-			schedWindowEnd = SchedInput(page, 388, 242, 74);
-			SchedLabel(page, "起点", 472, 244, 48);
-			schedAnchor = new DateTimePicker
-			{
-				Location = new Point(524, 242),
-				Size = new Size(184, 28),
-				Format = DateTimePickerFormat.Custom,
-				CustomFormat = "yyyy-MM-dd HH:mm"
-			};
-			schedAnchor.ValueChanged += delegate { if (!loadingPlan && !initializing) ScheduleTouched = true; };
-			page.Controls.Add(schedAnchor);
+			SchedLabel(page, "生效日期", 198, 210, 82);
+			schedStart = SchedInput(page, 284, 208, 148);
+			SchedLabel(page, "-", 438, 210, 14);
+			schedEnd = SchedInput(page, 456, 208, 164);
+
+			var lblWin = SchedLabelRef(page, "间隔时段", 198, 176, 82);
+			schedWindowStart = SchedInput(page, 284, 174, 74);
+			var lblWinTo = SchedLabelRef(page, "至", 362, 176, 22);
+			schedWindowEnd = SchedInput(page, 388, 174, 74);
+			var lblAnc = SchedLabelRef(page, "起始时间", 472, 176, 74);
+			schedAnchor = SchedInput(page, 550, 174, 176);
+			schedWindowRow = new Control[] { lblWin, schedWindowStart, lblWinTo, schedWindowEnd, lblAnc, schedAnchor };
 
 			stepsList = new ListBox
 			{
@@ -1257,7 +1351,14 @@ namespace AandmAuto
 
 		private void SchedLabel(Control parent, string text, int x, int y, int w)
 		{
-			parent.Controls.Add(new SmoothLabel { Text = text, Location = new Point(x, y), Size = new Size(w, 28), TextAlign = ContentAlignment.MiddleLeft, ForeColor = BodyText, BackColor = Color.Transparent });
+			SchedLabelRef(parent, text, x, y, w);
+		}
+
+		private SmoothLabel SchedLabelRef(Control parent, string text, int x, int y, int w)
+		{
+			var lbl = new SmoothLabel { Text = text, Location = new Point(x, y), Size = new Size(w, 28), TextAlign = ContentAlignment.MiddleLeft, ForeColor = BodyText, BackColor = Color.Transparent };
+			parent.Controls.Add(lbl);
+			return lbl;
 		}
 
 		private TextBox SchedInput(Control parent, int x, int y, int w)
@@ -1331,7 +1432,7 @@ namespace AandmAuto
 				schedWindowStart.Text = p.WindowStart;
 				schedWindowEnd.Text = p.WindowEnd;
 				DateTime v;
-				schedAnchor.Value = DateTime.TryParse(p.Anchor, out v) ? v : DateTime.Now;
+				schedAnchor.Text = DateTime.TryParse(p.Anchor, out v) ? v.ToString("yyyy-MM-dd HH:mm") : DateTime.Now.ToString("yyyy-MM-dd HH:mm");
 				for (int i = 0; i < 7; i++) schedDays[i].Checked = (p.Weekdays & (1 << i)) != 0;
 				stepsList.Items.Clear();
 				foreach (var s in p.Steps) stepsList.Items.Add(s);
@@ -1343,14 +1444,29 @@ namespace AandmAuto
 			}
 		}
 
+		private static void SetRowVisible(Control[] row, bool visible)
+		{
+			if (row == null) return;
+			for (int i = 0; i < row.Length; i++) if (row[i] != null) row[i].Visible = visible;
+		}
+
 		private void UpdateTriggerState()
 		{
 			int k = schedKind.SelectedIndex;
-			schedTimes.Enabled = k != 3;
-			schedDates.Enabled = k == 2;
-			schedInterval.Enabled = schedWindowStart.Enabled = schedWindowEnd.Enabled = k == 3;
-			schedAnchor.Enabled = k == 3;
-			foreach (var d in schedDays) if (d != null) d.Enabled = k == 1 || k == 3;
+			bool showTimes = k != 3;
+			bool showDays = k == 1 || k == 3;
+			bool showDates = k == 2;
+			bool showInterval = k == 3;
+			SetRowVisible(schedTimesRow, showTimes);
+			SetRowVisible(schedDaysRow, showDays);
+			SetRowVisible(schedDatesRow, showDates);
+			SetRowVisible(schedIntervalRow, showInterval);
+			SetRowVisible(schedWindowRow, showInterval);
+			schedTimes.Enabled = showTimes;
+			schedDates.Enabled = showDates;
+			schedInterval.Enabled = schedWindowStart.Enabled = schedWindowEnd.Enabled = showInterval;
+			schedAnchor.Enabled = showInterval;
+			foreach (var d in schedDays) if (d != null) d.Enabled = showDays;
 		}
 
 		private bool CommitSchedulePlan()
@@ -1370,7 +1486,8 @@ namespace AandmAuto
 				p.EndDate = schedEnd.Text.Trim();
 				p.WindowStart = schedWindowStart.Text.Trim();
 				p.WindowEnd = schedWindowEnd.Text.Trim();
-				p.Anchor = ScheduleBook.Stamp(schedAnchor.Value);
+				DateTime parsedAnchor;
+				p.Anchor = DateTime.TryParse(schedAnchor.Text.Trim(), out parsedAnchor) ? ScheduleBook.Stamp(parsedAnchor) : ScheduleBook.Stamp(DateTime.Now);
 				p.Weekdays = 0;
 				for (int i = 0; i < 7; i++) if (schedDays[i].Checked) p.Weekdays |= 1 << i;
 				p.Steps = new List<ScheduleStep>();
@@ -1445,14 +1562,14 @@ namespace AandmAuto
 			var bgBox = new InsetPanel
 			{
 				Location = new Point(10, 90),
-				Size = new Size(766, 104),
+				Size = new Size(766, 42),
 				Padding = new Padding(8, 4, 8, 4)
 			};
 			bgBox.Controls.Add(new SmoothLabel
 			{
 				Text = "自定义背景图",
 				Location = new Point(10, 7),
-				Size = new Size(102, 26),
+				Size = new Size(96, 26),
 				BackColor = Color.Transparent,
 				ForeColor = GoldText,
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold),
@@ -1461,8 +1578,8 @@ namespace AandmAuto
 			lblBgStatus = new SmoothLabel
 			{
 				Text = BackgroundStatus(),
-				Location = new Point(114, 7),
-				Size = new Size(250, 26),
+				Location = new Point(108, 7),
+				Size = new Size(190, 26),
 				BackColor = Color.Transparent,
 				ForeColor = MutedText,
 				Font = UiTheme.GameFont(8f),
@@ -1473,9 +1590,9 @@ namespace AandmAuto
 
 			var btnPickBg = new GameButton
 			{
-				Text = "选择图片",
-				Location = new Point(372, 5),
-				Size = new Size(90, 30),
+				Text = "选图",
+				Location = new Point(304, 5),
+				Size = new Size(72, 30),
 				Skin = GameButtonSkin.Stone,
 				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
 			};
@@ -1506,8 +1623,8 @@ namespace AandmAuto
 			var btnWeLib = new GameButton
 			{
 				Text = "壁纸引擎",
-				Location = new Point(470, 5),
-				Size = new Size(90, 30),
+				Location = new Point(382, 5),
+				Size = new Size(88, 30),
 				Skin = GameButtonSkin.Gold,
 				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
 			};
@@ -1525,8 +1642,8 @@ namespace AandmAuto
 			var btnSyncDesktop = new GameButton
 			{
 				Text = "同步桌面",
-				Location = new Point(568, 5),
-				Size = new Size(90, 30),
+				Location = new Point(476, 5),
+				Size = new Size(88, 30),
 				Skin = GameButtonSkin.Stone,
 				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
 			};
@@ -1550,9 +1667,9 @@ namespace AandmAuto
 
 			var btnClearBg = new GameButton
 			{
-				Text = "清除背景",
-				Location = new Point(666, 5),
-				Size = new Size(90, 30),
+				Text = "清除",
+				Location = new Point(570, 5),
+				Size = new Size(72, 30),
 				Skin = GameButtonSkin.Stone,
 				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
 			};
@@ -1567,10 +1684,30 @@ namespace AandmAuto
 			};
 			bgBox.Controls.Add(btnClearBg);
 
-			bgBox.Controls.Add(new SmoothLabel
+			bool bgAdvExpanded = false;
+			var btnBgAdv = new GameButton
+			{
+				Text = "高级微调 ▾",
+				Location = new Point(648, 5),
+				Size = new Size(108, 30),
+				Skin = GameButtonSkin.Stone,
+				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
+			};
+			bgBox.Controls.Add(btnBgAdv);
+
+			var bgAdvPanel = new Panel
+			{
+				Location = new Point(0, 38),
+				Size = new Size(762, 68),
+				BackColor = Color.Transparent,
+				Visible = false
+			};
+			bgBox.Controls.Add(bgAdvPanel);
+
+			bgAdvPanel.Controls.Add(new SmoothLabel
 			{
 				Text = "背景模式",
-				Location = new Point(10, 40),
+				Location = new Point(10, 4),
 				Size = new Size(74, 26),
 				BackColor = Color.Transparent,
 				ForeColor = BodyText,
@@ -1580,7 +1717,7 @@ namespace AandmAuto
 			cmbBgMode = new ComboBox
 			{
 				Name = "CustomBgModeCombo",
-				Location = new Point(86, 40),
+				Location = new Point(86, 4),
 				Size = new Size(194, 26),
 				DropDownStyle = ComboBoxStyle.DropDownList,
 				BackColor = UiTheme.Palette.InputBackColor,
@@ -1595,12 +1732,12 @@ namespace AandmAuto
 				"助手独立动态（原作品）"
 			});
 			cmbBgMode.SelectedIndex = Clamp(GetNum("customBgMode", 0), 0, UiTheme.BgModeEngine);
-			bgBox.Controls.Add(cmbBgMode);
+			bgAdvPanel.Controls.Add(cmbBgMode);
 
-			bgBox.Controls.Add(new SmoothLabel
+			bgAdvPanel.Controls.Add(new SmoothLabel
 			{
 				Text = "画面适配",
-				Location = new Point(288, 40),
+				Location = new Point(288, 4),
 				Size = new Size(74, 26),
 				BackColor = Color.Transparent,
 				ForeColor = BodyText,
@@ -1610,7 +1747,7 @@ namespace AandmAuto
 			var cmbBgFit = new ComboBox
 			{
 				Name = "CustomBgFitCombo",
-				Location = new Point(364, 40),
+				Location = new Point(364, 4),
 				Size = new Size(186, 26),
 				DropDownStyle = ComboBoxStyle.DropDownList,
 				BackColor = UiTheme.Palette.InputBackColor,
@@ -1627,12 +1764,12 @@ namespace AandmAuto
 			{
 				numbers["customBgFit"] = cmbBgFit.SelectedIndex;
 			};
-			bgBox.Controls.Add(cmbBgFit);
+			bgAdvPanel.Controls.Add(cmbBgFit);
 
 			lblCropStatus = new SmoothLabel
 			{
 				Text = FormatCropStatusText(),
-				Location = new Point(556, 40),
+				Location = new Point(556, 4),
 				Size = new Size(104, 26),
 				BackColor = Color.Transparent,
 				ForeColor = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? Color.White : MutedText,
@@ -1640,13 +1777,13 @@ namespace AandmAuto
 				TextAlign = ContentAlignment.MiddleRight,
 				AutoEllipsis = true
 			};
-			bgBox.Controls.Add(lblCropStatus);
+			bgAdvPanel.Controls.Add(lblCropStatus);
 
 			var btnCropBg = new GameButton
 			{
 				Name = "CropCustomBgButton",
 				Text = "裁剪区域",
-				Location = new Point(666, 38),
+				Location = new Point(666, 2),
 				Size = new Size(90, 30),
 				Skin = GameButtonSkin.Stone,
 				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
@@ -1675,12 +1812,12 @@ namespace AandmAuto
 					if (lblCropStatus != null) lblCropStatus.Text = FormatCropStatusText();
 				}
 			};
-			bgBox.Controls.Add(btnCropBg);
+			bgAdvPanel.Controls.Add(btnCropBg);
 
-			bgBox.Controls.Add(new SmoothLabel
+			bgAdvPanel.Controls.Add(new SmoothLabel
 			{
 				Text = "背景透度%",
-				Location = new Point(10, 73),
+				Location = new Point(10, 37),
 				Size = new Size(86, 26),
 				BackColor = Color.Transparent,
 				ForeColor = BodyText,
@@ -1693,17 +1830,17 @@ namespace AandmAuto
 				Minimum = 10,
 				Maximum = 90,
 				Value = GetNum("customBgOpacity", 35),
-				Location = new Point(98, 73),
+				Location = new Point(98, 37),
 				Size = new Size(64, 26),
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 			};
 			numBgOpacity.ValueChanged += delegate { numbers["customBgOpacity"] = numBgOpacity.Value; };
-			bgBox.Controls.Add(numBgOpacity);
+			bgAdvPanel.Controls.Add(numBgOpacity);
 
-			bgBox.Controls.Add(new SmoothLabel
+			bgAdvPanel.Controls.Add(new SmoothLabel
 			{
 				Text = "玻璃模糊度",
-				Location = new Point(176, 73),
+				Location = new Point(176, 37),
 				Size = new Size(90, 26),
 				BackColor = Color.Transparent,
 				ForeColor = BodyText,
@@ -1716,14 +1853,14 @@ namespace AandmAuto
 				Minimum = 0,
 				Maximum = 24,
 				Value = GetNum("glassBlur", 12),
-				Location = new Point(268, 73),
+				Location = new Point(268, 37),
 				Size = new Size(64, 26),
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 			};
 			numGlassBlur.ValueChanged += delegate { numbers["glassBlur"] = numGlassBlur.Value; };
-			bgBox.Controls.Add(numGlassBlur);
+			bgAdvPanel.Controls.Add(numGlassBlur);
 
-			var chkStageBg = OptionCheck(bgBox, "stageWallpaperBg", "整窗透出壁纸（含右侧游戏底与顶栏）", 352, 72, 396, true);
+			var chkStageBg = OptionCheck(bgAdvPanel, "stageWallpaperBg", "整窗透出壁纸（含右侧游戏底与顶栏）", 352, 36, 396, true);
 			chkStageBg.Font = UiTheme.GameFont(8.25f);
 			lblBgModeHint = null;
 			cmbBgMode.SelectedIndexChanged += delegate
@@ -1754,7 +1891,8 @@ namespace AandmAuto
 
 			page.Controls.Add(bgBox);
 
-			page.Controls.Add(SectionTitle("界面风格", 8, 198));
+			var lblThemeSection = SectionTitle("界面风格（点击卡片即时预览，取消自动恢复）", 8, 144, 700);
+			page.Controls.Add(lblThemeSection);
 			string[] themeTitles = { "现版暗褐", "羊皮纸书页", "原生浅灰", "复古暖木", "液态玻璃" };
 			Color cardIdleBg = UiTheme.CurrentTheme == UiTheme.ThemeClassic ? Color.FromArgb(72, 59, 34) : UiTheme.Palette.InsetColor;
 			for (int i = 0; i < 5; i++)
@@ -1762,7 +1900,7 @@ namespace AandmAuto
 				int themeMode = i;
 				var tCard = new CardPanel
 				{
-					Location = new Point(10 + i * 155, 222),
+					Location = new Point(10 + i * 155, 168),
 					Size = new Size(147, 136),
 					Padding = new Padding(6),
 					BackColor = cardIdleBg,
@@ -1812,7 +1950,8 @@ namespace AandmAuto
 				page.Controls.Add(tCard);
 			}
 
-			page.Controls.Add(SectionTitle("助手主面板版本", 8, 362));
+			var lblLayoutSection = SectionTitle("助手主面板版本", 8, 310);
+			page.Controls.Add(lblLayoutSection);
 
 			string[] names = { "经典分层", "方案 A · 规整网格", "方案 B · 状态优先", "方案 C · 任务清单" };
 			string[] descs = { "经典分层面板", "对称网格与动态", "顶部看板与长日志", "逐行状态与直达" };
@@ -1821,7 +1960,7 @@ namespace AandmAuto
 				int mode = i;
 				var card = new CardPanel
 				{
-					Location = new Point(10 + i * 194, 386),
+					Location = new Point(10 + i * 194, 334),
 					Size = new Size(184, 222),
 					Padding = new Padding(8),
 					BackColor = cardIdleBg,
@@ -1884,58 +2023,21 @@ namespace AandmAuto
 				card.Click += delegate { SelectUiLayout(mode); };
 				page.Controls.Add(card);
 			}
+			btnBgAdv.Click += delegate
+			{
+				bgAdvExpanded = !bgAdvExpanded;
+				bgAdvPanel.Visible = bgAdvExpanded;
+				bgBox.Height = bgAdvExpanded ? 110 : 42;
+				btnBgAdv.Text = bgAdvExpanded ? "收起微调 ▴" : "高级微调 ▾";
+				int dy = bgAdvExpanded ? 66 : 0;
+				lblThemeSection.Top = 144 + dy;
+				for (int i = 0; i < 5; i++) if (themeCards[i] != null) themeCards[i].Top = 168 + dy;
+				lblLayoutSection.Top = 310 + dy;
+				for (int i = 0; i < 4; i++) if (layoutCards[i] != null) layoutCards[i].Top = 334 + dy;
+			};
+
 			SelectUiTheme(GetNum("uiTheme", 0));
 			SelectUiLayout(GetNum("uiLayout", 0));
-
-			page.Controls.Add(SectionTitle("版本与在线更新", 8, 618));
-			var updateBox = new InsetPanel
-			{
-				Location = new Point(10, 642),
-				Size = new Size(766, 56),
-				Padding = new Padding(10, 6, 10, 6)
-			};
-			updateBox.Controls.Add(new SmoothLabel
-			{
-				Text = BuildEdition.EditionDisplayName + " · v" + BuildEdition.AppVersion + "（通道：" + BuildEdition.UpdateChannel + "）",
-				Location = new Point(12, 6),
-				Size = new Size(560, 20),
-				BackColor = Color.Transparent,
-				ForeColor = GoldText,
-				Font = UiTheme.GameFont(8.5f, FontStyle.Bold),
-				TextAlign = ContentAlignment.MiddleLeft
-			});
-			lblUpdateStatus = new SmoothLabel
-			{
-				Text = "更新状态：" + UpdateManager.LastCheckSummary() + "（启动仅日志提示、不弹窗）",
-				Location = new Point(12, 28),
-				Size = new Size(498, 20),
-				BackColor = Color.Transparent,
-				ForeColor = MutedText,
-				Font = UiTheme.GameFont(8f),
-				TextAlign = ContentAlignment.MiddleLeft
-			};
-			var btnPageDiag = new GameButton
-			{
-				Text = "导出诊断包",
-				Location = new Point(520, 10),
-				Size = new Size(110, 36),
-				Skin = GameButtonSkin.Stone,
-				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
-			};
-			btnPageDiag.Click += delegate { ExportDiagnosticBundle(); };
-			var btnPageUpdate = new GameButton
-			{
-				Text = "检查更新",
-				Location = new Point(638, 10),
-				Size = new Size(114, 36),
-				Skin = GameButtonSkin.Gold,
-				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
-			};
-			btnPageUpdate.Click += delegate { OpenCheckUpdateDialog(); };
-			updateBox.Controls.Add(lblUpdateStatus);
-			updateBox.Controls.Add(btnPageDiag);
-			updateBox.Controls.Add(btnPageUpdate);
-			page.Controls.Add(updateBox);
 		}
 
 		private void ExportDiagnosticBundle()
@@ -1951,10 +2053,6 @@ namespace AandmAuto
 				dlg.ShowDialog(this);
 			}
 			string summary = UpdateManager.LastCheckSummary();
-			if (lblUpdateStatus != null)
-			{
-				lblUpdateStatus.Text = "更新状态：" + summary + "（启动仅日志提示、不弹窗，按需手动更新）";
-			}
 			if (lblFooterVersion != null)
 			{
 				lblFooterVersion.Text = BuildEdition.EditionDisplayName + " v" + BuildEdition.AppVersion + " · " + summary;
@@ -2087,6 +2185,10 @@ namespace AandmAuto
 					themeSelectButtons[i].Skin = active ? GameButtonSkin.Gold : GameButtonSkin.Stone;
 					themeSelectButtons[i].Text = active ? "当前使用" : "选择";
 				}
+			}
+			if (!initializing && onPreviewTheme != null)
+			{
+				onPreviewTheme(mode);
 			}
 		}
 
@@ -2315,6 +2417,21 @@ namespace AandmAuto
 
 		internal void SetCategory(string category)
 		{
+			if (category == "resources")
+			{
+				category = "mining";
+				SetMiningSubCategory("resources");
+			}
+			else if (category == "growth")
+			{
+				category = "workshop";
+				SetWorkshopSubCategory("workshop");
+			}
+			else if (category == "mine")
+			{
+				category = "workshop";
+				SetWorkshopSubCategory("mine");
+			}
 			if (!pages.ContainsKey(category)) category = "mining";
 			foreach (var pair in pages) pair.Value.Visible = pair.Key == category;
 			foreach (var pair in navButtons)

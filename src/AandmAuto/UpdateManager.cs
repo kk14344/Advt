@@ -135,6 +135,25 @@ namespace AandmAuto
 
 			try
 			{
+				string fastestPath = Path.Combine(AppPaths.DataRoot, "fastest-mirror.txt");
+				if (File.Exists(fastestPath))
+				{
+					string fast = (File.ReadAllText(fastestPath, Encoding.UTF8) ?? "").Trim();
+					if (!string.IsNullOrEmpty(fast))
+					{
+						var prioritized = new List<string>();
+						AddUnique(prioritized, fast);
+						foreach (string m in cfg.DownloadMirrors) AddUnique(prioritized, m);
+						cfg.DownloadMirrors = prioritized;
+					}
+				}
+			}
+			catch
+			{
+			}
+
+			try
+			{
 				string localOverride = Path.Combine(AppPaths.DataRoot, "update-source.json");
 				if (File.Exists(localOverride))
 				{
@@ -313,7 +332,9 @@ namespace AandmAuto
 			}
 
 			string lastError = "所有更新源均连接失败";
-			foreach (string url in candidates)
+			// 对前 2 条候选（直连 + 首选镜像）做短超时并发竞速，避免国内直连超时卡死 60 秒
+			int batchStart = 0;
+			while (batchStart < candidates.Count)
 			{
 				if (cancel.IsCancellationRequested)
 				{
@@ -321,38 +342,113 @@ namespace AandmAuto
 					res.ErrorMessage = "已取消检查更新。";
 					return res;
 				}
-				try
+				int batchSize = Math.Min(2, candidates.Count - batchStart);
+				UpdateCheckResult winner = null;
+				if (batchSize == 1)
 				{
-					string body = DownloadText(url, 8000, cancel);
-					if (string.IsNullOrEmpty(body))
+					string url = candidates[batchStart];
+					try
 					{
-						lastError = "更新清单为空";
-						continue;
+						string body = DownloadText(url, 3800, cancel);
+						winner = string.IsNullOrEmpty(body) ? null : ParseManifest(body, url, cfg);
+						if (winner == null) lastError = "更新清单为空或不含当前通道：" + BuildEdition.UpdateChannel;
 					}
-					UpdateCheckResult parsed = ParseManifest(body, url, cfg);
-					if (parsed != null)
+					catch (OperationCanceledException)
 					{
-						LastResult = parsed;
-						return parsed;
+						res.State = UpdateCheckState.Error;
+						res.ErrorMessage = "已取消检查更新。";
+						return res;
 					}
-					lastError = "更新清单格式不含当前通道：" + BuildEdition.UpdateChannel;
+					catch (Exception ex)
+					{
+						lastError = ex.Message;
+					}
 				}
-				catch (OperationCanceledException)
+				else
 				{
-					res.State = UpdateCheckState.Error;
-					res.ErrorMessage = "已取消检查更新。";
-					return res;
+					var raceCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+					var raceLock = new object();
+					var doneEvent = new ManualResetEventSlim(false);
+					int remaining = batchSize;
+					string batchErr = lastError;
+					for (int bi = 0; bi < batchSize; bi++)
+					{
+						string url = candidates[batchStart + bi];
+						ThreadPool.QueueUserWorkItem(delegate
+						{
+							try
+							{
+								string body = DownloadText(url, 3800, raceCts.Token);
+								UpdateCheckResult parsed = string.IsNullOrEmpty(body) ? null : ParseManifest(body, url, cfg);
+								if (parsed != null)
+								{
+									lock (raceLock)
+									{
+										if (winner == null)
+										{
+											winner = parsed;
+											try { raceCts.Cancel(); } catch { }
+											doneEvent.Set();
+										}
+									}
+								}
+								else
+								{
+									lock (raceLock) { batchErr = "更新清单格式不含当前通道：" + BuildEdition.UpdateChannel; }
+								}
+							}
+							catch (Exception ex)
+							{
+								lock (raceLock) { if (winner == null) batchErr = ex.Message; }
+							}
+							finally
+							{
+								if (Interlocked.Decrement(ref remaining) == 0) doneEvent.Set();
+							}
+						});
+					}
+					doneEvent.Wait(4500);
+					try { raceCts.Cancel(); } catch { }
+					raceCts.Dispose();
+					doneEvent.Dispose();
+					lastError = batchErr;
 				}
-				catch (Exception ex)
+
+				if (winner != null)
 				{
-					lastError = ex.Message;
+					SaveFastestMirrorFromUrl(winner.SourceUrl, cfg.DownloadMirrors);
+					LastResult = winner;
+					return winner;
 				}
+				batchStart += batchSize;
 			}
 
 			res.State = UpdateCheckState.Error;
 			res.ErrorMessage = "无法连接到更新服务器：" + lastError;
 			LastResult = res;
 			return res;
+		}
+
+		private static void SaveFastestMirrorFromUrl(string winningUrl, List<string> mirrors)
+		{
+			if (string.IsNullOrEmpty(winningUrl) || mirrors == null) return;
+			try
+			{
+				foreach (string rawMirror in mirrors)
+				{
+					if (string.IsNullOrEmpty(rawMirror)) continue;
+					string m = rawMirror.Trim();
+					if (!m.EndsWith("/")) m += "/";
+					if (winningUrl.StartsWith(m, StringComparison.OrdinalIgnoreCase))
+					{
+						File.WriteAllText(Path.Combine(AppPaths.DataRoot, "fastest-mirror.txt"), m, Encoding.UTF8);
+						return;
+					}
+				}
+			}
+			catch
+			{
+			}
 		}
 
 		private static UpdateCheckResult ParseManifest(string body, string sourceUrl, UpdateConfig cfg)
@@ -492,8 +588,9 @@ namespace AandmAuto
 				try
 				{
 					if (File.Exists(tempPath)) File.Delete(tempPath);
-					DownloadFile(url, tempPath, info.Size, sourceLabel, onProgress, cancel);
-					if (onProgress != null) onProgress(100, info.Size, info.Size, "正在校验 SHA-256…");
+					long actualBytes = DownloadFile(url, tempPath, info.Size, sourceLabel, onProgress, cancel);
+					long displayTotal = info.Size > 0 ? info.Size : actualBytes;
+					if (onProgress != null) onProgress(100, actualBytes, displayTotal, "正在校验 SHA-256…");
 					string actualHash = ComputeSha256(tempPath);
 					if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
 					{
@@ -519,7 +616,7 @@ namespace AandmAuto
 			throw new InvalidOperationException("所有下载线路均失败：" + lastError);
 		}
 
-		private static void DownloadFile(string url, string destination, long expectedSize, string sourceLabel, Action<int, long, long, string> onProgress, CancellationToken cancel)
+		private static long DownloadFile(string url, string destination, long expectedSize, string sourceLabel, Action<int, long, long, string> onProgress, CancellationToken cancel)
 		{
 			var req = (HttpWebRequest)WebRequest.Create(url);
 			req.Method = "GET";
@@ -556,6 +653,7 @@ namespace AandmAuto
 						}
 					}
 					output.Flush();
+					return readTotal;
 				}
 			}
 		}
@@ -576,6 +674,44 @@ namespace AandmAuto
 		{
 			string dir = Path.GetDirectoryName(targetExePath);
 			if (string.IsNullOrEmpty(dir)) throw new InvalidOperationException("无法确定当前程序目录。");
+
+			// 检查是否存在其他同路径多开进程占用 .exe，防止退出后原地替换失败
+			int myPid = Process.GetCurrentProcess().Id;
+			string fullTarget = Path.GetFullPath(targetExePath);
+			try
+			{
+				foreach (Process proc in Process.GetProcessesByName(Process.GetCurrentProcess().ProcessName))
+				{
+					try
+					{
+						if (proc.Id == myPid) continue;
+						string otherPath = proc.MainModule != null ? proc.MainModule.FileName : "";
+						if (!string.IsNullOrEmpty(otherPath) && string.Equals(Path.GetFullPath(otherPath), fullTarget, StringComparison.OrdinalIgnoreCase))
+						{
+							throw new InvalidOperationException("检测到还有其他多开窗口正在运行同一个程序文件，请先关闭其他同路径窗口后再点击「立即更新」。");
+						}
+					}
+					catch (InvalidOperationException)
+					{
+						throw;
+					}
+					catch
+					{
+					}
+					finally
+					{
+						try { proc.Dispose(); } catch { }
+					}
+				}
+			}
+			catch (InvalidOperationException)
+			{
+				throw;
+			}
+			catch
+			{
+			}
+
 			string probe = Path.Combine(dir, ".aandm-update-probe-" + Guid.NewGuid().ToString("N"));
 			try
 			{
@@ -588,6 +724,23 @@ namespace AandmAuto
 			}
 		}
 
+		private static string BuildRelaunchArguments()
+		{
+			var parts = new List<string>();
+			if (!string.IsNullOrEmpty(AppPaths.ProfileId) && AppPaths.ProfileId != "main")
+			{
+				parts.Add("--profile");
+				parts.Add(AppPaths.QuoteArgument(AppPaths.ProfileId));
+			}
+			string customData = Environment.GetEnvironmentVariable("AANDM_DATA_DIR");
+			if (!string.IsNullOrEmpty(customData))
+			{
+				parts.Add("--data-root");
+				parts.Add(AppPaths.QuoteArgument(customData));
+			}
+			return string.Join(" ", parts.ToArray());
+		}
+
 		internal static void LaunchSelfReplaceAndRestart(string verifiedTempFile, string targetExePath)
 		{
 			if (!File.Exists(verifiedTempFile)) throw new FileNotFoundException("找不到已校验的新版临时文件。", verifiedTempFile);
@@ -597,13 +750,15 @@ namespace AandmAuto
 			string workDir = Path.GetDirectoryName(targetExePath) ?? Environment.CurrentDirectory;
 			string scriptDir = Path.GetDirectoryName(verifiedTempFile) ?? Path.GetTempPath();
 			string scriptPath = Path.Combine(scriptDir, "apply-update.ps1");
+			string relaunchArgs = BuildRelaunchArguments();
 
 			var sb = new StringBuilder();
 			sb.AppendLine("param(");
 			sb.AppendLine("  [int]$ParentPid,");
 			sb.AppendLine("  [string]$SourceFile,");
 			sb.AppendLine("  [string]$TargetExe,");
-			sb.AppendLine("  [string]$WorkDir");
+			sb.AppendLine("  [string]$WorkDir,");
+			sb.AppendLine("  [string]$ExtraArgs");
 			sb.AppendLine(")");
 			sb.AppendLine("$ErrorActionPreference = 'Stop'");
 			sb.AppendLine("for ($i = 0; $i -lt 120; $i++) {");
@@ -628,9 +783,14 @@ namespace AandmAuto
 			sb.AppendLine("}");
 			sb.AppendLine("if ($replaced) {");
 			sb.AppendLine("  try { Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue } catch {}");
-			sb.AppendLine("  Start-Process -FilePath $TargetExe -WorkingDirectory $WorkDir");
+			sb.AppendLine("  if ([string]::IsNullOrWhiteSpace($ExtraArgs)) { Start-Process -FilePath $TargetExe -WorkingDirectory $WorkDir } else { Start-Process -FilePath $TargetExe -ArgumentList $ExtraArgs -WorkingDirectory $WorkDir }");
+			sb.AppendLine("  try { Remove-Item -LiteralPath $PSScriptRoot -Recurse -Force -ErrorAction SilentlyContinue } catch {}");
+			sb.AppendLine("} else {");
+			sb.AppendLine("  try { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show(\"原地替换失败（程序文件被其他窗口或安全软件占用）。`r`n已校验的新版文件已保留在：`r`n$SourceFile`r`n`r`n将为你重新启动旧版程序，可关闭所有窗口后手动覆盖。\", \"自动更新未完成\", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null } catch {}");
+			sb.AppendLine("  if (Test-Path -LiteralPath $TargetExe) {");
+			sb.AppendLine("    if ([string]::IsNullOrWhiteSpace($ExtraArgs)) { Start-Process -FilePath $TargetExe -WorkingDirectory $WorkDir } else { Start-Process -FilePath $TargetExe -ArgumentList $ExtraArgs -WorkingDirectory $WorkDir }");
+			sb.AppendLine("  }");
 			sb.AppendLine("}");
-			sb.AppendLine("try { Remove-Item -LiteralPath $PSScriptRoot -Recurse -Force -ErrorAction SilentlyContinue } catch {}");
 
 			// UTF-8 with BOM so Windows PowerShell 5.1 reads Chinese paths cleanly
 			File.WriteAllText(scriptPath, sb.ToString(), new UTF8Encoding(true));
@@ -640,7 +800,8 @@ namespace AandmAuto
 				+ " -ParentPid " + pid
 				+ " -SourceFile " + AppPaths.QuoteArgument(verifiedTempFile)
 				+ " -TargetExe " + AppPaths.QuoteArgument(targetExePath)
-				+ " -WorkDir " + AppPaths.QuoteArgument(workDir);
+				+ " -WorkDir " + AppPaths.QuoteArgument(workDir)
+				+ " -ExtraArgs " + AppPaths.QuoteArgument(relaunchArgs);
 
 			var psi = new ProcessStartInfo
 			{

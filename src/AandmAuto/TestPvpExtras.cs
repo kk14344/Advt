@@ -208,7 +208,7 @@ namespace AandmAuto
 			return sb.ToString();
 		}
 
-		internal static void ShowBattleMatrixDialog(IWin32Window owner, int fid, int targetPct, double minWr, double avgWr, double totalSec, List<Dictionary<string, object>> rows)
+		internal static void ShowBattleMatrixDialog(IWin32Window owner, int fid, int targetPct, double minWr, double avgWr, double totalSec, List<Dictionary<string, object>> rows, Action onExportSnapshot = null)
 		{
 			if (rows == null || rows.Count == 0) return;
 			string md = FormatBattleMatrixMarkdown(fid, targetPct, minWr, avgWr, totalSec, rows);
@@ -306,9 +306,9 @@ namespace AandmAuto
 				{
 					Text = "复制 Markdown 战报",
 					Location = new Point(12, 368),
-					Size = new Size(180, 38),
+					Size = new Size(168, 38),
 					Skin = GameButtonSkin.Gold,
-					Font = UiTheme.GameFont(8.75f, FontStyle.Bold)
+					Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 				};
 				btnCopy.Click += delegate
 				{
@@ -321,6 +321,24 @@ namespace AandmAuto
 					{
 					}
 				};
+				dlg.Controls.Add(btnCopy);
+				if (onExportSnapshot != null)
+				{
+					var btnSnap = new GameButton
+					{
+						Text = "带战报导出一图流 PNG",
+						Location = new Point(190, 368),
+						Size = new Size(192, 38),
+						Skin = GameButtonSkin.Green,
+						Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
+					};
+					btnSnap.Click += delegate
+					{
+						dlg.Close();
+						onExportSnapshot();
+					};
+					dlg.Controls.Add(btnSnap);
+				}
 				var btnClose = new GameButton
 				{
 					Text = "关闭",
@@ -331,7 +349,6 @@ namespace AandmAuto
 				};
 				btnClose.Click += delegate { dlg.Close(); };
 
-				dlg.Controls.Add(btnCopy);
 				dlg.Controls.Add(btnClose);
 				dlg.ShowDialog(owner);
 			}

@@ -48,6 +48,12 @@ namespace AandmAuto
 					s = ReplaceIgnoreCase(s, profile.Replace("\\", "\\\\"), "<USERPROFILE>");
 					s = ReplaceIgnoreCase(s, profile.Replace("\\", "/"), "<USERPROFILE>");
 				}
+				string userName = Environment.UserName;
+				if (!string.IsNullOrEmpty(userName) && userName.Length >= 2)
+				{
+					s = Regex.Replace(s, @"([\\/])" + Regex.Escape(userName) + @"([\\/])", "$1<USER>$2", RegexOptions.IgnoreCase);
+					s = Regex.Replace(s, @"(\\\\)" + Regex.Escape(userName) + @"(\\\\)", "$1<USER>$2", RegexOptions.IgnoreCase);
+				}
 			}
 			catch
 			{
@@ -82,8 +88,20 @@ namespace AandmAuto
 					if (n <= 0) break;
 					offset += n;
 				}
+				int startIdx = 0;
+				if (start > 0)
+				{
+					// 跳过首部可能被截断的半个 UTF-8 多字节字符，直接从首个换行后开始
+					while (startIdx < offset && buf[startIdx] != (byte)'\n') startIdx++;
+					if (startIdx < offset && buf[startIdx] == (byte)'\n') startIdx++;
+					else
+					{
+						startIdx = 0;
+						while (startIdx < offset && (buf[startIdx] & 0xC0) == 0x80) startIdx++;
+					}
+				}
 				string prefix = start > 0 ? "[... 已截断较早日志 ...]\r\n" : "";
-				return prefix + Encoding.UTF8.GetString(buf, 0, offset);
+				return prefix + Encoding.UTF8.GetString(buf, startIdx, offset - startIdx);
 			}
 		}
 
@@ -201,7 +219,13 @@ namespace AandmAuto
 				var js = new JavaScriptSerializer();
 				var dict = js.DeserializeObject(rawJson) as Dictionary<string, object>;
 				if (dict == null) return SanitizeText(rawJson);
-				string[] stripKeys = { "customBackgroundPath", "customBackgroundLabel", "wallpaperEngineDir", "wallpaperEngineProject", "account", "username", "password" };
+				string[] stripKeys =
+				{
+					"customBgPath", "customBgLabel",
+					"customBackgroundPath", "customBackgroundLabel",
+					"wallpaperEngineDir", "wallpaperEngineProject",
+					"account", "username", "password"
+				};
 				foreach (string k in stripKeys)
 				{
 					if (dict.ContainsKey(k)) dict[k] = "<REDACTED>";
@@ -270,7 +294,7 @@ namespace AandmAuto
 			Directory.CreateDirectory(Path.Combine(fakeRoot, "EBWebView", "Default"));
 			File.WriteAllText(Path.Combine(fakeRoot, "EBWebView", "Default", "Cookies"), "SESSION_COOKIE_XYZ", Encoding.UTF8);
 			File.WriteAllText(Path.Combine(fakeRoot, "startup-error.log"), "Error at C:\\Users\\SecretPlayer\\Desktop\\app.exe token ghp_1234567890abcdef1234567890abcdef1234", Encoding.UTF8);
-			File.WriteAllText(Path.Combine(fakeRoot, "options.json"), "{\"autoMine\":true,\"customBackgroundPath\":\"C:\\\\Users\\\\SecretPlayer\\\\pic.png\"}", Encoding.UTF8);
+			File.WriteAllText(Path.Combine(fakeRoot, "options.json"), "{\"autoMine\":true,\"customBgPath\":\"C:\\\\Users\\\\SecretPlayer\\\\pic.png\",\"customBgLabel\":\"MySecretWallpaperName\",\"wallpaperEngineProject\":\"D:\\\\Secret\\\\proj.json\"}", Encoding.UTF8);
 
 			string zipPath = Path.Combine(outDir, "diag-test-" + BuildEdition.UpdateChannel + ".zip");
 			DiagnosticExportResult res = ExportToZip(zipPath, fakeRoot, "12:00:00 测试日志 C:\\Users\\SecretPlayer\\run");
@@ -298,6 +322,7 @@ namespace AandmAuto
 							|| body.Contains("MY_REAL_LOGIN_ID")
 							|| body.Contains("SESSION_COOKIE_XYZ")
 							|| body.Contains("SecretPlayer")
+							|| body.Contains("MySecretWallpaperName")
 							|| body.Contains("ghp_1234567890abcdef1234567890abcdef1234"))
 						{
 							leakedSecret = true;

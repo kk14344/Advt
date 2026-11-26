@@ -158,6 +158,25 @@ namespace AandmAuto
 		private int injectingPage = -1;
 		private int injectedPage = -1;
 		private readonly SelfHealWatchdog selfHeal = new SelfHealWatchdog();
+		private Timer selfHealTimer;
+
+		internal void SafeBeginInvoke(Action action)
+		{
+			if (action == null || IsDisposed || Disposing || !IsHandleCreated) return;
+			try
+			{
+				BeginInvoke((MethodInvoker)delegate
+				{
+					if (!IsDisposed && !Disposing) action();
+				});
+			}
+			catch (ObjectDisposedException)
+			{
+			}
+			catch (InvalidOperationException)
+			{
+			}
+		}
 
 		private bool lastRunning;
 
@@ -463,10 +482,26 @@ namespace AandmAuto
 			string planText = lblMinePlan != null ? lblMinePlan.Text : "";
 			string slotsText = lblMineSlots != null ? lblMineSlots.Text : "";
 
+			int themeBeforeSettings = UiTheme.CurrentTheme;
+			bool themePreviewed = false;
 			using (var wallpaperSnapshot = UiTheme.EngineFrame == null ? null : new Bitmap(UiTheme.EngineFrame))
-			using (var dialog = new AssistantSettingsForm(options, numberOptions, scheduleCopy, branchTitles, MineResearchMask(), planText, slotsText, initialCategory, customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, wallpaperSnapshot, AddLog, () => txtLog != null ? txtLog.Text : ""))
+			using (var dialog = new AssistantSettingsForm(options, numberOptions, scheduleCopy, branchTitles, MineResearchMask(), planText, slotsText, initialCategory, customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, wallpaperSnapshot, AddLog, () => txtLog != null ? txtLog.Text : "", delegate(int previewTheme)
 			{
-				if (dialog.ShowDialog(this) != DialogResult.OK) return;
+				if (previewTheme != UiTheme.CurrentTheme)
+				{
+					themePreviewed = true;
+					SwitchUiAppearance(activeUiLayout, previewTheme, customBgPath, UiTheme.CustomBackgroundOpacity, UiTheme.CustomBackgroundMode, UiTheme.GlassBlur, UiTheme.CustomBackgroundFit);
+				}
+			}))
+			{
+				if (dialog.ShowDialog(this) != DialogResult.OK)
+				{
+					if (themePreviewed && UiTheme.CurrentTheme != themeBeforeSettings)
+					{
+						SwitchUiAppearance(activeUiLayout, themeBeforeSettings, customBgPath, UiTheme.CustomBackgroundOpacity, UiTheme.CustomBackgroundMode, UiTheme.GlassBlur, UiTheme.CustomBackgroundFit);
+					}
+					return;
+				}
 
 				int prevLayout = activeUiLayout;
 				int prevTheme = UiTheme.CurrentTheme;
@@ -1087,7 +1122,7 @@ namespace AandmAuto
 			{
 				return;
 			}
-			if (string.Equals(result.Host, "118.195.220.62", StringComparison.OrdinalIgnoreCase))
+			if (string.Equals(result.Host, GameHost, StringComparison.OrdinalIgnoreCase))
 			{
 				webView.CoreWebView2.Navigate(e.Uri);
 			}
@@ -1124,11 +1159,19 @@ namespace AandmAuto
 			AddLog("触发挂机自愈（" + reason + " · " + decision.AttemptInWindow + "/" + decision.MaxInWindow + "）：3 秒后自动重载游戏页面" + (resumeMining ? "并续跑挖矿" : "") + "…", GoldColor);
 			SetStatusUi("挂机自愈重载中…", YellowColor, "3 秒后自动重载恢复");
 			SetBadge("自愈中", YellowColor);
-			var timer = new Timer { Interval = 3000 };
-			timer.Tick += delegate
+			if (selfHealTimer != null)
 			{
-				timer.Stop();
-				timer.Dispose();
+				try { selfHealTimer.Stop(); selfHealTimer.Dispose(); } catch { }
+				selfHealTimer = null;
+			}
+			selfHealTimer = new Timer { Interval = 3000 };
+			selfHealTimer.Tick += delegate
+			{
+				if (selfHealTimer != null)
+				{
+					try { selfHealTimer.Stop(); selfHealTimer.Dispose(); } catch { }
+					selfHealTimer = null;
+				}
 				selfHeal.ReloadScheduled = false;
 				if (IsDisposed || !coreReady || webView == null || webView.CoreWebView2 == null) return;
 				try
@@ -1140,7 +1183,7 @@ namespace AandmAuto
 					AddLog("挂机自愈重载失败：" + ex.Message, RedColor);
 				}
 			};
-			timer.Start();
+			selfHealTimer.Start();
 		}
 
 		private void Core_ProcessFailed(object sender, CoreWebView2ProcessFailedEventArgs e)
@@ -1149,6 +1192,15 @@ namespace AandmAuto
             ResetAllTaskStates();
             startRequested=lastRunning=false;RefreshTaskControls();
 			AddLog("游戏渲染进程异常：" + e.ProcessFailedKind, RedColor);
+			if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited)
+			{
+				coreReady = false;
+				selfHeal.ClearPendingResume();
+				SetStatusUi("浏览器主进程退出", RedColor, "请关闭并重新打开助手窗口");
+				SetBadge("需重启", RedColor);
+				AddLog("WebView2 浏览器主进程已异常退出，无法原地重载，请重启助手。", RedColor);
+				return;
+			}
 			SetStatusUi("游戏进程异常", RedColor, "请点击“重新加载游戏”恢复");
 			SetBadge("需处理", RedColor);
 			TryTriggerSelfHeal("渲染进程异常 " + e.ProcessFailedKind, wasMining);
@@ -2651,7 +2703,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 			else
 			{
-				webView.Source = new Uri("https://118.195.220.62/");
+				webView.Source = new Uri(GameUrl);
 			}
 		}
 
@@ -2759,7 +2811,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 			if (base.InvokeRequired)
 			{
-				BeginInvoke(new Action<bool>(ClearAdventureLogs), automatic);
+				SafeBeginInvoke(delegate { ClearAdventureLogs(automatic); });
 				return;
 			}
 			if (automatic && txtLog.TextLength == 0)
@@ -2792,7 +2844,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 			if (base.InvokeRequired)
 			{
-				BeginInvoke(new Action<string, Color>(AddLog), text, color);
+				SafeBeginInvoke(delegate { AddLog(text, color); });
 				return;
 			}
 			AppendAdventureLogs(new[] { text }, color);
@@ -2978,7 +3030,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 			if (accountUsername.Length <= 4)
 			{
-				return accountUsername;
+				return accountUsername.Substring(0, 1) + "***";
 			}
 			return accountUsername.Substring(0, 4) + "****";
 		}
@@ -3273,6 +3325,8 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
             try { if(scheduleTimer!=null){scheduleTimer.Stop();scheduleTimer.Dispose();} } catch { }
             try { if(dailyTaskTimer!=null){dailyTaskTimer.Stop();dailyTaskTimer.Dispose();} } catch { }
             try { if(logCleanupTimer!=null){logCleanupTimer.Stop();logCleanupTimer.Dispose();logCleanupTimer=null;} } catch { }
+            try { if(selfHealTimer!=null){selfHealTimer.Stop();selfHealTimer.Dispose();selfHealTimer=null;} } catch { }
+            try { if(hints!=null){hints.RemoveAll();hints.Dispose();hints=null;} } catch { }
             try
             {
                 if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Dispose(); trayIcon = null; }

@@ -180,6 +180,17 @@ namespace AandmAuto
 
 			Shown += delegate { StartCheck(); };
 			FormClosing += delegate { CancelActive(); };
+			FormClosed += delegate { DisposeCts(); };
+		}
+
+		private void DisposeCts()
+		{
+			if (cts != null)
+			{
+				try { cts.Cancel(); } catch { }
+				try { cts.Dispose(); } catch { }
+				cts = null;
+			}
 		}
 
 		private void CancelActive()
@@ -190,12 +201,30 @@ namespace AandmAuto
 			}
 		}
 
+		private void SafeUi(Action action)
+		{
+			if (action == null || IsDisposed || Disposing || !IsHandleCreated) return;
+			try
+			{
+				BeginInvoke((MethodInvoker)delegate
+				{
+					if (!IsDisposed && !Disposing) action();
+				});
+			}
+			catch (ObjectDisposedException)
+			{
+			}
+			catch (InvalidOperationException)
+			{
+			}
+		}
+
 		private void StartCheck()
 		{
 			if (busy) return;
 			busy = true;
 			downloading = false;
-			CancelActive();
+			DisposeCts();
 			cts = new CancellationTokenSource();
 			CancellationToken token = cts.Token;
 
@@ -203,7 +232,7 @@ namespace AandmAuto
 			btnUpdate.Enabled = false;
 			btnUpdate.Text = "立即更新";
 			progressBar.Visible = false;
-			lblProgress.Text = "正在检测更新源（直连优先，自动镜像回退）…";
+			lblProgress.Text = "正在检测更新源（直连与镜像并发竞速）…";
 			lblStatus.Text = "正在检查最新版本…";
 			lblStatus.ForeColor = UiTheme.Palette.TextColor;
 			txtNotes.Text = "正在请求静态更新清单，请稍候…";
@@ -211,14 +240,7 @@ namespace AandmAuto
 			ThreadPool.QueueUserWorkItem(delegate
 			{
 				UpdateCheckResult result = UpdateManager.CheckForUpdates(token);
-				if (IsDisposed || !IsHandleCreated) return;
-				try
-				{
-					BeginInvoke((MethodInvoker)delegate { ApplyCheckResult(result); });
-				}
-				catch
-				{
-				}
+				SafeUi(delegate { ApplyCheckResult(result); });
 			});
 		}
 
@@ -296,7 +318,7 @@ namespace AandmAuto
 
 			busy = true;
 			downloading = true;
-			CancelActive();
+			DisposeCts();
 			cts = new CancellationTokenSource();
 			CancellationToken token = cts.Token;
 
@@ -318,26 +340,18 @@ namespace AandmAuto
 						info,
 						delegate(int pct, long done, long total, string src)
 						{
-							if (IsDisposed || !IsHandleCreated) return;
-							try
+							SafeUi(delegate
 							{
-								BeginInvoke((MethodInvoker)delegate
-								{
-									progressBar.Value = Math.Max(0, Math.Min(100, pct));
-									string detail = total > 0
-										? string.Format("{0} · {1:0.00} MB / {2:0.00} MB ({3}%)", src, done / 1048576.0, total / 1048576.0, pct)
-										: string.Format("{0} · 已下载 {1:0.00} MB", src, done / 1048576.0);
-									lblProgress.Text = detail;
-								});
-							}
-							catch
-							{
-							}
+								progressBar.Value = Math.Max(0, Math.Min(100, pct));
+								string detail = total > 0
+									? string.Format("{0} · {1:0.00} MB / {2:0.00} MB ({3}%)", src, done / 1048576.0, total / 1048576.0, pct)
+									: string.Format("{0} · 已下载 {1:0.00} MB", src, done / 1048576.0);
+								lblProgress.Text = detail;
+							});
 						},
 						token);
 
-					if (IsDisposed || !IsHandleCreated) return;
-					BeginInvoke((MethodInvoker)delegate
+					SafeUi(delegate
 					{
 						lblStatus.Text = "校验通过！正在重启并替换新版本…";
 						lblProgress.Text = "SHA-256 校验通过，窗口关闭后将自动启动新版。";
@@ -357,25 +371,11 @@ namespace AandmAuto
 				}
 				catch (OperationCanceledException)
 				{
-					if (IsDisposed || !IsHandleCreated) return;
-					try
-					{
-						BeginInvoke((MethodInvoker)delegate { ResetAfterDownloadError("已取消下载。"); });
-					}
-					catch
-					{
-					}
+					SafeUi(delegate { ResetAfterDownloadError("已取消下载。"); });
 				}
 				catch (Exception ex)
 				{
-					if (IsDisposed || !IsHandleCreated) return;
-					try
-					{
-						BeginInvoke((MethodInvoker)delegate { ResetAfterDownloadError(ex.Message); });
-					}
-					catch
-					{
-					}
+					SafeUi(delegate { ResetAfterDownloadError(ex.Message); });
 				}
 			});
 		}

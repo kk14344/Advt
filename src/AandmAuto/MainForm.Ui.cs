@@ -248,6 +248,11 @@ namespace AandmAuto
 			Image headerBar = GameArt.Get("game-headerbar.png");
 			Image rewardBg = GameArt.Get("game-rewardbtn_bg.png");
 			Image icon = LoadArt("AandmAuto.icon.png");
+			header.Disposed += delegate
+			{
+				try { if (cave != null) { cave.Dispose(); cave = null; } } catch { }
+				try { if (icon != null) { icon.Dispose(); icon = null; } } catch { }
+			};
 			Font titleFont = UiTheme.GameFont(13f, FontStyle.Bold);
 			Font subFont = UiTheme.GameFont(7.5f, FontStyle.Regular);
 			Font nativeTitleFont = UiTheme.UiFont(11f, FontStyle.Bold);
@@ -385,12 +390,14 @@ namespace AandmAuto
 			};
 
 			var rightHost = new Panel { Dock = DockStyle.Right, Width = 104, BackColor = Color.Transparent };
-#if TEST_PVP_EDITION
 			var btnHeaderSettings = new HeaderIconButton(HeaderIconKind.Settings) { Location = new Point(0, 3), Size = new Size(30, 30) };
+#if TEST_PVP_EDITION
 			btnHeaderSettings.Click += delegate { OpenOptions("game"); };
+#else
+			btnHeaderSettings.Click += delegate { OpenOptions("mining"); };
+#endif
 			hints.SetToolTip(btnHeaderSettings, "助手设置与检查更新");
 			rightHost.Controls.Add(btnHeaderSettings);
-#endif
 			btnHeaderAccount = new HeaderIconButton(HeaderIconKind.Accounts) { Location = new Point(34, 3), Size = new Size(30, 30) };
 			btnHeaderAccount.Click += BtnAccount_Click;
 			hints.SetToolTip(btnHeaderAccount, "账号管理与多开同屏");
@@ -764,25 +771,22 @@ namespace AandmAuto
 			{
 				Dock = DockStyle.Fill,
 				ColumnCount = 3,
-				RowCount = 3,
+				RowCount = 2,
 				BackColor = Color.Transparent,
 				Margin = new Padding(0, 4, 0, 0)
 			};
 			for (int i = 0; i < 3; i++) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
-			for (int i = 0; i < 3; i++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
+			for (int i = 0; i < 2; i++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
 			campGridHost = grid;
 
 			string[,] cats =
 			{
-				{ "mining", "矿洞策略" },
-				{ "resources", "资源与宝箱" },
+				{ "mining", "挖矿与宝箱" },
 				{ "daily", "日常清单" },
-				{ "workshop", "工坊与工会" },
-				{ "growth", "符文与宿命" },
-				{ "mine", "矿山研究" },
+				{ "workshop", "工坊与矿山" },
 				{ "schedule", "定时任务" },
-				{ "game", "游戏偏好" },
-				{ "advanced", "高级策略" }
+				{ "game", "界面与壁纸" },
+				{ "advanced", "高级与治理" }
 			};
 			for (int i = 0; i < cats.GetLength(0); i++)
 			{
@@ -792,14 +796,12 @@ namespace AandmAuto
 					Text = cats[i, 1],
 					Dock = DockStyle.Fill,
 					Skin = GameButtonSkin.Stone,
-					Margin = new Padding(3, 2, 3, 2),
+					Margin = new Padding(3, 3, 3, 3),
 					Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 				};
 				btn.Click += async delegate { await OpenUnifiedSettingsAsync(key); };
 				if (key == "daily") btnDailyOptions = btn;
 				else if (key == "workshop") btnWorkshopOptions = btn;
-				else if (key == "growth") btnGrowthOptions = btn;
-				else if (key == "mine") btnMineResearch = btn;
 				else if (key == "schedule") btnSchedule = btn;
 				grid.Controls.Add(btn, i % 3, i / 3);
 			}

@@ -128,8 +128,9 @@ namespace AandmAuto
                 btnVoid.Text = voidActive ? "停止虚空" : "开始虚空";
             }
             bool shortRow = activeUiLayout == UiLayoutList;
+            bool compactStatus = activeUiLayout == UiLayoutStatus;
             if (numArenaCount != null) numArenaCount.Enabled = !any;
-            btnArena.Text = arenaActive ? (shortRow ? "停止" : "停止竞技场") : (shortRow ? "开始" : "开始竞技场");
+            btnArena.Text = arenaActive ? (shortRow ? "停止" : (compactStatus ? "停止竞技" : "停止竞技场")) : (shortRow ? "开始" : (compactStatus ? "竞技场" : "开始竞技场"));
             btnArena.Selected = arenaActive;
             if (btnMine != null) {
                 btnMine.Enabled = coreReady && !IsOtherTaskRunning(AssistantTaskKind.Mine);

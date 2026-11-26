@@ -116,12 +116,26 @@ namespace AandmAuto
 			return bar;
 		}
 
+		private string PvpExportsDir()
+		{
+			string dir = Path.Combine(AppPaths.DataRoot, "pvp-exports");
+			Directory.CreateDirectory(dir);
+			return dir;
+		}
+
+		private static bool HasLocalPvpSimToolkit()
+		{
+			return Directory.Exists(PvpSimDir) && File.Exists(Path.Combine(PvpSimDir, "sim.py"));
+		}
+
 		private void RebuildTestPvpSidebar()
 		{
 			if (sidebarScroll == null || sidebarScroll.IsDisposed) return;
 			sidebarScroll.SuspendLayout();
 			try
 			{
+				ClearSidebarDynamicRefs();
+				if (hints != null) hints.RemoveAll();
 				while (sidebarScroll.Controls.Count > 0)
 				{
 					Control c = sidebarScroll.Controls[0];
@@ -433,7 +447,7 @@ namespace AandmAuto
 			var row = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, BackColor = Color.Transparent, Margin = Padding.Empty };
 			for (int i = 0; i < 5; i++) row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20f));
 			AddRuneQuickButton(row, 0, "5×防衰", new int[] { 59, 59, 59, 59, 59 }, GameButtonSkin.Orange);
-			AddRuneQuickButton(row, 1, "3王+2闪王", new int[] { 63, 63, 63, 69, 69 }, GameButtonSkin.Violet);
+			AddRuneQuickButton(row, 1, "3王2闪王", new int[] { 63, 63, 63, 69, 69 }, GameButtonSkin.Violet);
 			AddRuneQuickButton(row, 2, "5×王衰", new int[] { 63, 63, 63, 63, 63 }, GameButtonSkin.Stone);
 			AddRuneQuickButton(row, 3, "5×防王", new int[] { 66, 66, 66, 66, 66 }, GameButtonSkin.Stone);
 			var btnCustom = new GameButton { Text = "自定义", Dock = DockStyle.Fill, Skin = GameButtonSkin.Green, StretchWide = true, Font = UiTheme.GameFont(7.8f, FontStyle.Bold), Margin = new Padding(2, 1, 0, 1) };
@@ -680,7 +694,7 @@ namespace AandmAuto
 			aRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44f));
 			aRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32f));
 			aRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24f));
-			aRow.Controls.Add(CreateBattleBtn("切磋实测(在途1)"), 0, 0);
+			aRow.Controls.Add(CreateBattleBtn("好友切磋"), 0, 0);
 			var btnOpt = CreateOptimizeBtn("10核寻优");
 			btnOpt.Margin = new Padding(3, 1, 3, 1);
 			aRow.Controls.Add(btnOpt, 1, 0);
@@ -1052,7 +1066,7 @@ namespace AandmAuto
 			AddLog("已零误差解析一图流：" + FormatLoadedFormationSummary(), GreenColor);
 		}
 
-		private void PickAndLoadPresetDialog()
+		private async void PickAndLoadPresetDialog()
 		{
 			PresetLoadResult loaded = TestPvpExtras.LoadPresetsWithFallback(PvpSimDir);
 			if (string.IsNullOrEmpty(loaded.RawJson))
@@ -1062,13 +1076,16 @@ namespace AandmAuto
 			}
 			Dictionary<string, object> all = json.DeserializeObject(loaded.RawJson) as Dictionary<string, object>;
 			if (all == null) return;
-			var keys = new List<string>();
+			var allKeys = new List<string>();
+			var visibleKeys = new List<string>();
+			bool deployAfterLoad = false;
+			int selectedFid = GetSelectedPvpFid();
 
 			using (var dlg = new Form
 			{
 				Text = "选择预设阵容 · " + loaded.SourceLabel,
-				Width = 500,
-				Height = 470,
+				Width = 540,
+				Height = 520,
 				StartPosition = FormStartPosition.CenterParent,
 				BackColor = SideColor,
 				ForeColor = TextColor,
@@ -1076,100 +1093,189 @@ namespace AandmAuto
 				MaximizeBox = false
 			})
 			{
+				var topWrap = new Panel { Dock = DockStyle.Top, Height = 58, Padding = new Padding(8, 4, 8, 4), BackColor = Color.Transparent };
 				var lblSrc = new SmoothLabel
 				{
 					Text = "当前来源：" + loaded.SourceLabel,
 					Dock = DockStyle.Top,
-					Height = 24,
+					Height = 22,
 					BackColor = Color.Transparent,
 					ForeColor = GoldColor,
 					Font = UiTheme.GameFont(8.25f, FontStyle.Bold),
-					Padding = new Padding(8, 0, 8, 0),
 					TextAlign = ContentAlignment.MiddleLeft
 				};
+				var txtSearch = new TextBox
+				{
+					Dock = DockStyle.Bottom,
+					Height = 24,
+					BackColor = UiTheme.Palette.InputBackColor,
+					ForeColor = TextColor,
+					Font = UiTheme.UiFont(9f, FontStyle.Regular)
+				};
+				var lblHint = new SmoothLabel
+				{
+					Text = "搜索流派/关键词：",
+					Dock = DockStyle.Left,
+					Width = 112,
+					BackColor = Color.Transparent,
+					ForeColor = MutedColor,
+					Font = UiTheme.GameFont(8f),
+					TextAlign = ContentAlignment.MiddleLeft
+				};
+				var searchRow = new Panel { Dock = DockStyle.Bottom, Height = 26, BackColor = Color.Transparent };
+				searchRow.Controls.Add(txtSearch);
+				searchRow.Controls.Add(lblHint);
+				topWrap.Controls.Add(searchRow);
+				topWrap.Controls.Add(lblSrc);
+
 				var lb = new ListBox
 				{
 					Dock = DockStyle.Fill,
 					BackColor = CardColor,
 					ForeColor = TextColor,
-					Font = UiTheme.UiFont(9.5f, FontStyle.Regular)
+					Font = UiTheme.UiFont(9.25f, FontStyle.Regular)
 				};
-				Action<Dictionary<string, object>> populate = delegate(Dictionary<string, object> map)
+				var lblPreview = new SmoothLabel
 				{
-					all = map;
-					keys.Clear();
-					lb.Items.Clear();
-					if (map == null) return;
-					foreach (string k in map.Keys)
+					Text = "选择上方预设查看武器与符文摘要",
+					Dock = DockStyle.Bottom,
+					Height = 26,
+					BackColor = UiTheme.Palette.InsetColor,
+					ForeColor = GoldColor,
+					Font = UiTheme.GameFont(8f),
+					Padding = new Padding(8, 0, 8, 0),
+					TextAlign = ContentAlignment.MiddleLeft,
+					AutoEllipsis = true
+				};
+
+				Action updatePreview = delegate
+				{
+					if (lb.SelectedIndex < 0 || lb.SelectedIndex >= visibleKeys.Count || all == null)
 					{
-						if (!k.StartsWith("friend_", StringComparison.OrdinalIgnoreCase)) keys.Add(k);
+						lblPreview.Text = "未选中预设";
+						return;
 					}
-					keys.Sort(StringComparer.OrdinalIgnoreCase);
-					foreach (string k in keys)
+					var d = all[visibleKeys[lb.SelectedIndex]] as Dictionary<string, object>;
+					if (d == null) return;
+					int wid = GetIntField(d, "weapon_id", GetIntField(d, "weapon", 12));
+					string wname = d.ContainsKey("weapon") && !(d["weapon"] is int) ? Convert.ToString(d["weapon"]) : ("武器#" + wid);
+					var runes = d.ContainsKey("runes") ? d["runes"] as System.Collections.IList : null;
+					var slots = d.ContainsKey("slots") ? d["slots"] as System.Collections.IList : null;
+					lblPreview.Text = string.Format("摘要：{0} · 佣兵 {1} 位 · 符文 {2} 枚", wname, slots != null ? slots.Count : 0, runes != null ? runes.Count : 0);
+				};
+
+				Action applyFilter = delegate
+				{
+					string q = (txtSearch.Text ?? "").Trim();
+					visibleKeys.Clear();
+					lb.Items.Clear();
+					foreach (string k in allKeys)
 					{
-						var d = map[k] as Dictionary<string, object>;
+						var d = all[k] as Dictionary<string, object>;
 						string nm = (d != null && d.ContainsKey("name")) ? Convert.ToString(d["name"]) : k;
+						if (q.Length > 0 && k.IndexOf(q, StringComparison.OrdinalIgnoreCase) < 0 && nm.IndexOf(q, StringComparison.OrdinalIgnoreCase) < 0) continue;
+						visibleKeys.Add(k);
 						lb.Items.Add(k + "  |  " + nm);
 					}
 					if (lb.Items.Count > 0) lb.SelectedIndex = 0;
+					updatePreview();
 				};
+
+				Action<Dictionary<string, object>> populate = delegate(Dictionary<string, object> map)
+				{
+					all = map;
+					allKeys.Clear();
+					if (map != null)
+					{
+						foreach (string k in map.Keys)
+						{
+							if (!k.StartsWith("friend_", StringComparison.OrdinalIgnoreCase)) allKeys.Add(k);
+						}
+						allKeys.Sort(StringComparer.OrdinalIgnoreCase);
+					}
+					applyFilter();
+				};
+
+				txtSearch.TextChanged += delegate { applyFilter(); };
+				lb.SelectedIndexChanged += delegate { updatePreview(); };
 				populate(all);
 
-				var bottomBar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 42, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Padding = new Padding(4, 3, 4, 3) };
-				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44f));
-				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56f));
+				var bottomBar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 42, ColumnCount = 3, RowCount = 1, BackColor = Color.Transparent, Padding = new Padding(4, 3, 4, 3) };
+				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34f));
+				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28f));
+				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38f));
 
-				var btnSync = new GameButton { Text = "在线同步最新预设库", Dock = DockStyle.Fill, Skin = GameButtonSkin.Stone, StretchWide = true, Font = UiTheme.GameFont(8.5f, FontStyle.Bold), Margin = new Padding(0, 0, 4, 0) };
-				var btnOk = new GameButton { Text = "载入所选预设", Dock = DockStyle.Fill, Skin = GameButtonSkin.Gold, StretchWide = true, Font = UiTheme.GameFont(9f, FontStyle.Bold), Margin = new Padding(4, 0, 0, 0) };
+				var btnSync = new GameButton { Text = "在线同步预设库", Dock = DockStyle.Fill, Skin = GameButtonSkin.Stone, StretchWide = true, Font = UiTheme.GameFont(8.2f, FontStyle.Bold), Margin = new Padding(0, 0, 4, 0) };
+				var btnLoadOnly = new GameButton { Text = "仅载入", Dock = DockStyle.Fill, Skin = GameButtonSkin.Gold, StretchWide = true, Font = UiTheme.GameFont(8.5f, FontStyle.Bold), Margin = new Padding(2, 0, 2, 0) };
+				var btnLoadDeploy = new GameButton { Text = "载入并部署到 F" + selectedFid, Dock = DockStyle.Fill, Skin = GameButtonSkin.Green, StretchWide = true, Font = UiTheme.GameFont(8.5f, FontStyle.Bold), Margin = new Padding(4, 0, 0, 0) };
 
 				btnSync.Click += delegate
 				{
 					btnSync.Enabled = false;
-					btnSync.Text = "正在同步云端预设…";
+					btnSync.Text = "正在同步…";
 					ThreadPool.QueueUserWorkItem(delegate
 					{
 						try
 						{
 							PresetLoadResult synced = TestPvpExtras.SyncPresetsOnline(CancellationToken.None);
 							var nextMap = json.DeserializeObject(synced.RawJson) as Dictionary<string, object>;
-							if (dlg.IsDisposed || !dlg.IsHandleCreated) return;
-							dlg.BeginInvoke((MethodInvoker)delegate
+							if (dlg.IsDisposed || dlg.Disposing || !dlg.IsHandleCreated) return;
+							try
 							{
-								populate(nextMap);
-								lblSrc.Text = "当前来源：" + synced.SourceLabel;
-								dlg.Text = "选择预设阵容 · " + synced.SourceLabel;
-								btnSync.Text = "同步成功 ✓";
-								btnSync.Enabled = true;
-								AddLog("已在线同步最新 PvP 预设库（共 " + synced.PresetCount + " 套阵型）。", GreenColor);
-							});
+								dlg.BeginInvoke((MethodInvoker)delegate
+								{
+									if (dlg.IsDisposed || dlg.Disposing) return;
+									populate(nextMap);
+									lblSrc.Text = "当前来源：" + synced.SourceLabel;
+									dlg.Text = "选择预设阵容 · " + synced.SourceLabel;
+									btnSync.Text = "同步成功 ✓";
+									btnSync.Enabled = true;
+									AddLog("已在线同步最新 PvP 预设库（共 " + synced.PresetCount + " 套阵型）。", GreenColor);
+								});
+							}
+							catch (ObjectDisposedException) { }
+							catch (InvalidOperationException) { }
 						}
 						catch (Exception ex)
 						{
-							if (dlg.IsDisposed || !dlg.IsHandleCreated) return;
-							dlg.BeginInvoke((MethodInvoker)delegate
+							if (dlg.IsDisposed || dlg.Disposing || !dlg.IsHandleCreated) return;
+							try
 							{
-								btnSync.Text = "在线同步最新预设库";
-								btnSync.Enabled = true;
-								MessageBox.Show(dlg, ex.Message, "同步预设库失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-							});
+								dlg.BeginInvoke((MethodInvoker)delegate
+								{
+									if (dlg.IsDisposed || dlg.Disposing) return;
+									btnSync.Text = "在线同步预设库";
+									btnSync.Enabled = true;
+									MessageBox.Show(dlg, ex.Message, "同步预设库失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+								});
+							}
+							catch (ObjectDisposedException) { }
+							catch (InvalidOperationException) { }
 						}
 					});
 				};
-				btnOk.Click += delegate { dlg.DialogResult = DialogResult.OK; dlg.Close(); };
-				lb.DoubleClick += delegate { dlg.DialogResult = DialogResult.OK; dlg.Close(); };
+				btnLoadOnly.Click += delegate { deployAfterLoad = false; dlg.DialogResult = DialogResult.OK; dlg.Close(); };
+				btnLoadDeploy.Click += delegate { deployAfterLoad = true; dlg.DialogResult = DialogResult.OK; dlg.Close(); };
+				lb.DoubleClick += delegate { deployAfterLoad = false; dlg.DialogResult = DialogResult.OK; dlg.Close(); };
 
 				bottomBar.Controls.Add(btnSync, 0, 0);
-				bottomBar.Controls.Add(btnOk, 1, 0);
+				bottomBar.Controls.Add(btnLoadOnly, 1, 0);
+				bottomBar.Controls.Add(btnLoadDeploy, 2, 0);
 				dlg.Controls.Add(lb);
-				dlg.Controls.Add(lblSrc);
+				dlg.Controls.Add(topWrap);
+				dlg.Controls.Add(lblPreview);
 				dlg.Controls.Add(bottomBar);
-				if (dlg.ShowDialog(this) == DialogResult.OK && lb.SelectedIndex >= 0 && lb.SelectedIndex < keys.Count)
+				if (dlg.ShowDialog(this) == DialogResult.OK && lb.SelectedIndex >= 0 && lb.SelectedIndex < visibleKeys.Count)
 				{
-					string key = keys[lb.SelectedIndex];
+					string key = visibleKeys[lb.SelectedIndex];
 					loadedFormation = all[key] as Dictionary<string, object>;
 					loadedFormationSource = "预设:" + key;
 					UpdateLoadedFormationUi();
 					AddLog("已载入预设：" + FormatLoadedFormationSummary(), GreenColor);
+					if (deployAfterLoad)
+					{
+						await DeployLoadedFormationAsync();
+					}
 				}
 			}
 		}
@@ -1545,6 +1651,12 @@ namespace AandmAuto
 					if (st != null && st.ContainsKey("done") && Convert.ToBoolean(st["done"])) break;
 				}
 				await EvalLuaDecodedAsync("if _G.__ANTIGRA_ORIG_DISPATCH then require('util.network').event_listener.Dispatch = _G.__ANTIGRA_ORIG_DISPATCH end; if _G.__ANTIGRA_ORIG_QUERY_RUNE_LOADOUTS then require('logic.rune').QueryRuneLoadouts = _G.__ANTIGRA_ORIG_QUERY_RUNE_LOADOUTS end; return true");
+				if (testPvpCancel.IsCancellationRequested)
+				{
+					AddLog("已手动停止无损换符文。", YellowColor);
+					EndTestPvpWork("已停止", YellowColor);
+					return;
+				}
 				if (st == null || !Convert.ToBoolean(st["ok"]))
 					throw new Exception(st != null && st.ContainsKey("err") ? Convert.ToString(st["err"]) : "换符文超时");
 				AddLog(string.Format("符文已无损切换为 [{0}]（转换{1}次 · 装备{2}次 · 重试{3} · 耗时 {4:0.2}s）", label, st["exchanges"], st["equips"], st["retries"], sw.Elapsed.TotalSeconds), GreenColor);
@@ -1690,13 +1802,25 @@ namespace AandmAuto
 				cbFid.SelectedIndex = GetSelectedPvpFid() - 1;
 				var numN = new NumericUpDown { Width = 74, Minimum = 10, Maximum = 500, Value = 100, BackColor = CardColor, ForeColor = TextColor };
 				var numTarget = new NumericUpDown { Width = 62, Minimum = 1, Maximum = 100, Value = 70, BackColor = CardColor, ForeColor = TextColor };
+				bool userEditedN = false;
+				bool settingAutoN = false;
+				numN.ValueChanged += delegate { if (!settingAutoN) userEditedN = true; };
 				clb.ItemCheck += delegate
 				{
-					dlg.BeginInvoke((MethodInvoker)delegate
+					if (dlg.IsDisposed || dlg.Disposing || !dlg.IsHandleCreated) return;
+					try
 					{
-						int cnt = clb.CheckedIndices.Count;
-						numN.Value = cnt <= 1 ? 100 : 80;
-					});
+						dlg.BeginInvoke((MethodInvoker)delegate
+						{
+							if (dlg.IsDisposed || clb.IsDisposed || numN.IsDisposed || userEditedN) return;
+							int cnt = clb.CheckedIndices.Count;
+							settingAutoN = true;
+							numN.Value = cnt <= 1 ? 100 : 80;
+							settingAutoN = false;
+						});
+					}
+					catch (ObjectDisposedException) { }
+					catch (InvalidOperationException) { }
 				};
 				rowOpt.Controls.Add(new SmoothLabel { Text = "出战:", Width = 40, Height = 24, ForeColor = TextColor, TextAlign = ContentAlignment.MiddleLeft });
 				rowOpt.Controls.Add(cbFid);
@@ -1807,8 +1931,7 @@ namespace AandmAuto
 						if (!Convert.ToBoolean(r["pass"])) allPass = false;
 					}
 					double avgWr = Math.Round(sumWr / reportRows.Count, 2);
-					string repPath = Path.Combine(PvpSimDir, "exports", "helper_live_report_f" + fid + ".json");
-					Directory.CreateDirectory(Path.GetDirectoryName(repPath));
+					string repPath = Path.Combine(PvpExportsDir(), "helper_live_report_f" + fid + ".json");
 					var repObj = new Dictionary<string, object>
 					{
 						{ "tested_at", DateTime.UtcNow.ToString("o") },
@@ -1818,11 +1941,14 @@ namespace AandmAuto
 						{ "results", reportRows }
 					};
 					File.WriteAllText(repPath, json.Serialize(repObj), Encoding.UTF8);
-					AddLog(string.Format("实测完毕：最低 {0:0.2}% · 均胜 {1:0.2}% · 总耗时 {2:0.2}s（战报已保存，可点 ⑥ 导出一图流）", minWr, avgWr, swAll.Elapsed.TotalSeconds), allPass ? GreenColor : GoldColor);
+					AddLog(string.Format("实测完毕：最低 {0:0.2}% · 均胜 {1:0.2}% · 总耗时 {2:0.2}s（战报已保存至本地数据目录）", minWr, avgWr, swAll.Elapsed.TotalSeconds), allPass ? GreenColor : GoldColor);
 					EndTestPvpWork(string.Format("实测完成 均胜{0:0.1}%", avgWr), allPass ? GreenColor : GoldColor);
 					if (reportRows.Count > 1 && !IsDisposed)
 					{
-						TestPvpExtras.ShowBattleMatrixDialog(this, fid, targetPct, minWr, avgWr, swAll.Elapsed.TotalSeconds, reportRows);
+						TestPvpExtras.ShowBattleMatrixDialog(this, fid, targetPct, minWr, avgWr, swAll.Elapsed.TotalSeconds, reportRows, delegate
+						{
+							var unused = ExportCurrentFormationSnapshotAsync();
+						});
 					}
 				}
 				else
@@ -2003,11 +2129,15 @@ namespace AandmAuto
 
 		private async Task RunLocalOptimizerAsync(string oppsCsv, string objective, string runeMode, int targetPct, bool autoDeploy)
 		{
+			if (!HasLocalPvpSimToolkit())
+			{
+				MessageBox.Show(this, "当前电脑未找到本地模拟器工具目录（pvp-simulator），无法运行本地 10 核寻优。\r\n提示：仍可正常使用「选预设 → 在线同步预设库」与「好友切磋实测」。", "需要本地模拟器环境", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				return;
+			}
 			if (!BeginTestPvpWork("10核一键寻优")) return;
 			try
 			{
-				string outJson = Path.Combine(PvpSimDir, "exports", "helper_opt_latest.json");
-				Directory.CreateDirectory(Path.GetDirectoryName(outJson));
+				string outJson = Path.Combine(PvpExportsDir(), "helper_opt_latest.json");
 				AddLog(string.Format("开始同步对手 [{0}] 最新阵容与符文…", oppsCsv), BlueColor);
 				await RunExternalCommandAsync("node", string.Format("\"{0}\" sync --opps \"{1}\"", Path.Combine(PvpSimDir, "maowa.mjs"), oppsCsv));
 				if (testPvpCancel.IsCancellationRequested) { EndTestPvpWork("寻优已停止", YellowColor); return; }
@@ -2065,7 +2195,7 @@ namespace AandmAuto
 							if (!string.IsNullOrEmpty(e.Data))
 							{
 								string line = e.Data;
-								if (!IsDisposed) BeginInvoke((MethodInvoker)delegate { AddLog("  " + line, AutoLogColor); });
+								SafeBeginInvoke(delegate { AddLog("  " + line, AutoLogColor); });
 							}
 						};
 						p.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e)
@@ -2073,7 +2203,7 @@ namespace AandmAuto
 							if (!string.IsNullOrEmpty(e.Data))
 							{
 								string line = e.Data;
-								if (!IsDisposed) BeginInvoke((MethodInvoker)delegate { AddLog("  [err] " + line, YellowColor); });
+								SafeBeginInvoke(delegate { AddLog("  [err] " + line, YellowColor); });
 							}
 						};
 						p.BeginOutputReadLine();
@@ -2086,6 +2216,7 @@ namespace AandmAuto
 								break;
 							}
 						}
+						try { p.WaitForExit(); } catch { }
 						tcs.TrySetResult(p.ExitCode);
 					}
 				}
@@ -2122,12 +2253,19 @@ namespace AandmAuto
 				var snap = await EvalLuaDecodedAsync(lua) as Dictionary<string, object>;
 				if (snap == null || !snap.ContainsKey("slots")) throw new Exception("未读取到阵型数据，请确认已登录进入主界面。");
 
-				string expDir = Path.Combine(PvpSimDir, "exports");
-				Directory.CreateDirectory(expDir);
+				string expDir = PvpExportsDir();
 				string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 				string tmpJson = Path.Combine(expDir, string.Format("snapshot_F{0}_{1}.json", fid, stamp));
 				string outPng = Path.Combine(expDir, string.Format("snapshot_F{0}_{1}.png", fid, stamp));
 				File.WriteAllText(tmpJson, json.Serialize(snap), Encoding.UTF8);
+
+				if (!HasLocalPvpSimToolkit())
+				{
+					AddLog("已导出当前阵型 JSON 快照（未检测到本地 Python 一图流渲染环境）：" + tmpJson, GoldColor);
+					EndTestPvpWork("已导出 JSON 快照", GoldColor);
+					try { Process.Start("explorer.exe", "/select,\"" + tmpJson + "\""); } catch { }
+					return;
+				}
 
 				string repPath = Path.Combine(expDir, "helper_live_report_f" + fid + ".json");
 				string repArg = File.Exists(repPath) ? string.Format(" --live-report \"{0}\"", repPath) : "";

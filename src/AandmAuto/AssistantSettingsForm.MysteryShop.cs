@@ -54,7 +54,7 @@ namespace AandmAuto
                 TextAlign = ContentAlignment.MiddleLeft, ForeColor = MutedText, BackColor = Color.Transparent
             });
             panel.Controls.Add(SectionTitle("购买种类", 8, 147));
-            mysteryProductList = new CheckedListBox {
+            mysteryProductList = new GlassCheckedListBox {
                 Name = "MysteryProducts", Location = new Point(12, 190), Size = new Size(756, 233),
                 Font = UiTheme.GameFont(9f), IntegralHeight = false, CheckOnClick = true,
                 BackColor = UiTheme.Palette.InsetColor, ForeColor = BodyText, BorderStyle = BorderStyle.FixedSingle

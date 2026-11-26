@@ -1291,41 +1291,62 @@ namespace AandmAuto
 
 		private void ShowGuide()
 		{
-			using (var dialog = new Form
+			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
+			using (var dialog = new CompositedForm
 			{
 				Text = "虚空 · 每周攻略",
 				Width = 700,
 				Height = 720,
 				StartPosition = FormStartPosition.CenterParent,
-				BackColor = SideColor,
-				ForeColor = TextColor,
+				BackColor = glass ? UiTheme.Palette.BgColor : SideColor,
+				ForeColor = glass ? LiquidGlassEngine.GlassInk(true) : TextColor,
 				Font = Font,
 				MinimizeBox = false,
 				MaximizeBox = false
 			})
 			{
-				var text = new RichTextBox
-				{
-					Dock = DockStyle.Fill,
-					ReadOnly = true,
-					BackColor = CardColor,
-					ForeColor = TextColor,
-					Font = UiTheme.GameFont(10f),
-					BorderStyle = BorderStyle.None,
-					DetectUrls = false
-				};
+				string guideText = string.Empty;
 				using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("AandmAuto.guide.txt"))
-					if (stream != null) using (var reader = new StreamReader(stream, Encoding.UTF8)) text.Text = reader.ReadToEnd();
+					if (stream != null) using (var reader = new StreamReader(stream, Encoding.UTF8)) guideText = reader.ReadToEnd();
 				var note = new SmoothLabel
 				{
 					Dock = DockStyle.Top,
 					Height = 64,
 					Padding = new Padding(14, 9, 14, 0),
 					Text = "按游戏服务器星期匹配；原文第一关对应游戏地图2。\r\n攻略门槛不满足时停止并说明缺项。周五过滤加回合佣兵。",
-					ForeColor = GoldColor
+					ForeColor = glass ? LiquidGlassEngine.GlassInk(true) : GoldColor,
+					BackColor = Color.Transparent
 				};
-				dialog.Controls.Add(text);
-				dialog.Controls.Add(note);
+				if (glass)
+				{
+					var root = new SettingsRootPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(12, 8, 12, 12), Margin = Padding.Empty };
+					root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+					root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
+					root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+					note.Dock = DockStyle.Fill;
+					var viewer = new GlassReadOnlyTextBox { Dock = DockStyle.Fill, Font = UiTheme.GameFont(9.5f), Text = guideText };
+					root.Controls.Add(note, 0, 0);
+					root.Controls.Add(viewer, 0, 1);
+					dialog.Controls.Add(root);
+					GlassControlStyler.ApplyToForm(dialog);
+					GlassFormTransition.Attach(dialog);
+				}
+				else
+				{
+					var text = new RichTextBox
+					{
+						Dock = DockStyle.Fill,
+						ReadOnly = true,
+						BackColor = CardColor,
+						ForeColor = TextColor,
+						Font = UiTheme.GameFont(10f),
+						BorderStyle = BorderStyle.None,
+						DetectUrls = false,
+						Text = guideText
+					};
+					dialog.Controls.Add(text);
+					dialog.Controls.Add(note);
+				}
 				dialog.ShowDialog(this);
 			}
 		}

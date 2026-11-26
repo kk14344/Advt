@@ -6,17 +6,27 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace AandmAuto
 {
 	/// <summary>
-	/// High-precision 60-120fps on-demand animation driver for Liquid Glass micro-interactions.
-	/// Uses Stopwatch sub-millisecond timing and on-demand 1ms multimedia timer resolution
-	/// ONLY while animations are active, releasing immediately when settled (strict 0% idle CPU).
+	/// True 90-144fps+ DWM VSync animation driver for Liquid Glass micro-interactions and dialog transitions.
+	/// Blocks a single background pacing thread on dwmapi.DwmFlush() ONLY while animations are active,
+	/// delivering monitor-native VBlank ticks (90/120/144/165Hz) via WM_APP without WM_TIMER 60fps capping
+	/// or message-queue pileups. Suspends immediately on idle for strict 0% idle CPU.
 	/// </summary>
 	internal static class GlassAnimator
 	{
+		private const int WmAppTick = 0x8000 + 0x42;
+
+		[DllImport("dwmapi.dll")]
+		private static extern int DwmFlush();
+
+		[DllImport("user32.dll", SetLastError = true)]
+		private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
 		[DllImport("winmm.dll")]
 		private static extern uint timeBeginPeriod(uint uPeriod);
 
@@ -28,14 +38,46 @@ namespace AandmAuto
 			internal Func<float, bool> Step;
 		}
 
+		private sealed class TickSink : NativeWindow
+		{
+			internal TickSink()
+			{
+				var cp = new CreateParams
+				{
+					Caption = "AandmGlassTickSink",
+					Parent = new IntPtr(-3) // HWND_MESSAGE
+				};
+				CreateHandle(cp);
+			}
+
+			protected override void WndProc(ref Message m)
+			{
+				if (m.Msg == WmAppTick)
+				{
+					Interlocked.Exchange(ref tickPending, 0);
+					ProcessTickOnUiThread();
+					return;
+				}
+				base.WndProc(ref m);
+			}
+		}
+
 		private static readonly List<Entry> entries = new List<Entry>();
-		private static Timer timer;
+		private static readonly ManualResetEventSlim wakeEvent = new ManualResetEventSlim(false);
+		private static TickSink sink;
+		private static IntPtr sinkHandle = IntPtr.Zero;
+		private static Thread vsyncThread;
+		private static int activeFlag;
+		private static int tickPending;
+		private static int shutdownFlag;
 		private static long lastTimestamp;
 		private static bool highResTimerActive;
+		private static System.Windows.Forms.Timer fallbackTimer;
 
 		static GlassAnimator()
 		{
-			AppDomain.CurrentDomain.ProcessExit += delegate { EndHighResTimer(); };
+			AppDomain.CurrentDomain.ProcessExit += delegate { Shutdown(); };
+			Application.ApplicationExit += delegate { Shutdown(); };
 		}
 
 		internal static bool Enabled
@@ -52,6 +94,14 @@ namespace AandmAuto
 		internal static bool IsAnimating
 		{
 			get { return entries.Count > 0; }
+		}
+
+		private static void Shutdown()
+		{
+			Interlocked.Exchange(ref shutdownFlag, 1);
+			Interlocked.Exchange(ref activeFlag, 0);
+			try { wakeEvent.Set(); } catch { }
+			EndHighResTimer();
 		}
 
 		private static void BeginHighResTimer()
@@ -71,9 +121,11 @@ namespace AandmAuto
 			}
 		}
 
-		private static void StopTimer()
+		private static void StopDriver()
 		{
-			if (timer != null && timer.Enabled) timer.Stop();
+			Interlocked.Exchange(ref activeFlag, 0);
+			wakeEvent.Reset();
+			if (fallbackTimer != null && fallbackTimer.Enabled) fallbackTimer.Stop();
 			EndHighResTimer();
 		}
 
@@ -100,30 +152,98 @@ namespace AandmAuto
 			{
 				if (entries[i].Step == step) entries.RemoveAt(i);
 			}
-			if (entries.Count == 0) StopTimer();
+			if (entries.Count == 0) StopDriver();
 		}
 
 		private static void EnsureRunning()
 		{
-			if (timer == null)
+			if (Volatile.Read(ref activeFlag) != 0) return;
+
+			if (sink == null || sinkHandle == IntPtr.Zero)
 			{
-				timer = new Timer { Interval = 8 };
-				timer.Tick += OnTick;
+				try
+				{
+					sink = new TickSink();
+					sinkHandle = sink.Handle;
+				}
+				catch
+				{
+					sinkHandle = IntPtr.Zero;
+				}
 			}
-			if (!timer.Enabled)
+
+			BeginHighResTimer();
+			lastTimestamp = Stopwatch.GetTimestamp();
+
+			if (sinkHandle != IntPtr.Zero)
 			{
-				BeginHighResTimer();
-				lastTimestamp = Stopwatch.GetTimestamp();
-				timer.Start();
+				if (vsyncThread == null)
+				{
+					vsyncThread = new Thread(VSyncLoop)
+					{
+						Name = "GlassVSyncPacer",
+						IsBackground = true,
+						Priority = ThreadPriority.AboveNormal
+					};
+					vsyncThread.Start();
+				}
+				Interlocked.Exchange(ref activeFlag, 1);
+				wakeEvent.Set();
+				// Immediately dispatch first tick so animations begin on the very next frame with zero delay
+				if (Interlocked.CompareExchange(ref tickPending, 1, 0) == 0)
+				{
+					PostMessage(sinkHandle, WmAppTick, IntPtr.Zero, IntPtr.Zero);
+				}
+			}
+			else
+			{
+				if (fallbackTimer == null)
+				{
+					fallbackTimer = new System.Windows.Forms.Timer { Interval = 8 };
+					fallbackTimer.Tick += delegate { ProcessTickOnUiThread(); };
+				}
+				Interlocked.Exchange(ref activeFlag, 1);
+				if (!fallbackTimer.Enabled) fallbackTimer.Start();
 			}
 		}
 
-		private static void OnTick(object sender, EventArgs e)
+		private static void VSyncLoop()
+		{
+			while (Volatile.Read(ref shutdownFlag) == 0)
+			{
+				wakeEvent.Wait();
+				if (Volatile.Read(ref shutdownFlag) != 0) break;
+
+				while (Volatile.Read(ref activeFlag) != 0 && Volatile.Read(ref shutdownFlag) == 0)
+				{
+					long t0 = Stopwatch.GetTimestamp();
+					int hr = -1;
+					try { hr = DwmFlush(); } catch { hr = -1; }
+					long elapsedMs = (Stopwatch.GetTimestamp() - t0) * 1000L / Stopwatch.Frequency;
+					// If DwmFlush failed or returned instantaneously (e.g. headless/RDP), pace smoothly at ~125Hz
+					if (hr != 0 || elapsedMs < 2)
+					{
+						Thread.Sleep(7);
+					}
+					if (Volatile.Read(ref activeFlag) == 0) break;
+					IntPtr h = sinkHandle;
+					if (h != IntPtr.Zero && Interlocked.CompareExchange(ref tickPending, 1, 0) == 0)
+					{
+						if (!PostMessage(h, WmAppTick, IntPtr.Zero, IntPtr.Zero))
+						{
+							Interlocked.Exchange(ref tickPending, 0);
+						}
+					}
+				}
+			}
+		}
+
+		private static void ProcessTickOnUiThread()
 		{
 			long now = Stopwatch.GetTimestamp();
 			float dt = (float)((now - lastTimestamp) / (double)Stopwatch.Frequency);
 			lastTimestamp = now;
-			if (dt <= 0.001f || dt > 0.045f) dt = 1f / 60f;
+			if (dt <= 0.0005f || dt > 0.045f) dt = 1f / 90f;
 
 			if (!Enabled)
 			{
@@ -132,7 +252,7 @@ namespace AandmAuto
 					try { entries[i].Step(1f); } catch { }
 				}
 				entries.Clear();
-				StopTimer();
+				StopDriver();
 				return;
 			}
 
@@ -146,7 +266,7 @@ namespace AandmAuto
 
 			if (entries.Count == 0)
 			{
-				StopTimer();
+				StopDriver();
 			}
 		}
 	}
@@ -495,13 +615,29 @@ namespace AandmAuto
 			if (ctrl == null || ctrl.IsDisposed) return GlassInputFill();
 			try
 			{
-				Color sampled = UiTheme.SampleGlassTextBackground(ctrl);
-				// Blend sampled wallpaper hue softly so native Win32 boxes harmonize with pink/warm/cool wallpapers
-				if (bright)
+				Bitmap sample = UiTheme.IsOutsideEngineCanvasPublic(ctrl) ? null : UiTheme.GetBlurredGlassBackground();
+				if (sample != null)
 				{
-					return UiTheme.Mix(sampled, Color.FromArgb(246, 248, 252), 0.58f);
+					int cw, ch, ox, oy;
+					UiTheme.GetWindowCanvasMetrics(ctrl, out cw, out ch, out ox, out oy);
+					Rectangle dest = UiTheme.GlassSourceRectanglePublic(sample, cw, ch, ox, oy);
+					int cx = ctrl.Width / 2;
+					int cy = ctrl.Height / 2;
+					if (dest.Width > 0 && dest.Height > 0 && dest.Contains(cx, cy))
+					{
+						int sx = Math.Max(0, Math.Min(sample.Width - 1, (int)((cx - dest.Left) * (long)sample.Width / dest.Width)));
+						int sy = Math.Max(0, Math.Min(sample.Height - 1, (int)((cy - dest.Top) * (long)sample.Height / dest.Height)));
+						Color wall = sample.GetPixel(sx, sy);
+						// Preserve real blurred wallpaper hue (rose/pink/lavender/blue) with restrained frosted grounding
+						if (bright)
+							return UiTheme.Mix(wall, Color.FromArgb(248, 246, 250), 0.36f);
+						return UiTheme.Mix(wall, Color.FromArgb(14, 18, 28), 0.34f);
+					}
 				}
-				return UiTheme.Mix(sampled, Color.FromArgb(28, 34, 48), 0.42f);
+				Color sampled = UiTheme.SampleGlassTextBackground(ctrl);
+				return bright
+					? UiTheme.Mix(sampled, Color.FromArgb(248, 246, 250), 0.40f)
+					: UiTheme.Mix(sampled, Color.FromArgb(18, 22, 34), 0.22f);
 			}
 			catch
 			{

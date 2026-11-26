@@ -25,6 +25,14 @@ namespace AandmAuto
         }
         private const int WmPaint = 0x000F;
         private const int WmEraseBackground = 0x0014;
+        private const int WmPrintClient = 0x0318;
+
+        private bool ShouldPaintGlassBackdrop()
+        {
+            if (UiTheme.ExtremePerformanceMode) return false;
+            if (UiTheme.UsesEngineCanvas(this)) return true;
+            return UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct PaintInfo
@@ -150,7 +158,7 @@ namespace AandmAuto
 
         protected override void WndProc(ref Message m)
         {
-            if (m.Msg == WmPaint && m.WParam == IntPtr.Zero && UiTheme.UsesEngineCanvas(this))
+            if (m.Msg == WmPaint && m.WParam == IntPtr.Zero && ShouldPaintGlassBackdrop())
             {
                 PaintInfo paint;
                 IntPtr dc = BeginPaint(Handle, out paint);
@@ -162,12 +170,7 @@ namespace AandmAuto
                         using (Graphics graphics = Graphics.FromHdc(dc))
                         using (BufferedGraphics buffer = BufferedGraphicsManager.Current.Allocate(graphics, area))
                         {
-                            buffer.Graphics.Clear(BackColor);
-                            UiTheme.DrawCustomBackground(buffer.Graphics, this, area, BackColor);
-                            using (var tint = new SolidBrush(Color.FromArgb(112, BackColor)))
-                                buffer.Graphics.FillRectangle(tint, area);
-                            DrawLogSelection(buffer.Graphics, area);
-                            DrawTextLayer(buffer.Graphics, area);
+                            PaintGlassSurface(buffer.Graphics, area);
                             buffer.Render(graphics);
                             LastWallpaperPaint = UiTheme.WallpaperFrameSequence;
                         }
@@ -177,7 +180,23 @@ namespace AandmAuto
                 m.Result = IntPtr.Zero;
                 return;
             }
-            if (m.Msg == WmEraseBackground && UiTheme.UsesEngineCanvas(this))
+            if (m.Msg == WmPrintClient && m.WParam != IntPtr.Zero && ShouldPaintGlassBackdrop())
+            {
+                Rectangle area = ClientRectangle;
+                if (area.Width > 0 && area.Height > 0)
+                {
+                    using (Graphics graphics = Graphics.FromHdc(m.WParam))
+                    using (var bmp = new Bitmap(area.Width, area.Height, PixelFormat.Format32bppPArgb))
+                    {
+                        using (Graphics bg = Graphics.FromImage(bmp))
+                            PaintGlassSurface(bg, area);
+                        graphics.DrawImageUnscaled(bmp, 0, 0);
+                    }
+                }
+                m.Result = IntPtr.Zero;
+                return;
+            }
+            if (m.Msg == WmEraseBackground && ShouldPaintGlassBackdrop())
             {
                 m.Result = new IntPtr(1);
                 return;
@@ -193,6 +212,31 @@ namespace AandmAuto
                     break;
             }
             base.WndProc(ref m);
+        }
+
+        private void PaintGlassSurface(Graphics graphics, Rectangle area)
+        {
+            if (UiTheme.UsesEngineCanvas(this))
+            {
+                graphics.Clear(BackColor);
+                UiTheme.DrawCustomBackground(graphics, this, area, BackColor);
+                using (var tint = new SolidBrush(Color.FromArgb(112, BackColor)))
+                    graphics.FillRectangle(tint, area);
+            }
+            else
+            {
+                // Seamless frosted glass directly from parent InsetPanel/CardPanel cached FrameBackdrop!
+                UiSurface.PaintBackdrop(this, graphics);
+                // Restrained grounded frosted veil so colored adventure logs & battle reports stay razor-sharp
+                // even over bright pastel/pink wallpapers while letting the blurred wallpaper shine through.
+                int veilAlpha = LiquidGlassEngine.Preset == LiquidGlassEngine.PresetCrystal
+                    ? 22
+                    : (LiquidGlassEngine.Preset == LiquidGlassEngine.PresetDeep ? 64 : 38);
+                using (var veil = new SolidBrush(Color.FromArgb(veilAlpha, 10, 14, 24)))
+                    graphics.FillRectangle(veil, area);
+            }
+            DrawLogSelection(graphics, area);
+            DrawTextLayer(graphics, area);
         }
 
         private void DrawTextLayer(Graphics graphics, Rectangle area)
@@ -221,17 +265,46 @@ namespace AandmAuto
 
         private unsafe void MakeTextLayerTransparent(Rectangle area)
         {
-            uint matte = (uint)BackColor.ToArgb() & 0x00ffffff;
+            int mR = BackColor.R;
+            int mG = BackColor.G;
+            int mB = BackColor.B;
             BitmapData data = textLayer.LockBits(area, ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
             try
             {
                 for (int y = 0; y < area.Height; y++)
                 {
-                    uint* row = (uint*)((byte*)data.Scan0 + y * data.Stride);
+                    byte* row = (byte*)data.Scan0 + y * data.Stride;
                     for (int x = 0; x < area.Width; x++)
                     {
-                        uint rgb = row[x] & 0x00ffffff;
-                        row[x] = rgb == matte ? 0 : rgb | 0xff000000;
+                        int o = x * 4;
+                        int b = row[o + 0];
+                        int g = row[o + 1];
+                        int r = row[o + 2];
+                        int dr = r - mR; if (dr < 0) dr = -dr;
+                        int dg = g - mG; if (dg < 0) dg = -dg;
+                        int db = b - mB; if (db < 0) db = -db;
+                        int diff = dr > dg ? (dr > db ? dr : db) : (dg > db ? dg : db);
+                        if (diff <= 3)
+                        {
+                            row[o + 0] = 0;
+                            row[o + 1] = 0;
+                            row[o + 2] = 0;
+                            row[o + 3] = 0;
+                        }
+                        else if (diff < 36)
+                        {
+                            // Smooth anti-aliased edge transparency (eliminates opaque halo around glyphs)
+                            float a = (diff - 3) / 33f;
+                            byte ab = (byte)(a * 255f + 0.5f);
+                            row[o + 0] = (byte)(b * a + 0.5f);
+                            row[o + 1] = (byte)(g * a + 0.5f);
+                            row[o + 2] = (byte)(r * a + 0.5f);
+                            row[o + 3] = ab;
+                        }
+                        else
+                        {
+                            row[o + 3] = 255;
+                        }
                     }
                 }
             }
@@ -336,8 +409,8 @@ namespace AandmAuto
 			long now = Stopwatch.GetTimestamp();
 			if (!Visible || IsDisposed || UiTheme.UsesEngineCanvas(this) || now < nextBackgroundSample) return;
 			nextBackgroundSample = now + Stopwatch.Frequency / 4;
-			// Keep the RichEdit window native so its selection, scroll and handle creation work.
-			Color next = UiTheme.SampleGlassTextBackground(this);
+			// Match RichEdit matte color to local frosted surface for seamless AA edges
+			Color next = LiquidGlassEngine.SampleAdaptiveGlassFill(this);
 			if (BackColor != next) BackColor = next;
 		}
 	}

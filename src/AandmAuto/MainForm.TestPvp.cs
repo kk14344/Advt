@@ -1285,6 +1285,8 @@ namespace AandmAuto
 				dlg.Controls.Add(topWrap);
 				dlg.Controls.Add(lblPreview);
 				dlg.Controls.Add(bottomBar);
+				GlassControlStyler.ApplyToForm(dlg);
+				GlassFormTransition.Attach(dlg);
 				if (dlg.ShowDialog(this) == DialogResult.OK && lb.SelectedIndex >= 0 && lb.SelectedIndex < visibleKeys.Count)
 				{
 					string key = visibleKeys[lb.SelectedIndex];
@@ -1740,6 +1742,8 @@ namespace AandmAuto
 				tbl.Controls.Add(btnGo, 0, 5);
 				tbl.SetColumnSpan(btnGo, 2);
 				dlg.Controls.Add(tbl);
+				GlassControlStyler.ApplyToForm(dlg);
+				GlassFormTransition.Attach(dlg);
 				if (dlg.ShowDialog(this) == DialogResult.OK)
 				{
 					var tids = new int[5];
@@ -1791,7 +1795,7 @@ namespace AandmAuto
 				MaximizeBox = false
 			})
 			{
-				var clb = new CheckedListBox
+				var clb = new GlassCheckedListBox
 				{
 					Dock = DockStyle.Fill,
 					CheckOnClick = true,
@@ -1863,6 +1867,8 @@ namespace AandmAuto
 				dlg.Controls.Add(clb);
 				dlg.Controls.Add(top);
 				dlg.Controls.Add(btnStart);
+				GlassControlStyler.ApplyToForm(dlg);
+				GlassFormTransition.Attach(dlg);
 
 				if (dlg.ShowDialog(this) == DialogResult.OK)
 				{
@@ -2024,6 +2030,8 @@ namespace AandmAuto
 				tbl.Controls.Add(btnGo, 0, 2);
 				tbl.SetColumnSpan(btnGo, 2);
 				dlg.Controls.Add(tbl);
+				GlassControlStyler.ApplyToForm(dlg);
+				GlassFormTransition.Attach(dlg);
 
 				if (dlg.ShowDialog(this) == DialogResult.OK)
 				{
@@ -2137,6 +2145,8 @@ namespace AandmAuto
 				tbl.Controls.Add(btnGo, 0, 5);
 				tbl.SetColumnSpan(btnGo, 2);
 				dlg.Controls.Add(tbl);
+				GlassControlStyler.ApplyToForm(dlg);
+				GlassFormTransition.Attach(dlg);
 
 				if (dlg.ShowDialog(this) == DialogResult.OK)
 				{

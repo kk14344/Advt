@@ -196,6 +196,7 @@ namespace AandmAuto
 				dropGrid.Controls.Add(cell, i % 2, i / 2);
 			}
 			dropGridHost.Controls.Add(dropGrid);
+			if (glass) GlassControlStyler.ApplyScrollThemePublic(dropGridHost);
 			layout.Controls.Add(dropGridHost, 0, 1);
 
 			lblMiningStatsSpend = new SmoothLabel

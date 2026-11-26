@@ -90,30 +90,58 @@ namespace AandmAuto
         {
             var data=ReadReview();
             var prior=data.Daily;
+            bool glass=UiTheme.CurrentTheme==UiTheme.ThemeLiquidGlass;
             using(var dialog=ReviewDialog("任务记录",840,520))
             {
-                var tabs=new TabControl{Dock=DockStyle.Fill};
-                var daily=new TabPage("日常结果");
                 var list=new ListView{Dock=DockStyle.Fill,View=View.Details,FullRowSelect=true,ShowItemToolTips=true,
-                    BackColor=Color.FromArgb(70,58,35),ForeColor=TextColor,Font=UiTheme.GameFont(8.5f)};
-                list.Columns.Add("事项",155);list.Columns.Add("结果",106);list.Columns.Add("详情",508);
+                    BackColor=glass?LiquidGlassEngine.GlassInputFill():Color.FromArgb(70,58,35),
+                    ForeColor=glass?LiquidGlassEngine.GlassInk(true):TextColor,Font=UiTheme.GameFont(8.5f)};
+                list.Columns.Add("事项",155);list.Columns.Add("结果",106);list.Columns.Add("详情",glass?530:508);
                 foreach(var row in prior==null||prior.rows==null?new List<ReviewRow>():prior.rows){
                     var item=new ListViewItem(new[]{row.name,row.status,row.detail}){ToolTipText=row.detail};
                     list.Items.Add(item);
                 }
                 if(list.Items.Count==0)list.Items.Add(new ListViewItem("等待首次日常结果"));
-                daily.Controls.Add(list);
-                var recent=new TabPage("消耗与收益");
-                recent.Controls.Add(new TextBox{Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,
-                    BackColor=Color.FromArgb(70,58,35),ForeColor=TextColor,Font=UiTheme.GameFont(9f),
-                    Text=data.History.Count==0?"等待任务记录":string.Join(Environment.NewLine+Environment.NewLine,data.History)});
-                tabs.TabPages.Add(daily);tabs.TabPages.Add(recent);
+                string historyText=data.History.Count==0?"等待任务记录":string.Join(Environment.NewLine+Environment.NewLine,data.History);
                 var footer=ReviewFooter();
                 footer.Controls.Add(ReviewButton("关闭",DialogResult.Cancel,GameButtonSkin.Stone));
                 var retry=ReviewButton("补办未完成项",DialogResult.Retry,GameButtonSkin.Green);
                 retry.Enabled=prior!=null&&prior.rows!=null&&prior.rows.Any(x=>x.retry)&&coreReady&&!AnyTaskRunning();
                 footer.Controls.Add(retry);
-                dialog.Controls.Add(tabs);dialog.Controls.Add(footer);
+                if(glass)
+                {
+                    var root=new SettingsRootPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(14,10,14,10),Margin=Padding.Empty};
+                    root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100f));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute,36f));
+                    root.RowStyles.Add(new RowStyle(SizeType.Percent,100f));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute,50f));
+                    var seg=new GlassSegmentedBar("日常结果","消耗与收益"){Dock=DockStyle.Left,Width=240,Height=32,Margin=new Padding(0,0,0,4)};
+                    var segHost=new Panel{Dock=DockStyle.Fill,BackColor=Color.Transparent,Margin=Padding.Empty};
+                    segHost.Controls.Add(seg);
+                    var bodyHost=new Panel{Dock=DockStyle.Fill,BackColor=Color.Transparent,Margin=new Padding(0,4,0,4)};
+                    var dailyWrap=new CardPanel{Dock=DockStyle.Fill,Padding=new Padding(8),CornerRadius=10};
+                    dailyWrap.Controls.Add(list);
+                    var recentBox=new GlassReadOnlyTextBox{Dock=DockStyle.Fill,Font=UiTheme.GameFont(9f),Text=historyText,Visible=false};
+                    bodyHost.Controls.Add(dailyWrap);
+                    bodyHost.Controls.Add(recentBox);
+                    seg.SelectedIndexChanged+=delegate{dailyWrap.Visible=seg.SelectedIndex==0;recentBox.Visible=seg.SelectedIndex==1;};
+                    footer.Dock=DockStyle.Fill;footer.BackColor=Color.Transparent;
+                    root.Controls.Add(segHost,0,0);root.Controls.Add(bodyHost,0,1);root.Controls.Add(footer,0,2);
+                    dialog.Padding=Padding.Empty;
+                    dialog.Controls.Add(root);
+                    GlassControlStyler.ApplyToForm(dialog);
+                }
+                else
+                {
+                    var tabs=new TabControl{Dock=DockStyle.Fill};
+                    var daily=new TabPage("日常结果");
+                    daily.Controls.Add(list);
+                    var recent=new TabPage("消耗与收益");
+                    recent.Controls.Add(new TextBox{Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,
+                        BackColor=Color.FromArgb(70,58,35),ForeColor=TextColor,Font=UiTheme.GameFont(9f),Text=historyText});
+                    tabs.TabPages.Add(daily);tabs.TabPages.Add(recent);
+                    dialog.Controls.Add(tabs);dialog.Controls.Add(footer);
+                }
                 if(dialog.ShowDialog(this)!=DialogResult.Retry||AnyTaskRunning())return;
             }
             var scope=prior.rows.Where(x=>x.retry).ToDictionary(x=>x.key,x=>true);
@@ -125,13 +153,17 @@ namespace AandmAuto
 
         private Form ReviewDialog(string title,int width,int height)
         {
-            return new CompositedForm{Text=title,ClientSize=new Size(width,height),StartPosition=FormStartPosition.CenterParent,
+            bool glass=UiTheme.CurrentTheme==UiTheme.ThemeLiquidGlass;
+            var dlg=new CompositedForm{Text=title,ClientSize=new Size(width,height),StartPosition=FormStartPosition.CenterParent,
                 FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,ShowInTaskbar=false,
-                BackColor=Color.FromArgb(63,51,32),ForeColor=TextColor,Font=UiTheme.GameFont(9f),Padding=new Padding(12)};
+                BackColor=glass?UiTheme.Palette.BgColor:Color.FromArgb(63,51,32),
+                ForeColor=glass?LiquidGlassEngine.GlassInk(true):TextColor,Font=UiTheme.GameFont(9f),Padding=new Padding(12)};
+            if(glass)GlassFormTransition.Attach(dlg);
+            return dlg;
         }
 
         private static FlowLayoutPanel ReviewFooter(){
-            return new FlowLayoutPanel{Dock=DockStyle.Bottom,FlowDirection=FlowDirection.RightToLeft,Height=49,Padding=new Padding(0,6,0,0)};
+            return new FlowLayoutPanel{Dock=DockStyle.Bottom,FlowDirection=FlowDirection.RightToLeft,Height=49,Padding=new Padding(0,6,0,0),BackColor=Color.Transparent};
         }
 
         private static GameButton ReviewButton(string title,DialogResult result,GameButtonSkin skin){
@@ -143,9 +175,11 @@ namespace AandmAuto
             var rows=GetArray(result,"runeTargets");
             if(rows==null||rows.Length==0||runePrompt!=null||WindowState==FormWindowState.Minimized||!Visible||Form.ActiveForm!=this)return;
             string chosen=null;
+            bool glass=UiTheme.CurrentTheme==UiTheme.ThemeLiquidGlass;
             using(var dialog=ReviewDialog("选择本轮要强化的符文",520,340)){
-                var list=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,BackColor=Color.FromArgb(70,58,35),
-                    ForeColor=TextColor,Font=UiTheme.GameFont(10f)};
+                var list=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,
+                    BackColor=glass?LiquidGlassEngine.GlassInputFill():Color.FromArgb(70,58,35),
+                    ForeColor=glass?LiquidGlassEngine.GlassInk(true):TextColor,Font=UiTheme.GameFont(10f)};
                 var ids=new List<string>();
                 foreach(var raw in rows){
                     var row=raw as Dictionary<string,object>;
@@ -160,7 +194,25 @@ namespace AandmAuto
                 confirm.Enabled=false;
                 list.SelectedIndexChanged+=delegate{confirm.Enabled=list.SelectedIndex>=0;};
                 footer.Controls.Add(cancel);footer.Controls.Add(confirm);
-                dialog.Controls.Add(list);dialog.Controls.Add(footer);dialog.CancelButton=cancel;
+                if(glass)
+                {
+                    var root=new SettingsRootPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(14,12,14,10),Margin=Padding.Empty};
+                    root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100f));
+                    root.RowStyles.Add(new RowStyle(SizeType.Percent,100f));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute,50f));
+                    var card=new CardPanel{Dock=DockStyle.Fill,Padding=new Padding(8),CornerRadius=10};
+                    card.Controls.Add(list);
+                    footer.Dock=DockStyle.Fill;footer.BackColor=Color.Transparent;
+                    root.Controls.Add(card,0,0);root.Controls.Add(footer,0,1);
+                    dialog.Padding=Padding.Empty;
+                    dialog.Controls.Add(root);
+                    GlassControlStyler.ApplyToForm(dialog);
+                }
+                else
+                {
+                    dialog.Controls.Add(list);dialog.Controls.Add(footer);
+                }
+                dialog.CancelButton=cancel;
                 runePrompt=dialog;
                 try{
                     DialogResult action=dialog.ShowDialog(this);

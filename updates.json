@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-26T08:25:57Z",
+  "updatedAt": "2026-11-26T10:28:56Z",
   "channels": {
     "official": {
       "version": "1.0.0",
       "tag": "official-v1.0.0",
       "fileName": "冒险与挖矿自动助手-优化版.exe",
       "assetName": "AandmAuto-Official.exe",
-      "sha256": "48566a7d2cbe22f4fb684433136fd6e19ec1e58d735f4cad0ced6e47cc056399",
-      "size": 5891584,
-      "publishedAt": "2026-11-26T08:25:57Z",
-      "notes": "v1.0.0 初始发布：双端独立更新通道（静默日志检测、设置页按需一键更新、镜像自动回退、SHA-256 强制校验与原地替换重启）。",
+      "sha256": "b83346b8fe342aa359c1a5b81cf3e45b8cc7bd2a278f88cddacec067fdfc1693",
+      "size": 5892096,
+      "publishedAt": "2026-11-26T10:28:56Z",
+      "notes": "fix(ci): force UTF-8 stdout on English windows-latest runners for Chinese exe paths",
       "downloadUrl": "https://github.com/kk14344/Advt/releases/download/official-v1.0.0/AandmAuto-Official.exe",
       "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/official-v1.0.0"
     },

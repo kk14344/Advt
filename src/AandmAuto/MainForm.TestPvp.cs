@@ -1054,43 +1054,21 @@ namespace AandmAuto
 
 		private void PickAndLoadPresetDialog()
 		{
-			string pPath = Path.Combine(PvpSimDir, "presets.json");
-			string rawJson = null;
-			bool fromEmbedded = false;
-			if (File.Exists(pPath))
+			PresetLoadResult loaded = TestPvpExtras.LoadPresetsWithFallback(PvpSimDir);
+			if (string.IsNullOrEmpty(loaded.RawJson))
 			{
-				rawJson = File.ReadAllText(pPath, Encoding.UTF8);
-			}
-			else
-			{
-				using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("AandmAuto.presets.json"))
-				{
-					if (s != null)
-					{
-						using (var r = new StreamReader(s, Encoding.UTF8)) rawJson = r.ReadToEnd();
-						fromEmbedded = true;
-					}
-				}
-			}
-			if (string.IsNullOrEmpty(rawJson))
-			{
-				MessageBox.Show(this, "未找到外部或内置预设库 presets.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				MessageBox.Show(this, "未找到外部、云端或内置预设库 presets.json。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
 				return;
 			}
-			var all = json.DeserializeObject(rawJson) as Dictionary<string, object>;
+			Dictionary<string, object> all = json.DeserializeObject(loaded.RawJson) as Dictionary<string, object>;
 			if (all == null) return;
 			var keys = new List<string>();
-			foreach (string k in all.Keys)
-			{
-				if (!k.StartsWith("friend_", StringComparison.OrdinalIgnoreCase)) keys.Add(k);
-			}
-			keys.Sort(StringComparer.OrdinalIgnoreCase);
 
 			using (var dlg = new Form
 			{
-				Text = fromEmbedded ? "选择内置离线预设阵容" : "选择预设阵容（已同步最新 presets.json）",
-				Width = 460,
-				Height = 440,
+				Text = "选择预设阵容 · " + loaded.SourceLabel,
+				Width = 500,
+				Height = 470,
 				StartPosition = FormStartPosition.CenterParent,
 				BackColor = SideColor,
 				ForeColor = TextColor,
@@ -1098,6 +1076,17 @@ namespace AandmAuto
 				MaximizeBox = false
 			})
 			{
+				var lblSrc = new SmoothLabel
+				{
+					Text = "当前来源：" + loaded.SourceLabel,
+					Dock = DockStyle.Top,
+					Height = 24,
+					BackColor = Color.Transparent,
+					ForeColor = GoldColor,
+					Font = UiTheme.GameFont(8.25f, FontStyle.Bold),
+					Padding = new Padding(8, 0, 8, 0),
+					TextAlign = ContentAlignment.MiddleLeft
+				};
 				var lb = new ListBox
 				{
 					Dock = DockStyle.Fill,
@@ -1105,19 +1094,76 @@ namespace AandmAuto
 					ForeColor = TextColor,
 					Font = UiTheme.UiFont(9.5f, FontStyle.Regular)
 				};
-				foreach (string k in keys)
+				Action<Dictionary<string, object>> populate = delegate(Dictionary<string, object> map)
 				{
-					var d = all[k] as Dictionary<string, object>;
-					string nm = (d != null && d.ContainsKey("name")) ? Convert.ToString(d["name"]) : k;
-					lb.Items.Add(k + "  |  " + nm);
-				}
-				if (lb.Items.Count > 0) lb.SelectedIndex = 0;
-				var btnOk = new GameButton { Text = "载入所选预设", Dock = DockStyle.Bottom, Height = 38, Skin = GameButtonSkin.Gold, StretchWide = true, Font = UiTheme.GameFont(9f, FontStyle.Bold) };
+					all = map;
+					keys.Clear();
+					lb.Items.Clear();
+					if (map == null) return;
+					foreach (string k in map.Keys)
+					{
+						if (!k.StartsWith("friend_", StringComparison.OrdinalIgnoreCase)) keys.Add(k);
+					}
+					keys.Sort(StringComparer.OrdinalIgnoreCase);
+					foreach (string k in keys)
+					{
+						var d = map[k] as Dictionary<string, object>;
+						string nm = (d != null && d.ContainsKey("name")) ? Convert.ToString(d["name"]) : k;
+						lb.Items.Add(k + "  |  " + nm);
+					}
+					if (lb.Items.Count > 0) lb.SelectedIndex = 0;
+				};
+				populate(all);
+
+				var bottomBar = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 42, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Padding = new Padding(4, 3, 4, 3) };
+				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44f));
+				bottomBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56f));
+
+				var btnSync = new GameButton { Text = "在线同步最新预设库", Dock = DockStyle.Fill, Skin = GameButtonSkin.Stone, StretchWide = true, Font = UiTheme.GameFont(8.5f, FontStyle.Bold), Margin = new Padding(0, 0, 4, 0) };
+				var btnOk = new GameButton { Text = "载入所选预设", Dock = DockStyle.Fill, Skin = GameButtonSkin.Gold, StretchWide = true, Font = UiTheme.GameFont(9f, FontStyle.Bold), Margin = new Padding(4, 0, 0, 0) };
+
+				btnSync.Click += delegate
+				{
+					btnSync.Enabled = false;
+					btnSync.Text = "正在同步云端预设…";
+					ThreadPool.QueueUserWorkItem(delegate
+					{
+						try
+						{
+							PresetLoadResult synced = TestPvpExtras.SyncPresetsOnline(CancellationToken.None);
+							var nextMap = json.DeserializeObject(synced.RawJson) as Dictionary<string, object>;
+							if (dlg.IsDisposed || !dlg.IsHandleCreated) return;
+							dlg.BeginInvoke((MethodInvoker)delegate
+							{
+								populate(nextMap);
+								lblSrc.Text = "当前来源：" + synced.SourceLabel;
+								dlg.Text = "选择预设阵容 · " + synced.SourceLabel;
+								btnSync.Text = "同步成功 ✓";
+								btnSync.Enabled = true;
+								AddLog("已在线同步最新 PvP 预设库（共 " + synced.PresetCount + " 套阵型）。", GreenColor);
+							});
+						}
+						catch (Exception ex)
+						{
+							if (dlg.IsDisposed || !dlg.IsHandleCreated) return;
+							dlg.BeginInvoke((MethodInvoker)delegate
+							{
+								btnSync.Text = "在线同步最新预设库";
+								btnSync.Enabled = true;
+								MessageBox.Show(dlg, ex.Message, "同步预设库失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+							});
+						}
+					});
+				};
 				btnOk.Click += delegate { dlg.DialogResult = DialogResult.OK; dlg.Close(); };
 				lb.DoubleClick += delegate { dlg.DialogResult = DialogResult.OK; dlg.Close(); };
+
+				bottomBar.Controls.Add(btnSync, 0, 0);
+				bottomBar.Controls.Add(btnOk, 1, 0);
 				dlg.Controls.Add(lb);
-				dlg.Controls.Add(btnOk);
-				if (dlg.ShowDialog(this) == DialogResult.OK && lb.SelectedIndex >= 0)
+				dlg.Controls.Add(lblSrc);
+				dlg.Controls.Add(bottomBar);
+				if (dlg.ShowDialog(this) == DialogResult.OK && lb.SelectedIndex >= 0 && lb.SelectedIndex < keys.Count)
 				{
 					string key = keys[lb.SelectedIndex];
 					loadedFormation = all[key] as Dictionary<string, object>;
@@ -1623,8 +1669,21 @@ namespace AandmAuto
 				};
 				foreach (var f in friends) clb.Items.Add(f.Value + " (" + f.Key + ")", f.Key == "3YPN0");
 
-				var top = new Panel { Dock = DockStyle.Top, Height = 74, Padding = new Padding(10, 6, 10, 6) };
+				var top = new Panel { Dock = DockStyle.Top, Height = 104, Padding = new Padding(10, 6, 10, 4) };
 				var lblTip = new SmoothLabel { Text = "规则：严格在途=1（无并发丢包）· 勾选1人默认100把 · 多人默认各80把", Dock = DockStyle.Top, Height = 22, ForeColor = GoldColor };
+				var rowQuick = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, BackColor = Color.Transparent, Padding = new Padding(0, 2, 0, 0) };
+				var btnAll = new GameButton { Text = "全选对手", Width = 86, Height = 26, Skin = GameButtonSkin.Stone, Font = UiTheme.GameFont(7.8f, FontStyle.Bold) };
+				var btnNone = new GameButton { Text = "清空勾选", Width = 86, Height = 26, Skin = GameButtonSkin.Stone, Font = UiTheme.GameFont(7.8f, FontStyle.Bold) };
+				var btnTop7 = new GameButton { Text = "勾选常用强敌", Width = 106, Height = 26, Skin = GameButtonSkin.Gold, Font = UiTheme.GameFont(7.8f, FontStyle.Bold) };
+				btnAll.Click += delegate { for (int i = 0; i < clb.Items.Count; i++) clb.SetItemChecked(i, true); };
+				btnNone.Click += delegate { for (int i = 0; i < clb.Items.Count; i++) clb.SetItemChecked(i, false); };
+				btnTop7.Click += delegate
+				{
+					for (int i = 0; i < clb.Items.Count; i++) clb.SetItemChecked(i, KnownFriendLabels.ContainsKey(friends[i].Key));
+				};
+				rowQuick.Controls.Add(btnAll);
+				rowQuick.Controls.Add(btnNone);
+				rowQuick.Controls.Add(btnTop7);
 				var rowOpt = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 34, BackColor = Color.Transparent };
 				var cbFid = new ComboBox { Width = 78, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = CardColor, ForeColor = TextColor };
 				cbFid.Items.AddRange(new object[] { "阵型1", "阵型2", "阵型3", "阵型4", "阵型5" });
@@ -1646,6 +1705,7 @@ namespace AandmAuto
 				rowOpt.Controls.Add(new SmoothLabel { Text = "达标%:", Width = 48, Height = 24, ForeColor = TextColor, TextAlign = ContentAlignment.MiddleRight });
 				rowOpt.Controls.Add(numTarget);
 				top.Controls.Add(rowOpt);
+				top.Controls.Add(rowQuick);
 				top.Controls.Add(lblTip);
 
 				var btnStart = new GameButton { Text = "开始实机切磋 (in_flight=1)", Dock = DockStyle.Bottom, Height = 40, Skin = GameButtonSkin.Green, StretchWide = true, Font = UiTheme.GameFont(9.2f, FontStyle.Bold) };
@@ -1760,6 +1820,10 @@ namespace AandmAuto
 					File.WriteAllText(repPath, json.Serialize(repObj), Encoding.UTF8);
 					AddLog(string.Format("实测完毕：最低 {0:0.2}% · 均胜 {1:0.2}% · 总耗时 {2:0.2}s（战报已保存，可点 ⑥ 导出一图流）", minWr, avgWr, swAll.Elapsed.TotalSeconds), allPass ? GreenColor : GoldColor);
 					EndTestPvpWork(string.Format("实测完成 均胜{0:0.1}%", avgWr), allPass ? GreenColor : GoldColor);
+					if (reportRows.Count > 1 && !IsDisposed)
+					{
+						TestPvpExtras.ShowBattleMatrixDialog(this, fid, targetPct, minWr, avgWr, swAll.Elapsed.TotalSeconds, reportRows);
+					}
 				}
 				else
 				{

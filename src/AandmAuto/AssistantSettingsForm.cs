@@ -2145,6 +2145,7 @@ namespace AandmAuto
 				Close();
 			};
 			page.Controls.Add(devBtn);
+			OptionCheck(page, "autoSelfHeal", "挂机异常自愈（渲染崩溃/连续失联自动重载并续跑挖矿）", 152, 154, 600);
 
 			page.Controls.Add(SectionTitle("磁盘占用与缓存治理（保留登录态、计划、统计与当前壁纸）", 8, 204));
 			var diskCard = new CardPanel

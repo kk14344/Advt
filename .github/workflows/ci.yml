@@ -37,9 +37,11 @@ jobs:
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File tools/verify_embedded.ps1 -Edition all
 
-      - name: Run updater end-to-end smoke test
+      - name: Run updater, privacy & P2 end-to-end smoke tests
         shell: pwsh
-        run: python tools/test_updater.py --channel all
+        run: |
+          python tools/test_updater.py --channel all
+          python tools/sync_game_data.py
 
       - name: Run Lua task & background regression suites
         shell: pwsh

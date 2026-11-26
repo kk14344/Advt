@@ -157,6 +157,7 @@ namespace AandmAuto
 		private int pageGeneration;
 		private int injectingPage = -1;
 		private int injectedPage = -1;
+		private readonly SelfHealWatchdog selfHeal = new SelfHealWatchdog();
 
 		private bool lastRunning;
 
@@ -1056,6 +1057,10 @@ namespace AandmAuto
 				AddLog("游戏页面加载失败：" + e.WebErrorStatus, RedColor);
 				SetStatusUi("页面加载失败", RedColor, "可点击“重新加载游戏”重试");
 				SetBadge("加载失败", RedColor);
+				if (IsSelfHealEnabled() && (startRequested || selfHeal.HasPendingResumeMining(DateTime.UtcNow)))
+				{
+					TryTriggerSelfHeal("页面加载失败：" + e.WebErrorStatus, startRequested || selfHeal.HasPendingResumeMining(DateTime.UtcNow));
+				}
 			}
 			else
 			{
@@ -1098,13 +1103,55 @@ namespace AandmAuto
 			}
 		}
 
+		private bool IsSelfHealEnabled()
+		{
+			if (previewMode || Environment.GetEnvironmentVariable("AANDM_SMOKE") == "1" || Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE") == "1") return false;
+			bool enabled;
+			return !options.TryGetValue("autoSelfHeal", out enabled) || enabled;
+		}
+
+		private void TryTriggerSelfHeal(string reason, bool resumeMining)
+		{
+			if (!IsSelfHealEnabled() || !coreReady || selfHeal.ReloadScheduled || IsDisposed) return;
+			SelfHealDecision decision = selfHeal.TryConsumeRecoveryQuota(DateTime.UtcNow);
+			if (!decision.Allowed)
+			{
+				AddLog("挂机自愈未触发（" + reason + "）：" + decision.Reason, YellowColor);
+				return;
+			}
+			if (resumeMining) selfHeal.MarkPendingResumeMining(DateTime.UtcNow);
+			selfHeal.ReloadScheduled = true;
+			AddLog("触发挂机自愈（" + reason + " · " + decision.AttemptInWindow + "/" + decision.MaxInWindow + "）：3 秒后自动重载游戏页面" + (resumeMining ? "并续跑挖矿" : "") + "…", GoldColor);
+			SetStatusUi("挂机自愈重载中…", YellowColor, "3 秒后自动重载恢复");
+			SetBadge("自愈中", YellowColor);
+			var timer = new Timer { Interval = 3000 };
+			timer.Tick += delegate
+			{
+				timer.Stop();
+				timer.Dispose();
+				selfHeal.ReloadScheduled = false;
+				if (IsDisposed || !coreReady || webView == null || webView.CoreWebView2 == null) return;
+				try
+				{
+					webView.CoreWebView2.Reload();
+				}
+				catch (Exception ex)
+				{
+					AddLog("挂机自愈重载失败：" + ex.Message, RedColor);
+				}
+			};
+			timer.Start();
+		}
+
 		private void Core_ProcessFailed(object sender, CoreWebView2ProcessFailedEventArgs e)
         {
+            bool wasMining = startRequested || lastRunning;
             ResetAllTaskStates();
             startRequested=lastRunning=false;RefreshTaskControls();
 			AddLog("游戏渲染进程异常：" + e.ProcessFailedKind, RedColor);
 			SetStatusUi("游戏进程异常", RedColor, "请点击“重新加载游戏”恢复");
 			SetBadge("需处理", RedColor);
+			TryTriggerSelfHeal("渲染进程异常 " + e.ProcessFailedKind, wasMining);
 		}
 
 		private async Task InjectAsync()
@@ -1177,12 +1224,30 @@ namespace AandmAuto
 					return;
 				}
 				Dictionary<string, object> snapshot = json.Deserialize<Dictionary<string, object>>(result);
+				selfHeal.RecordPollSuccess();
 				gameSnapshotReady = GetBool(snapshot, "ready");
 				UpdateFromSnapshot(snapshot);
-				if (gameSnapshotReady) await SyncSafetyStateAsync(snapshot, generation);
+				if (gameSnapshotReady)
+				{
+					await SyncSafetyStateAsync(snapshot, generation);
+					if (selfHeal.ConsumePendingResumeMining(DateTime.UtcNow) && !lastRunning && !startRequested && !AnyTaskRunning())
+					{
+						AddLog("挂机自愈完成：游戏页面已恢复就绪，自动续跑挖矿。", GreenColor);
+						BtnMain_Click(this, EventArgs.Empty);
+					}
+				}
 			}
 			catch
 			{
+				if (coreReady && IsSelfHealEnabled() && (lastRunning || startRequested || AnyTaskRunning()))
+				{
+					int errs = selfHeal.RecordPollError();
+					if (errs >= SelfHealWatchdog.PollErrorReloadThreshold)
+					{
+						bool wasMining = lastRunning || startRequested;
+						TryTriggerSelfHeal("连续 " + errs + " 次脚本轮询无响应", wasMining);
+					}
+				}
 			}
 			finally
 			{
@@ -2938,7 +3003,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
             for(int id=1;id<=15;id++)optionKeys.Add("dailyTask"+id);
             optionKeys.AddRange(new[]{"dailyRewards","dailyFreePrayer","dailyFreeAlchemy","dailyIncludeMine",
                 "cartUpgradeMax","cartBuyEscort","cartPaidTargetRefresh",
-                "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg"});
+                "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg","autoSelfHeal"});
             array=optionKeys.ToArray();
 			for (int i = 0; i < array.Length; i++)
 			{

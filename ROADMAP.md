@@ -35,11 +35,11 @@
 
 ### P2 · 双端核心业务能力迭代（v1.1.x）
 - **正式服优化版**
-  - [ ] 挂机异常自愈加固：断线重连检测、卡弹窗自动清理、WebView2 渲染进程异常崩溃自动恢复续跑（不做配置导入导出）。
+  - [x] 挂机异常自愈加固（[SelfHealWatchdog.cs](src/AandmAuto/SelfHealWatchdog.cs)）：渲染进程崩溃（`ProcessFailed`）/页面加载失败/连续脚本轮询无响应自动重载并续跑挖矿，带 10 分钟 3 次配额与 30 秒冷却保护，可在「设置 → 高级策略」开关（不做配置导入导出）。
 - **测试服 PvP 专项版**
-  - [ ] 预设阵型库随在线更新同步（支持云端热更 `presets.json` 无需重发整包）。
-  - [ ] 多对手批量实测胜率汇总表（一键对多个目标跑 80 场并输出直观胜率矩阵）。
-  - [ ] 新版本佣兵/技能上线快速校验与同步工具链。
+  - [x] 预设阵型库随在线更新同步（[TestPvpExtras.cs](src/AandmAuto/TestPvpExtras.cs)）：支持「选预设」弹窗一键从云端热更最新 `presets.json`（走直连 + 镜像回退并缓存本地），免重下 `.exe`。
+  - [x] 多对手批量实测胜率汇总表：实测台新增「全选 / 清空 / 勾选常用强敌」，多人批量实测完成后自动弹出胜率矩阵表并支持一键复制 Markdown 战报。
+  - [x] 新版本佣兵/技能数据一键校验同步工具链（[sync_game_data.py](tools/sync_game_data.py)）：一键比对预设库与模拟器引擎佣兵/武器/符文一致性，并支持扫描新版 Cocos Creator APK 模块与协议变动。
 
 ### P3 · Cocos Creator 3.x 新客户端双引擎适配（待官方放出 H5 网页入口后启动）
 > 已通过测试服 APK（`mxywk-v1.0.1-vc2.apk.1`）实证：新客户端为 **Cocos Creator 3.x**（285 个明文 TS 编译模块 `System.register("chunks:///_virtual/*.ts")`），原生内置 `aandm.h5.*` 网页端支持，且后端核心协议（`dig_block`、`equip_rune`、`query_rune`、`resource_recycle`、`escort_`、`guild_boss` 等）与老端高度一致。

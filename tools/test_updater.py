@@ -23,6 +23,7 @@ PAYLOAD_SHA = hashlib.sha256(PAYLOAD).hexdigest()
 
 class MockHandler(BaseHTTPRequestHandler):
     manifest_bytes = b'{}'
+    presets_bytes = b'{"demo_preset":{"name":"Cloud Sync Demo","weapon_id":12,"runes":[[66,20]],"slots":[{"id":99000001,"name":"Hero"}]}}'
 
     def do_GET(self):
         if self.path == '/updates.json':
@@ -31,6 +32,12 @@ class MockHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(self.manifest_bytes)))
             self.end_headers()
             self.wfile.write(self.manifest_bytes)
+        elif self.path == '/presets.json':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(self.presets_bytes)))
+            self.end_headers()
+            self.wfile.write(self.presets_bytes)
         elif self.path in ('/official.exe', '/testpvp.exe'):
             self.send_response(200)
             self.send_header('Content-Type', 'application/octet-stream')
@@ -116,6 +123,15 @@ def main():
                 assert diag.get('leakedSecret') is False, diag
                 assert diag.get('hasForbiddenEntry') is False, diag
                 print(f'[PASS] {ch} diagnostic export privacy smoke passed: {diag["includedCount"]} whitelisted files, 0 leaks')
+
+                env['AANDM_PRESETS_SYNC_URL'] = f'{base}/presets.json'
+                env['AANDM_DATA_DIR'] = str(Path(tmp) / f'p2-data-{ch}')
+                subprocess.run([str(exe), '--p2-smoke', tmp], env=env, check=True)
+                sh = json.loads((Path(tmp) / f'selfheal-smoke-{ch}.json').read_text(encoding='utf-8-sig'))
+                assert sh.get('passed') is True, sh
+                p2 = json.loads((Path(tmp) / f'p2-extras-smoke-{ch}.json').read_text(encoding='utf-8-sig'))
+                assert p2.get('passed') is True, p2
+                print(f'[PASS] {ch} P2 smoke passed: self-heal quota/resume ok, preset cloud sync={p2.get("syncedCount")}, matrix markdown ok')
     finally:
         server.shutdown()
 

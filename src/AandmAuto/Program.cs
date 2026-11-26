@@ -38,6 +38,8 @@ namespace AandmAuto
                 if(check>=0){if(check+1>=commandArgs.Length)throw new ArgumentException("缺少测试输出目录");ProfileChecks.Run(commandArgs[check+1]);return;}
                 int updaterSmoke=Array.IndexOf(commandArgs,"--updater-smoke");
                 if(updaterSmoke>=0){if(updaterSmoke+1>=commandArgs.Length)throw new ArgumentException("缺少测试输出目录");UpdateManager.RunSmokeSelfTest(commandArgs[updaterSmoke+1]);return;}
+                int diagSmoke=Array.IndexOf(commandArgs,"--diag-smoke");
+                if(diagSmoke>=0){if(diagSmoke+1>=commandArgs.Length)throw new ArgumentException("缺少测试输出目录");DiagnosticExport.RunSmokeSelfTest(commandArgs[diagSmoke+1]);return;}
                 if(Array.IndexOf(commandArgs,"--ui-check")>=0) {
                     AppDomain.CurrentDomain.AssemblyResolve+=ResolveWebView2Assembly;
                     Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);

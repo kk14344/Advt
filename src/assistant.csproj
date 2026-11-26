@@ -69,5 +69,6 @@
       <HintPath>..\lib\Microsoft.Web.WebView2.Core.dll</HintPath>
     </Reference>
     <Reference Include="System.Security" />
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
 </Project>

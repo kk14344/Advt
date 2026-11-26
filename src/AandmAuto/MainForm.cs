@@ -463,7 +463,7 @@ namespace AandmAuto
 			string slotsText = lblMineSlots != null ? lblMineSlots.Text : "";
 
 			using (var wallpaperSnapshot = UiTheme.EngineFrame == null ? null : new Bitmap(UiTheme.EngineFrame))
-			using (var dialog = new AssistantSettingsForm(options, numberOptions, scheduleCopy, branchTitles, MineResearchMask(), planText, slotsText, initialCategory, customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, wallpaperSnapshot, AddLog))
+			using (var dialog = new AssistantSettingsForm(options, numberOptions, scheduleCopy, branchTitles, MineResearchMask(), planText, slotsText, initialCategory, customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, wallpaperSnapshot, AddLog, () => txtLog != null ? txtLog.Text : ""))
 			{
 				if (dialog.ShowDialog(this) != DialogResult.OK) return;
 

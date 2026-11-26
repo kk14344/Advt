@@ -88,6 +88,7 @@ namespace AandmAuto
 		private TextBox txtDiskDetails;
 		private ComboBox cmbAuditRetention;
 		private readonly Action<string, Color> onLog;
+		private readonly Func<string> getLogText;
 		private SmoothLabel lblUpdateStatus;
 		private SmoothLabel lblFooterVersion;
 
@@ -141,9 +142,10 @@ namespace AandmAuto
 			string dataRootPath = "",
 			string currentCustomBgLabel = "",
 			string currentWeDir = "",
-			Size ownerWindowSize = default(Size), string currentEngineProject = "", string currentPlaybackStatus = "", Image currentPlaybackSnapshot = null, Action<string, Color> onLogCallback = null)
+			Size ownerWindowSize = default(Size), string currentEngineProject = "", string currentPlaybackStatus = "", Image currentPlaybackSnapshot = null, Action<string, Color> onLogCallback = null, Func<string> getLogTextCallback = null)
 		{
 			onLog = onLogCallback;
+			getLogText = getLogTextCallback;
 			customBgPath = currentCustomBgPath ?? "";
 			this.dataRootPath = dataRootPath ?? "";
 			customBgLabel = currentCustomBgLabel ?? "";
@@ -290,22 +292,32 @@ namespace AandmAuto
 			{
 				Text = "检查更新",
 				Location = new Point(0, 3),
-				Size = new Size(106, 42),
+				Size = new Size(98, 42),
 				Skin = GameButtonSkin.Stone,
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 			};
 			btnFooterUpdate.Click += delegate { OpenCheckUpdateDialog(); };
+			var btnFooterDiag = new GameButton
+			{
+				Text = "导出诊断包",
+				Location = new Point(106, 3),
+				Size = new Size(106, 42),
+				Skin = GameButtonSkin.Stone,
+				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
+			};
+			btnFooterDiag.Click += delegate { ExportDiagnosticBundle(); };
 			lblFooterVersion = new SmoothLabel
 			{
 				Text = BuildEdition.EditionDisplayName + " v" + BuildEdition.AppVersion + " · " + UpdateManager.LastCheckSummary(),
-				Location = new Point(116, 12),
-				Size = new Size(420, 24),
+				Location = new Point(222, 12),
+				Size = new Size(340, 24),
 				BackColor = Color.Transparent,
 				ForeColor = MutedText,
 				Font = UiTheme.GameFont(8.25f),
 				TextAlign = ContentAlignment.MiddleLeft
 			};
 			footer.Controls.Add(btnFooterUpdate);
+			footer.Controls.Add(btnFooterDiag);
 			footer.Controls.Add(lblFooterVersion);
 			var footerButtons = new FlowLayoutPanel
 			{
@@ -1894,26 +1906,42 @@ namespace AandmAuto
 			});
 			lblUpdateStatus = new SmoothLabel
 			{
-				Text = "更新状态：" + UpdateManager.LastCheckSummary() + "（启动仅日志提示、不弹窗，按需手动更新）",
+				Text = "更新状态：" + UpdateManager.LastCheckSummary() + "（启动仅日志提示、不弹窗）",
 				Location = new Point(12, 28),
-				Size = new Size(580, 20),
+				Size = new Size(498, 20),
 				BackColor = Color.Transparent,
 				ForeColor = MutedText,
 				Font = UiTheme.GameFont(8f),
 				TextAlign = ContentAlignment.MiddleLeft
 			};
+			var btnPageDiag = new GameButton
+			{
+				Text = "导出诊断包",
+				Location = new Point(520, 10),
+				Size = new Size(110, 36),
+				Skin = GameButtonSkin.Stone,
+				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
+			};
+			btnPageDiag.Click += delegate { ExportDiagnosticBundle(); };
 			var btnPageUpdate = new GameButton
 			{
 				Text = "检查更新",
-				Location = new Point(632, 10),
-				Size = new Size(120, 36),
+				Location = new Point(638, 10),
+				Size = new Size(114, 36),
 				Skin = GameButtonSkin.Gold,
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 			};
 			btnPageUpdate.Click += delegate { OpenCheckUpdateDialog(); };
 			updateBox.Controls.Add(lblUpdateStatus);
+			updateBox.Controls.Add(btnPageDiag);
 			updateBox.Controls.Add(btnPageUpdate);
 			page.Controls.Add(updateBox);
+		}
+
+		private void ExportDiagnosticBundle()
+		{
+			string liveLog = getLogText != null ? getLogText() : "";
+			DiagnosticExport.ExportInteractive(this, dataRootPath, liveLog, onLog);
 		}
 
 		private void OpenCheckUpdateDialog()

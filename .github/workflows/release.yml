@@ -155,6 +155,8 @@ jobs:
           chs = ['official', 'testpvp'] if ch == 'all' else [ch]
           cur['schemaVersion'] = 1
           cur['updatedAt'] = new_data.get('updatedAt', '')
+          if new_data.get('mirrors'):
+              cur['mirrors'] = new_data['mirrors']
           cur.setdefault('channels', {})
           for c in chs:
               if c in new_data.get('channels', {}):

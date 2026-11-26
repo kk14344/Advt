@@ -72,6 +72,9 @@ def main():
     now_iso = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     manifest['schemaVersion'] = 1
     manifest['updatedAt'] = now_iso
+    mirrors = cfg.get('downloadMirrors', [])
+    if isinstance(mirrors, list):
+        manifest['mirrors'] = mirrors
 
     for ch in channels:
         cn_name, ascii_name = CHANNEL_FILES[ch]

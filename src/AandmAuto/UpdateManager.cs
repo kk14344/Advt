@@ -51,6 +51,7 @@ namespace AandmAuto
 		public string SourceUrl = "";
 		public string ErrorMessage = "";
 		public DateTime CheckedAt = DateTime.Now;
+		public List<string> RemoteMirrors = new List<string>();
 	}
 
 	internal static class UpdateManager
@@ -105,6 +106,26 @@ namespace AandmAuto
 						{
 							MergeConfigJson(cfg, reader.ReadToEnd());
 						}
+					}
+				}
+			}
+			catch
+			{
+			}
+
+			try
+			{
+				string cachedMirrorsPath = Path.Combine(AppPaths.DataRoot, "cached-mirrors.json");
+				if (File.Exists(cachedMirrorsPath))
+				{
+					var cached = new UpdateConfig();
+					MergeConfigJson(cached, File.ReadAllText(cachedMirrorsPath, Encoding.UTF8));
+					if (cached.DownloadMirrors != null && cached.DownloadMirrors.Count > 0)
+					{
+						var merged = new List<string>();
+						foreach (string m in cached.DownloadMirrors) AddUnique(merged, m);
+						foreach (string m in cfg.DownloadMirrors) AddUnique(merged, m);
+						cfg.DownloadMirrors = merged;
 					}
 				}
 			}
@@ -383,7 +404,28 @@ namespace AandmAuto
 
 			int cmp = CompareSemVer(res.LatestVersion, res.CurrentVersion);
 			res.State = cmp > 0 ? UpdateCheckState.UpdateAvailable : UpdateCheckState.UpToDate;
+
+			List<string> remoteMirrors;
+			if (TryGetStringList(root, "mirrors", out remoteMirrors) && remoteMirrors.Count > 0)
+			{
+				res.RemoteMirrors = remoteMirrors;
+				SaveCachedMirrors(remoteMirrors);
+			}
 			return res;
+		}
+
+		private static void SaveCachedMirrors(List<string> mirrors)
+		{
+			if (mirrors == null || mirrors.Count == 0) return;
+			try
+			{
+				var js = new JavaScriptSerializer();
+				string payload = js.Serialize(new Dictionary<string, object> { { "downloadMirrors", mirrors } });
+				File.WriteAllText(Path.Combine(AppPaths.DataRoot, "cached-mirrors.json"), payload, Encoding.UTF8);
+			}
+			catch
+			{
+			}
 		}
 
 		private static string DownloadText(string url, int timeoutMs, CancellationToken cancel)
@@ -426,7 +468,16 @@ namespace AandmAuto
 			}
 
 			UpdateConfig cfg = LoadConfig();
-			List<string> candidates = BuildCandidateUrls(info.DownloadUrl, cfg.DownloadMirrors);
+			var mergedMirrors = new List<string>();
+			if (info.RemoteMirrors != null)
+			{
+				foreach (string m in info.RemoteMirrors) AddUnique(mergedMirrors, m);
+			}
+			if (cfg.DownloadMirrors != null)
+			{
+				foreach (string m in cfg.DownloadMirrors) AddUnique(mergedMirrors, m);
+			}
+			List<string> candidates = BuildCandidateUrls(info.DownloadUrl, mergedMirrors);
 			string tempDir = Path.Combine(Path.GetTempPath(), "AandmAutoUpdate", Guid.NewGuid().ToString("N"));
 			Directory.CreateDirectory(tempDir);
 			string safeName = SanitizeFileName(string.IsNullOrEmpty(info.FileName) ? BuildEdition.DefaultExeName : info.FileName);
@@ -669,6 +720,7 @@ namespace AandmAuto
 				report["latestVersion"] = res.LatestVersion;
 				report["notes"] = res.Notes;
 				report["error"] = res.ErrorMessage;
+				report["remoteMirrorsCount"] = res.RemoteMirrors != null ? res.RemoteMirrors.Count : 0;
 
 				if (res.State == UpdateCheckState.UpdateAvailable)
 				{

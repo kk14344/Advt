@@ -27,11 +27,11 @@
 - [x] 修复 [test_tasks.cjs](tools/test_tasks.cjs) 在 Node 24 下的沙箱兼容问题，恢复全量 Lua 回归测试。
 - [x] 加固 [.github/workflows/release.yml](.github/workflows/release.yml)（串行并发锁、多行日志输出、`gh release view` 状态判定、干净回写 `updates.json`、版本校验）。
 - [x] 新增 [.github/workflows/ci.yml](.github/workflows/ci.yml)：每次 push/PR 自动在 `windows-latest` 执行双端编译、内嵌资源校验、更新器端到端烟测、Lua 回归与后台保活测试。
-- [ ] 在 GitHub Actions 手动/重推触发 `v1.0.0` 双端正式 Release 上线验收。
+- [x] 在 GitHub Actions 手动/重推触发 `v1.0.0` 双端正式 Release 上线验收（`Dual-Edition CI`、`official-v1.0.0`、`testpvp-v1.0.0` 三连绿）。
 
 ### P1 · 低售后分发体验升级（v1.0.x）
-- [ ] **更新镜像列表远程热下发**：允许 `updates.json` 下发并合并最新可用加速镜像列表，避免旧版 `.exe` 内置公共代理失效后无法更新。
-- [ ] **设置页「一键导出脱敏诊断包」**：一键打包助手版本号、冒险日志、启动异常日志、任务审计摘要与系统环境为 zip，**严格过滤** `account.dat`、Cookie、WebView2 缓存等全部凭据，方便群友反馈问题时一键定位。
+- [x] **更新镜像列表远程热下发**：允许 `updates.json` 下发并合并最新可用加速镜像列表（并缓存至本地 `cached-mirrors.json`），避免旧版 `.exe` 内置公共代理失效后无法更新。
+- [x] **设置页「一键导出脱敏诊断包」**：一键打包助手版本号、冒险日志、启动异常日志、脱敏配置与近期审计摘要为 zip，**严格白名单过滤** `account.dat`、Cookie、WebView2 缓存并脱敏用户名/Token，已通过双端隐私烟测。
 
 ### P2 · 双端核心业务能力迭代（v1.1.x）
 - **正式服优化版**

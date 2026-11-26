@@ -56,6 +56,7 @@ def main():
     manifest = {
         'schemaVersion': 1,
         'updatedAt': '2026-11-26T00:00:00Z',
+        'mirrors': ['https://ghfast.top/', 'https://gh-proxy.com/'],
         'channels': {
             'official': {
                 'version': '99.0.2',
@@ -105,7 +106,16 @@ def main():
                 assert report['latestVersion'] == expected_ver, f'Channel isolation failed: {report}'
                 assert report['tamperRejected'] is True, report
                 assert report['downloadVerified'] is True, report
-                print(f'[PASS] {ch} updater smoke passed: detected v{report["latestVersion"]}, tamper rejected, valid SHA-256 downloaded & verified')
+                assert report.get('remoteMirrorsCount', 0) == 2, report
+                print(f'[PASS] {ch} updater smoke passed: detected v{report["latestVersion"]}, remote mirrors=2, tamper rejected, valid SHA-256 downloaded & verified')
+
+                subprocess.run([str(exe), '--diag-smoke', tmp], env=env, check=True)
+                diag_path = Path(tmp) / f'diag-smoke-{ch}.json'
+                diag = json.loads(diag_path.read_text(encoding='utf-8-sig'))
+                assert diag.get('passed') is True, diag
+                assert diag.get('leakedSecret') is False, diag
+                assert diag.get('hasForbiddenEntry') is False, diag
+                print(f'[PASS] {ch} diagnostic export privacy smoke passed: {diag["includedCount"]} whitelisted files, 0 leaks')
     finally:
         server.shutdown()
 

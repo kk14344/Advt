@@ -138,6 +138,7 @@ def build_edition(edition: str, lua_only: bool = False):
     args += ['/reference:' + s for s in [
         'System.dll', 'System.Core.dll', 'System.Drawing.dll',
         'System.Windows.Forms.dll', 'System.Web.Extensions.dll', 'System.Security.dll',
+        'System.IO.Compression.dll',
     ]]
     args += ['/reference:' + str(root / 'lib' / s) for s in [
         'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll',

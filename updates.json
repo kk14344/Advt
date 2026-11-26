@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-26T10:29:27Z",
+  "updatedAt": "2026-11-26T15:55:35Z",
   "channels": {
     "official": {
-      "version": "1.0.0",
-      "tag": "official-v1.0.0",
+      "version": "1.1.0",
+      "tag": "official-v1.1.0",
       "fileName": "冒险与挖矿自动助手-优化版.exe",
       "assetName": "AandmAuto-Official.exe",
-      "sha256": "b83346b8fe342aa359c1a5b81cf3e45b8cc7bd2a278f88cddacec067fdfc1693",
-      "size": 5892096,
-      "publishedAt": "2026-11-26T10:28:56Z",
-      "notes": "fix(ci): force UTF-8 stdout on English windows-latest runners for Chinese exe paths",
-      "downloadUrl": "https://github.com/kk14344/Advt/releases/download/official-v1.0.0/AandmAuto-Official.exe",
-      "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/official-v1.0.0"
+      "sha256": "dd8200268f758dab39d96187af5bada96095e4df428dc546e49d29fcc80ca711",
+      "size": 6184448,
+      "publishedAt": "2026-11-26T15:55:35Z",
+      "notes": "feat(ui): DWM VSync 90fps+ dialog ghost transitions and full-app frosted glass overhaul",
+      "downloadUrl": "https://github.com/kk14344/Advt/releases/download/official-v1.1.0/AandmAuto-Official.exe",
+      "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/official-v1.1.0"
     },
     "testpvp": {
       "version": "1.0.0",
@@ -26,5 +26,10 @@
       "downloadUrl": "https://github.com/kk14344/Advt/releases/download/testpvp-v1.0.0/AandmAuto-TestPvP.exe",
       "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/testpvp-v1.0.0"
     }
-  }
+  },
+  "mirrors": [
+    "https://ghfast.top/",
+    "https://gh-proxy.com/",
+    "https://mirror.ghproxy.com/"
+  ]
 }

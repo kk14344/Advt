@@ -238,8 +238,32 @@ namespace AandmAuto
 		internal static Color GlassInputFill()
 		{
 			return IsBrightBackdrop()
-				? Color.FromArgb(185, 255, 255, 255)
-				: Color.FromArgb(24, 34, 52);
+				? Color.FromArgb(238, 244, 250)
+				: Color.FromArgb(38, 46, 62);
+		}
+
+		/// <summary>
+		/// Samples the actual blurred wallpaper behind a native WinForms control (TextBox/ListBox/ComboBox dropdown)
+		/// to produce a harmonious frosted fill instead of an abrupt solid black box.
+		/// </summary>
+		internal static Color SampleAdaptiveGlassFill(Control ctrl)
+		{
+			bool bright = IsBrightBackdrop();
+			if (ctrl == null || ctrl.IsDisposed) return GlassInputFill();
+			try
+			{
+				Color sampled = UiTheme.SampleGlassTextBackground(ctrl);
+				// Blend sampled wallpaper hue softly so native Win32 boxes harmonize with pink/warm/cool wallpapers
+				if (bright)
+				{
+					return UiTheme.Mix(sampled, Color.FromArgb(246, 248, 252), 0.58f);
+				}
+				return UiTheme.Mix(sampled, Color.FromArgb(28, 34, 48), 0.42f);
+			}
+			catch
+			{
+				return GlassInputFill();
+			}
 		}
 
 		internal static void DrawGlassCard(Graphics g, Control ctrl, GraphicsPath clipPath, int cornerRadius, Color tintColor, bool subtle)

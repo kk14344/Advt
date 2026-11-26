@@ -87,7 +87,7 @@ namespace AandmAuto
 		private SmoothLabel lblBgModeHint;
 		private Size ownerWindowSize = new Size(1440, 940);
 		private SmoothLabel lblDiskSummary;
-		private TextBox txtDiskDetails;
+		private Control txtDiskDetails;
 		private ComboBox cmbAuditRetention;
 		private readonly bool initialExtremePerf;
 		private readonly bool startupExtremePerf;
@@ -368,6 +368,7 @@ namespace AandmAuto
 			initializing = false;
 			SetCategory(initialCategory);
 			GlassControlStyler.ApplyToForm(this);
+			GlassFormTransition.Attach(this);
 		}
 
 		protected override void OnHandleCreated(EventArgs e)
@@ -2451,7 +2452,7 @@ namespace AandmAuto
 				DropDownStyle = ComboBoxStyle.DropDownList,
 				BackColor = UiTheme.Palette.InputBackColor,
 				ForeColor = BodyText,
-				Font = UiTheme.UiFont(8.5f)
+				Font = UiTheme.GameFont(8.5f)
 			};
 			int[] retentionChoices = { 7, 14, 30 };
 			foreach (int d in retentionChoices) cmbAuditRetention.Items.Add(d + " 天");
@@ -2547,18 +2548,30 @@ namespace AandmAuto
 			};
 			diskCard.Controls.Add(lblDiskSummary);
 
-			txtDiskDetails = new TextBox
+			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && !UiTheme.ExtremePerformanceMode)
 			{
-				Location = new Point(12, 84),
-				Size = new Size(762, 160),
-				Multiline = true,
-				ReadOnly = true,
-				ScrollBars = ScrollBars.Vertical,
-				BackColor = UiTheme.Palette.InputBackColor,
-				ForeColor = BodyText,
-				BorderStyle = BorderStyle.FixedSingle,
-				Font = UiTheme.UiFont(8.75f)
-			};
+				txtDiskDetails = new GlassReadOnlyTextBox
+				{
+					Location = new Point(12, 84),
+					Size = new Size(762, 160),
+					Font = UiTheme.GameFont(8.75f)
+				};
+			}
+			else
+			{
+				txtDiskDetails = new TextBox
+				{
+					Location = new Point(12, 84),
+					Size = new Size(762, 160),
+					Multiline = true,
+					ReadOnly = true,
+					ScrollBars = ScrollBars.Vertical,
+					BackColor = UiTheme.Palette.InputBackColor,
+					ForeColor = BodyText,
+					BorderStyle = BorderStyle.FixedSingle,
+					Font = UiTheme.GameFont(8.75f)
+				};
+			}
 			diskCard.Controls.Add(txtDiskDetails);
 			page.Controls.Add(diskCard);
 			RefreshDiskReport();

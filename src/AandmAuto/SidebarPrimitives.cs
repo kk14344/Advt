@@ -340,10 +340,11 @@ namespace AandmAuto
 			{
 				Rectangle rg = new Rectangle(0, selected ? 0 : 2, Width - 1, Height - (selected ? 0 : 2) - 2);
 				Color tintC = selected ? Color.FromArgb(14, 132, 255) : Color.White;
-				int tintA = selected ? 94 : 0;
-				UiTheme.DrawLiquidGlassPill(g, this, rg, rg.Height / 2, tintC, tintA, Color.White, hovered, false, selected, Enabled);
+				int tintA = selected ? 114 : 0;
+				UiTheme.DrawLiquidGlassPill(g, this, rg, rg.Height / 2, tintC, tintA, Color.White, hovered, false, selected, Enabled,
+					hovered ? 1f : 0f, 0f, 0f, new Point(-999, -999), !selected);
 				Color tcg = selected ? Color.White : LiquidGlassEngine.GlassInk(Enabled);
-				Color shg = selected ? Color.FromArgb(145, 0, 0, 0) : LiquidGlassEngine.GlassTextShadow();
+				Color shg = selected ? Color.FromArgb(135, 0, 0, 0) : LiquidGlassEngine.GlassTextShadow();
 				Rectangle tbg = TextBounds;
 				if (!selected) tbg.Y += 1;
 				TextFormatFlags fg = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding;

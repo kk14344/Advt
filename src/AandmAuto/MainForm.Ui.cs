@@ -34,6 +34,8 @@ namespace AandmAuto
 
 		private GlassSegmentedBar segBottomTabs;
 
+		private string[] segBottomKeys;
+
 		private GameButton btnMine;
 
 		private GameButton btnMineResearch;
@@ -1119,10 +1121,12 @@ namespace AandmAuto
 					Dock = DockStyle.Fill,
 					Font = UiTheme.GameFont(8.5f, FontStyle.Regular)
 				};
+				segBottomKeys = new[] { "status", "stats", "log" };
 				segBottomTabs.SelectedIndexChanged += delegate
 				{
 					int idx = segBottomTabs.SelectedIndex;
-					SwitchBottomTab(idx == 1 ? "stats" : (idx == 2 ? "log" : "status"));
+					if (segBottomKeys != null && idx >= 0 && idx < segBottomKeys.Length)
+						SwitchBottomTab(segBottomKeys[idx]);
 				};
 				tabBottomStatus = null;
 				tabBottomStats = null;
@@ -1184,29 +1188,34 @@ namespace AandmAuto
 			if (activeUiLayout == UiLayoutStatus && tab == "status") tab = "log";
 			currentBottomTab = tab;
 			if (panelBottomLog == null || panelBottomStats == null) return;
-			UiSurface.Batch(sidebarScroll, delegate
+			Control bodyHost = panelBottomLog.Parent ?? sidebarScroll;
+			UiSurface.Batch(bodyHost, delegate
 			{
 				if (panelBottomStatus != null) panelBottomStatus.Visible = tab == "status";
 				panelBottomStats.Visible = tab == "stats";
 				panelBottomLog.Visible = tab == "log";
-				SetTabState(tabBottomStatus, tab == "status");
-				SetTabState(tabBottomStats, tab == "stats");
-				SetTabState(tabBottomLog, tab == "log");
-				if (segBottomTabs != null) segBottomTabs.SetSelectedIndex(tab == "stats" ? 1 : (tab == "log" ? 2 : 0), true, false);
-				if (topTabBottomStatus != null) topTabBottomStatus.Selected = tab == "status";
-				if (topTabBottomStats != null) topTabBottomStats.Selected = tab == "stats";
-				if (topTabBottomLog != null) topTabBottomLog.Selected = tab == "log";
-				if (activeUiLayout == UiLayoutStatus)
-				{
-					if (btnBottomReview != null) btnBottomReview.Visible = true;
-					if (btnBottomClearLog != null) btnBottomClearLog.Visible = tab == "log";
-				}
-				else
-				{
-					if (btnBottomReview != null) btnBottomReview.Visible = tab == "status";
-					if (btnBottomClearLog != null) btnBottomClearLog.Visible = tab == "log";
-				}
 			});
+			SetTabState(tabBottomStatus, tab == "status");
+			SetTabState(tabBottomStats, tab == "stats");
+			SetTabState(tabBottomLog, tab == "log");
+			if (segBottomTabs != null)
+			{
+				int idx = segBottomKeys != null ? Array.IndexOf(segBottomKeys, tab) : (tab == "stats" ? 1 : (tab == "log" ? 2 : 0));
+				if (idx >= 0) segBottomTabs.SetSelectedIndex(idx, true, false);
+			}
+			if (topTabBottomStatus != null) topTabBottomStatus.Selected = tab == "status";
+			if (topTabBottomStats != null) topTabBottomStats.Selected = tab == "stats";
+			if (topTabBottomLog != null) topTabBottomLog.Selected = tab == "log";
+			if (activeUiLayout == UiLayoutStatus)
+			{
+				if (btnBottomReview != null) btnBottomReview.Visible = true;
+				if (btnBottomClearLog != null) btnBottomClearLog.Visible = tab == "log";
+			}
+			else
+			{
+				if (btnBottomReview != null) btnBottomReview.Visible = tab == "status";
+				if (btnBottomClearLog != null) btnBottomClearLog.Visible = tab == "log";
+			}
 		}
 
 		private GameCheckBox OptionCheck(string key, string text, float fontSize)
@@ -1251,16 +1260,17 @@ namespace AandmAuto
 			if (tab == "mine") tab = "camp";
 			currentTab = tab;
 			if (pageTasks == null) return;
-			UiSurface.Batch(sidebarScroll, delegate
+			Control pageHost = pageTasks.Parent ?? sidebarScroll;
+			UiSurface.Batch(pageHost, delegate
 			{
 				pageTasks.Visible = tab == "tasks";
 				pageCamp.Visible = tab == "camp";
-				SetTabState(tabTasks, tab == "tasks");
-				SetTabState(tabCamp, tab == "camp");
-				if (segMainTabs != null) segMainTabs.SetSelectedIndex(tab == "camp" ? 1 : 0, true, false);
-				if (topTabTasks != null) topTabTasks.Selected = tab == "tasks";
-				if (topTabCamp != null) topTabCamp.Selected = tab == "camp";
 			});
+			SetTabState(tabTasks, tab == "tasks");
+			SetTabState(tabCamp, tab == "camp");
+			if (segMainTabs != null) segMainTabs.SetSelectedIndex(tab == "camp" ? 1 : 0, true, false);
+			if (topTabTasks != null) topTabTasks.Selected = tab == "tasks";
+			if (topTabCamp != null) topTabCamp.Selected = tab == "camp";
 		}
 
 		private static void SetTabState(GameButton button, bool selected)

@@ -416,6 +416,7 @@ namespace AandmAuto
 			tabCamp = null;
 			segMainTabs = null;
 			segBottomTabs = null;
+			segBottomKeys = null;
 			topTabTasks = null;
 			topTabCamp = null;
 			tabBottomStatus = null;
@@ -669,7 +670,7 @@ namespace AandmAuto
 
 				if (activeUiLayout == UiLayoutGrid)
 				{
-					bool tall = h >= 780;
+					bool tall = h >= (glass ? 840 : 800);
 					if (panelRecentTitle != null) panelRecentTitle.Visible = tall;
 					if (panelRecentBox != null) panelRecentBox.Visible = tall;
 				}
@@ -773,10 +774,11 @@ namespace AandmAuto
 			row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
 			row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
 			row.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-			btnMain = new GameButton { Size = new Size(btnW, btnH), Anchor = AnchorStyles.None, Text = "▶ 开始挖矿", Skin = GameButtonSkin.Green, Enabled = false };
+			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
+			btnMain = new GameButton { Size = new Size(btnW, btnH), Anchor = AnchorStyles.None, Text = "▶ 开始挖矿", Skin = GameButtonSkin.Green, PrimaryHero = glass, Enabled = false };
 			btnMain.Click += BtnMain_Click;
 			hints.SetToolTip(btnMain, "自动挖掘；先处理魔像与宝箱，再向下探索。再次点击暂停。");
-			btnDaily = new GameButton { Size = new Size(btnW, btnH), Anchor = AnchorStyles.None, Text = "一键日常", Skin = GameButtonSkin.Gold, Enabled = false };
+			btnDaily = new GameButton { Size = new Size(btnW, btnH), Anchor = AnchorStyles.None, Text = "一键日常", Skin = GameButtonSkin.Gold, AlwaysGlass = glass, SemanticDotColor = glass ? Color.FromArgb(245, 198, 72) : Color.Empty, Enabled = false };
 			FitGlassAction(btnMain);
 			FitGlassAction(btnDaily);
 			btnDaily.Click += BtnDaily_Click;
@@ -886,14 +888,15 @@ namespace AandmAuto
 
 		private Control BuildStatusBodyA()
 		{
+			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 			var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, BackColor = Color.Transparent, Margin = Padding.Empty };
 			layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 28f : 26f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 28f : 26f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 90f : 80f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 22f : 19f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 70f : 64f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 22f : 19f));
 			layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
 			// Row 0: title + detail side by side
@@ -1004,9 +1007,9 @@ namespace AandmAuto
 			priRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
 			priRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
 			priRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-			btnMain = new GameButton { Size = new Size(glass ? 186 : 156, glass ? 48 : 52), Anchor = AnchorStyles.None, Text = "▶ 开始挖矿", Skin = GameButtonSkin.Green, Enabled = false };
+			btnMain = new GameButton { Size = new Size(glass ? 186 : 156, glass ? 48 : 52), Anchor = AnchorStyles.None, Text = "▶ 开始挖矿", Skin = GameButtonSkin.Green, PrimaryHero = glass, Enabled = false };
 			btnMain.Click += BtnMain_Click;
-			btnDaily = new GameButton { Size = new Size(glass ? 186 : 156, glass ? 48 : 52), Anchor = AnchorStyles.None, Text = "一键日常", Skin = GameButtonSkin.Gold, Enabled = false };
+			btnDaily = new GameButton { Size = new Size(glass ? 186 : 156, glass ? 48 : 52), Anchor = AnchorStyles.None, Text = "一键日常", Skin = GameButtonSkin.Gold, AlwaysGlass = glass, SemanticDotColor = glass ? Color.FromArgb(245, 198, 72) : Color.Empty, Enabled = false };
 			FitGlassAction(btnMain);
 			FitGlassAction(btnDaily);
 			btnDaily.Click += BtnDaily_Click;
@@ -1457,10 +1460,11 @@ namespace AandmAuto
 
 		private Control BuildStatusBodyC()
 		{
+			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 			var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent, Margin = Padding.Empty };
 			layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 28f : 26f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 48f : 44f));
 			layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
 			// Top status title + right chips
@@ -1505,19 +1509,49 @@ namespace AandmAuto
 			out GameTopTab tab0, out GameTopTab tab1, out GameTopTab tab2)
 		{
 			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
-			int barH = glass ? 35 : 28;
+			int barH = glass ? 36 : 28;
 			var host = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = Padding.Empty };
-			var tabBar = new Panel { Dock = DockStyle.Top, Height = barH, BackColor = Color.Transparent, Padding = new Padding(glass ? 4 : 10, 0, 4, glass ? 3 : 0) };
-			Panel tabHost;
+			var tabBar = new Panel { Dock = DockStyle.Fill, Height = barH, BackColor = Color.Transparent, Margin = Padding.Empty, Padding = new Padding(glass ? 2 : 10, 0, 2, glass ? 2 : 0) };
+			tab0 = tab1 = tab2 = null;
+
 			if (glass)
 			{
-				var glassTabs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = labels.Length, RowCount = 1, BackColor = Color.Transparent, Margin = Padding.Empty };
-				for (int i = 0; i < labels.Length; i++) glassTabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / labels.Length));
-				glassTabs.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 				var barColumns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = rightAccessory == null ? 1 : 2, RowCount = 1, BackColor = Color.Transparent, Margin = Padding.Empty };
 				barColumns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 				barColumns.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-				barColumns.Controls.Add(glassTabs, 0, 0);
+
+				var segWrap = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty, Padding = new Padding(0, 1, rightAccessory != null ? 6 : 0, 1), BackColor = Color.Transparent };
+				var seg = new GlassSegmentedBar(labels)
+				{
+					Dock = DockStyle.Fill,
+					Font = UiTheme.GameFont(isTopSection ? 9f : 8.5f, FontStyle.Regular)
+				};
+				string[] capturedKeys = (string[])keys.Clone();
+				if (isTopSection)
+				{
+					segMainTabs = seg;
+					seg.SelectedIndexChanged += delegate
+					{
+						int idx = seg.SelectedIndex;
+						if (idx >= 0 && idx < capturedKeys.Length) SwitchTab(capturedKeys[idx]);
+					};
+				}
+				else
+				{
+					segBottomTabs = seg;
+					segBottomKeys = capturedKeys;
+					seg.SelectedIndexChanged += delegate
+					{
+						int idx = seg.SelectedIndex;
+						if (idx >= 0 && idx < capturedKeys.Length)
+						{
+							SwitchBottomTab(capturedKeys[idx]);
+							if (capturedKeys[idx] == "log") FlushDeferredLogUi();
+						}
+					};
+				}
+				segWrap.Controls.Add(seg);
+				barColumns.Controls.Add(segWrap, 0, 0);
 				if (rightAccessory != null)
 				{
 					barColumns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, rightAccessory.Width));
@@ -1526,33 +1560,30 @@ namespace AandmAuto
 					barColumns.Controls.Add(rightAccessory, 1, 0);
 				}
 				tabBar.Controls.Add(barColumns);
-				tabHost = glassTabs;
 			}
 			else
 			{
-				tabHost = new FlowLayoutPanel { Dock = DockStyle.Left, Width = labels.Length >= 3 ? 318 : 220, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, Margin = Padding.Empty };
+				Panel tabHost = new FlowLayoutPanel { Dock = DockStyle.Left, Width = labels.Length >= 3 ? 318 : 220, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, Margin = Padding.Empty };
 				tabBar.Controls.Add(tabHost);
 				if (rightAccessory != null) tabBar.Controls.Add(rightAccessory);
-			}
-
-			tab0 = tab1 = tab2 = null;
-			for (int i = 0; i < labels.Length; i++)
-			{
-				string key = keys[i];
-				var tab = new GameTopTab
+				for (int i = 0; i < labels.Length; i++)
 				{
-					Text = labels[i],
-					Size = new Size(labels.Length >= 3 ? 102 : 100, 28),
-					Dock = glass ? DockStyle.Fill : DockStyle.None,
-					Margin = new Padding(0, 0, glass ? 4 : 2, 0),
-					Font = UiTheme.GameFont(glass ? 8.5f : 8f, FontStyle.Bold)
-				};
-				if (isTopSection) tab.Click += delegate { SwitchTab(key); };
-				else tab.Click += delegate { SwitchBottomTab(key); if (key == "log") FlushDeferredLogUi(); };
-				tabHost.Controls.Add(tab);
-				if (i == 0) tab0 = tab;
-				else if (i == 1) tab1 = tab;
-				else if (i == 2) tab2 = tab;
+					string key = keys[i];
+					var tab = new GameTopTab
+					{
+						Text = labels[i],
+						Size = new Size(labels.Length >= 3 ? 102 : 100, 28),
+						Dock = DockStyle.None,
+						Margin = new Padding(0, 0, 2, 0),
+						Font = UiTheme.GameFont(8f, FontStyle.Bold)
+					};
+					if (isTopSection) tab.Click += delegate { SwitchTab(key); };
+					else tab.Click += delegate { SwitchBottomTab(key); if (key == "log") FlushDeferredLogUi(); };
+					tabHost.Controls.Add(tab);
+					if (i == 0) tab0 = tab;
+					else if (i == 1) tab1 = tab;
+					else if (i == 2) tab2 = tab;
+				}
 			}
 			var box = new PixelBoxPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 9, 10, 10), Margin = glass ? new Padding(0, 3, 0, 0) : Padding.Empty };
 			var bodyHost = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = Padding.Empty };
@@ -1718,30 +1749,31 @@ namespace AandmAuto
 			string[] names = { "挖矿", "魔像", "BOSS", "胜利", "失败", "宝箱" };
 			for (int i = 0; i < keys.Length; i++)
 			{
-				var tile = new InsetPanel { Dock = DockStyle.Fill, Margin = new Padding(2, 2, 2, 2), Padding = new Padding(1, 1, 1, 1) };
+				var tile = new InsetPanel { Dock = DockStyle.Fill, Margin = new Padding(2, 2, 2, 2), Padding = new Padding(1, 0, 1, 1) };
 				var stack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Color.Transparent, Margin = Padding.Empty };
 				stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-				stack.RowStyles.Add(new RowStyle(SizeType.Percent, 56f));
-				stack.RowStyles.Add(new RowStyle(SizeType.Percent, 44f));
+				stack.RowStyles.Add(new RowStyle(SizeType.Percent, 54f));
+				stack.RowStyles.Add(new RowStyle(SizeType.Percent, 46f));
 
 				Color valColor = keys[i] == "wins" ? GreenColor : (keys[i] == "losses" ? RedColor : ((UiTheme.IsLightTheme || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass) ? TextColor : Color.FromArgb(255, 233, 176)));
+				bool isGlassKpi = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 				var valLbl = new SmoothLabel
 				{
 					Text = "0",
 					Dock = DockStyle.Fill,
 					BackColor = Color.Transparent,
 					ForeColor = valColor,
-					Font = UiTheme.GameFont(twoRows ? 10.5f : 9.5f, FontStyle.Bold),
-					TextAlign = ContentAlignment.BottomCenter
+					Font = UiTheme.GameFont(isGlassKpi ? (twoRows ? 9.75f : 9f) : (twoRows ? 10.5f : 9.5f), FontStyle.Bold),
+					TextAlign = ContentAlignment.MiddleCenter
 				};
 				var capLbl = new SmoothLabel
 				{
 					Text = names[i],
 					Dock = DockStyle.Fill,
 					BackColor = Color.Transparent,
-					ForeColor = MutedColor,
-					Font = UiTheme.GameFont(7f),
-					TextAlign = ContentAlignment.TopCenter
+					ForeColor = isGlassKpi ? LiquidGlassEngine.GlassInk(true) : MutedColor,
+					Font = UiTheme.GameFont(isGlassKpi ? 7.25f : 7f),
+					TextAlign = ContentAlignment.MiddleCenter
 				};
 				stack.Controls.Add(valLbl, 0, 0);
 				stack.Controls.Add(capLbl, 0, 1);

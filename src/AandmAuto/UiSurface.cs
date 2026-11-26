@@ -75,6 +75,9 @@ namespace AandmAuto
             internal long Frame = -1;
             internal Rectangle Area;
             internal Size Canvas;
+            internal int Theme = -1;
+            internal int Preset = -1;
+            internal int Blur = -1;
 
             internal void Release()
             {
@@ -89,7 +92,10 @@ namespace AandmAuto
 
         internal static void PaintFrameBackdrop(Control owner, IBackdropOwner backdrop, Graphics graphics)
         {
-            if (UiTheme.ExtremePerformanceMode || UiTheme.EngineFrame == null || owner.Width <= 0 || owner.Height <= 0)
+            bool useCache = !UiTheme.ExtremePerformanceMode
+                && owner.Width > 0 && owner.Height > 0
+                && (UiTheme.EngineFrame != null || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass);
+            if (!useCache)
             {
                 FrameBackdrop existing;
                 if (frameBackdrops.TryGetValue(owner, out existing)) existing.Release();
@@ -107,7 +113,11 @@ namespace AandmAuto
                 return value;
             });
             var canvas = new Size(canvasWidth, canvasHeight);
-            if (cache.Frame != UiTheme.WallpaperFrameSequence || cache.Area != area || cache.Canvas != canvas)
+            int curTheme = UiTheme.CurrentTheme;
+            int curPreset = LiquidGlassEngine.Preset;
+            int curBlur = UiTheme.GlassBlur;
+            if (cache.Frame != UiTheme.WallpaperFrameSequence || cache.Area != area || cache.Canvas != canvas
+                || cache.Theme != curTheme || cache.Preset != curPreset || cache.Blur != curBlur)
             {
                 if (cache.Image == null || cache.Image.Size != area.Size)
                 {
@@ -123,6 +133,9 @@ namespace AandmAuto
                 cache.Frame = UiTheme.WallpaperFrameSequence;
                 cache.Area = area;
                 cache.Canvas = canvas;
+                cache.Theme = curTheme;
+                cache.Preset = curPreset;
+                cache.Blur = curBlur;
             }
 
             Rectangle clip = Rectangle.Intersect(owner.ClientRectangle, Rectangle.Ceiling(graphics.VisibleClipBounds));

@@ -24,7 +24,14 @@ namespace AandmAuto
                     case ContentAlignment.MiddleLeft:case ContentAlignment.MiddleCenter:case ContentAlignment.MiddleRight:flags|=TextFormatFlags.VerticalCenter;break;
                     case ContentAlignment.BottomLeft:case ContentAlignment.BottomCenter:case ContentAlignment.BottomRight:flags|=TextFormatFlags.Bottom;break;
                 }
-                GameText.Draw(g,Text,Font,box,Enabled?ForeColor:SystemColors.GrayText,flags);
+                Color ink = Enabled ? ForeColor : SystemColors.GrayText;
+                if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && !UiTheme.ExtremePerformanceMode && BackColor.A == 0 && Enabled)
+                {
+                    Color shadow = LiquidGlassEngine.GlassTextShadow();
+                    if (shadow.A > 0)
+                        GameText.Draw(g, Text, Font, new Rectangle(box.X + 1, box.Y + 1, box.Width, box.Height), shadow, flags);
+                }
+                GameText.Draw(g,Text,Font,box,ink,flags);
             });
         }
     }

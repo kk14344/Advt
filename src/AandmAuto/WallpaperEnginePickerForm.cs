@@ -133,6 +133,8 @@ namespace AandmAuto
 			BackColor = UiTheme.Palette.BgColor;
 			ForeColor = UiTheme.Palette.TextColor;
 			Font = UiTheme.GameFont(9f);
+			Shown += delegate { GlassControlStyler.ApplyToForm(this); };
+			GlassFormTransition.Attach(this);
 
 			var root = new SettingsRootPanel
 			{

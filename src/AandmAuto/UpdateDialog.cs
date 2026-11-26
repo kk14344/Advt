@@ -10,7 +10,7 @@ namespace AandmAuto
 		private readonly Action<string, Color> logCallback;
 		private readonly SmoothLabel lblEdition;
 		private readonly SmoothLabel lblStatus;
-		private readonly TextBox txtNotes;
+		private readonly Control txtNotes;
 		private readonly GameProgressBar progressBar;
 		private readonly SmoothLabel lblProgress;
 		private readonly GameButton btnRecheck;
@@ -92,19 +92,32 @@ namespace AandmAuto
 			};
 			host.Controls.Add(lblNotesTitle);
 
-			txtNotes = new TextBox
+			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && !UiTheme.ExtremePerformanceMode)
 			{
-				Location = new Point(14, 104),
-				Size = new Size(492, 162),
-				Multiline = true,
-				ReadOnly = true,
-				ScrollBars = ScrollBars.Vertical,
-				BackColor = UiTheme.Palette.InsetColor,
-				ForeColor = UiTheme.Palette.TextColor,
-				BorderStyle = BorderStyle.FixedSingle,
-				Font = UiTheme.GameFont(8.75f, FontStyle.Regular),
-				Text = "正在检查中，请稍候…"
-			};
+				txtNotes = new GlassReadOnlyTextBox
+				{
+					Location = new Point(14, 104),
+					Size = new Size(492, 162),
+					Font = UiTheme.GameFont(8.75f, FontStyle.Regular),
+					Text = "正在检查中，请稍候…"
+				};
+			}
+			else
+			{
+				txtNotes = new TextBox
+				{
+					Location = new Point(14, 104),
+					Size = new Size(492, 162),
+					Multiline = true,
+					ReadOnly = true,
+					ScrollBars = ScrollBars.Vertical,
+					BackColor = UiTheme.Palette.InsetColor,
+					ForeColor = UiTheme.Palette.TextColor,
+					BorderStyle = BorderStyle.FixedSingle,
+					Font = UiTheme.GameFont(8.75f, FontStyle.Regular),
+					Text = "正在检查中，请稍候…"
+				};
+			}
 			host.Controls.Add(txtNotes);
 
 			progressBar = new GameProgressBar
@@ -193,6 +206,7 @@ namespace AandmAuto
 			host.Controls.Add(btnClose);
 
 			GlassControlStyler.ApplyToForm(this);
+			GlassFormTransition.Attach(this);
 			Shown += delegate { StartCheck(); };
 			FormClosing += delegate { CancelActive(); };
 			FormClosed += delegate { DisposeCts(); };

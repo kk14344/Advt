@@ -146,12 +146,15 @@ namespace AandmAuto
 			}
 			if (lblViewportTitle != null && !lblViewportTitle.IsDisposed)
 			{
-				lblViewportTitle.ForeColor = unifiedBackdrop
-					? Color.White
-					: (UiTheme.CurrentTheme == UiTheme.ThemeParchment
-						? Color.FromArgb(255, 238, 178)
-						: (UiTheme.CurrentTheme == UiTheme.ThemeWarmWood ? Color.FromArgb(255, 228, 143) : GoldColor));
+				lblViewportTitle.ForeColor = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass
+					? LiquidGlassEngine.GlassInk(true)
+					: (unifiedBackdrop
+						? Color.White
+						: (UiTheme.CurrentTheme == UiTheme.ThemeParchment
+							? Color.FromArgb(255, 238, 178)
+							: (UiTheme.CurrentTheme == UiTheme.ThemeWarmWood ? Color.FromArgb(255, 228, 143) : GoldColor)));
 			}
+			WindowStyle.ApplyThemeChrome(this);
 			SwitchUiLayout(layoutMode);
 			ConfigureBackgroundRuntime();
 		}
@@ -411,6 +414,8 @@ namespace AandmAuto
 			pageCamp = null;
 			tabTasks = null;
 			tabCamp = null;
+			segMainTabs = null;
+			segBottomTabs = null;
 			topTabTasks = null;
 			topTabCamp = null;
 			tabBottomStatus = null;

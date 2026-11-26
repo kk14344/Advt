@@ -8,6 +8,9 @@ namespace AandmAuto
 	internal sealed class GameCheckBox : CheckBox
 	{
         private bool hovered;
+        private float checkT;
+        private float hoverT;
+        private Func<float, bool> animStep;
         private const int MarkWidth = 14;
         private const int MarkX = 2;
         internal Rectangle LabelBounds
@@ -72,14 +75,41 @@ namespace AandmAuto
 			}
 			else if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
-				using (GraphicsPath path = UiTheme.RoundedRect(rectangle, 4))
+				bool bright = LiquidGlassEngine.IsBrightBackdrop();
+				float ct = GlassAnimator.Enabled ? checkT : (Checked ? 1f : 0f);
+				float ht = GlassAnimator.Enabled ? hoverT : (hovered ? 1f : 0f);
+				Rectangle box = new Rectangle(num2, Math.Max(1, (base.Height - 15) / 2), 15, 15);
+				using (GraphicsPath path = UiTheme.RoundedRect(box, 4))
 				{
-					Color fill = Checked ? Color.FromArgb(84, 255, 255, 255) : Color.FromArgb(26, 255, 255, 255);
-					using (var bg = new SolidBrush(fill)) graphics.FillPath(bg, path);
-					Color bColor = Checked ? Color.FromArgb(245, 255, 255, 255) : (hovered ? Color.FromArgb(235, 255, 255, 255) : Color.FromArgb(165, 255, 255, 255));
-					using (var p = new Pen(bColor, 1.15f)) graphics.DrawPath(p, path);
+					Color uncheckedFill = bright ? Color.FromArgb(40, 255, 255, 255) : Color.FromArgb(24, 255, 255, 255);
+					Color checkedFill = Color.FromArgb(215, 14, 132, 255);
+					int r = (int)(uncheckedFill.R + (checkedFill.R - uncheckedFill.R) * ct);
+					int gC = (int)(uncheckedFill.G + (checkedFill.G - uncheckedFill.G) * ct);
+					int b = (int)(uncheckedFill.B + (checkedFill.B - uncheckedFill.B) * ct);
+					int a = (int)(uncheckedFill.A + (checkedFill.A - uncheckedFill.A) * ct + ht * 24f);
+					using (var bg = new SolidBrush(Color.FromArgb(Math.Min(255, a), r, gC, b)))
+						graphics.FillPath(bg, path);
+
+					Color bColor = ct > 0.5f
+						? Color.FromArgb(220, 180, 224, 255)
+						: (bright
+							? Color.FromArgb((int)(110 + ht * 75), 24, 38, 60)
+							: Color.FromArgb((int)(155 + ht * 85), 255, 255, 255));
+					using (var p = new Pen(bColor, 1.15f))
+						graphics.DrawPath(p, path);
 				}
-				if (Checked) DrawCheckLines(graphics, num2, num3, Color.White);
+				if (ct > 0.12f)
+				{
+					using (Pen pen = new Pen(Color.FromArgb((int)(Math.Min(1f, ct) * 255f), Color.White), 1.85f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+					{
+						graphics.DrawLines(pen, new PointF[3]
+						{
+							new PointF(box.X + 3.4f, box.Y + 7.6f),
+							new PointF(box.X + 6.4f, box.Y + 10.6f),
+							new PointF(box.X + 11.6f, box.Y + 4.4f)
+						});
+					}
+				}
 			}
 			else if (UiTheme.CurrentTheme == UiTheme.ThemeWarmWood)
 			{
@@ -108,10 +138,23 @@ namespace AandmAuto
 				}
 			}
 
-			Color foreColor = base.Enabled
-				? (LabelColorOverride ?? ((UiTheme.IsLightTheme || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass) ? UiTheme.Palette.TextColor : ForeColor))
-				: UiTheme.Palette.MutedColor;
-			GameText.Draw(graphics, Text, Font, LabelBounds, foreColor, UiSurface.TextFlags | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+			Color foreColor;
+			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
+			{
+				foreColor = base.Enabled ? (LabelColorOverride ?? LiquidGlassEngine.GlassInk(true)) : LiquidGlassEngine.GlassInk(false);
+				Color shadow = LiquidGlassEngine.GlassTextShadow();
+				TextFormatFlags lf = UiSurface.TextFlags | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter;
+				if (shadow.A > 0 && !UiTheme.ExtremePerformanceMode)
+					GameText.Draw(graphics, Text, Font, new Rectangle(LabelBounds.X + 1, LabelBounds.Y + 1, LabelBounds.Width, LabelBounds.Height), shadow, lf);
+				GameText.Draw(graphics, Text, Font, LabelBounds, foreColor, lf);
+			}
+			else
+			{
+				foreColor = base.Enabled
+					? (LabelColorOverride ?? (UiTheme.IsLightTheme ? UiTheme.Palette.TextColor : ForeColor))
+					: UiTheme.Palette.MutedColor;
+				GameText.Draw(graphics, Text, Font, LabelBounds, foreColor, UiSurface.TextFlags | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+			}
 			if (Focused)
 			{
 				Rectangle rectangle2 = new Rectangle(0, 0, base.Width - 1, base.Height - 1);
@@ -132,8 +175,56 @@ namespace AandmAuto
 			}
 		}
 
-		protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
-		protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
+		private void StartGlassAnim()
+		{
+			if (UiTheme.CurrentTheme != UiTheme.ThemeLiquidGlass) return;
+			if (!GlassAnimator.Enabled)
+			{
+				checkT = Checked ? 1f : 0f;
+				hoverT = hovered ? 1f : 0f;
+				return;
+			}
+			if (animStep == null) animStep = StepGlassAnim;
+			GlassAnimator.Add(animStep);
+		}
+
+		private bool StepGlassAnim(float dt)
+		{
+			if (IsDisposed || !Visible) return false;
+			bool dirty = false;
+			float tc = Checked ? 1f : 0f;
+			float th = hovered ? 1f : 0f;
+			if (Math.Abs(checkT - tc) > 0.005f)
+			{
+				checkT += (tc - checkT) * Math.Min(1f, dt * 11f);
+				if (Math.Abs(checkT - tc) <= 0.01f) checkT = tc;
+				dirty = true;
+			}
+			if (Math.Abs(hoverT - th) > 0.005f)
+			{
+				hoverT += (th - hoverT) * Math.Min(1f, dt * 7f);
+				if (Math.Abs(hoverT - th) <= 0.01f) hoverT = th;
+				dirty = true;
+			}
+			if (dirty) Invalidate();
+			return dirty;
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing && animStep != null) GlassAnimator.Remove(animStep);
+			base.Dispose(disposing);
+		}
+
+		protected override void OnCheckedChanged(EventArgs e)
+		{
+			StartGlassAnim();
+			Invalidate();
+			base.OnCheckedChanged(e);
+		}
+
+		protected override void OnMouseEnter(EventArgs e) { hovered = true; StartGlassAnim(); Invalidate(); base.OnMouseEnter(e); }
+		protected override void OnMouseLeave(EventArgs e) { hovered = false; StartGlassAnim(); Invalidate(); base.OnMouseLeave(e); }
 		protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
 	}
 }

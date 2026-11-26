@@ -102,7 +102,7 @@ namespace AandmAuto
 			}
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
-				DrawTitleAndHint(graphics, rectangle, Color.White, Color.FromArgb(200, 255, 255, 255), Color.FromArgb(145, 0, 0, 0));
+				DrawTitleAndHint(graphics, rectangle, LiquidGlassEngine.GlassInk(true), LiquidGlassEngine.GlassMutedInk(), LiquidGlassEngine.GlassTextShadow());
 				return;
 			}
 			if (UiTheme.CurrentTheme == UiTheme.ThemeWarmWood)

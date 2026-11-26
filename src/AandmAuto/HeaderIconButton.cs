@@ -20,6 +20,11 @@ namespace AandmAuto
 		private readonly HeaderIconKind kind;
 		private bool hovered;
 		private bool pressed;
+		private float hoverT;
+		private float pressT;
+		private float sheenT;
+		private bool sheenActive;
+		private Func<float, bool> animStep;
 
 		public HeaderIconButton(HeaderIconKind kind)
 		{
@@ -80,8 +85,12 @@ namespace AandmAuto
 			}
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
-				UiTheme.DrawLiquidGlassPill(g, this, face, face.Height / 2, Color.White, 16, Color.White, hovered, pressed, false, Enabled);
-				DrawGlyph(g, face, Enabled ? Color.White : Color.FromArgb(175, 255, 255, 255));
+				UiTheme.DrawLiquidGlassPill(
+					g, this, face, face.Height / 2,
+					Color.White, 0, Color.White,
+					hovered, pressed, false, Enabled,
+					hoverT, pressT, sheenActive ? sheenT : 0f, new Point(face.Width / 2, face.Height / 2));
+				DrawGlyph(g, face, LiquidGlassEngine.GlassInk(Enabled));
 				return;
 			}
 			if (UiTheme.CurrentTheme == UiTheme.ThemeWarmWood)
@@ -217,9 +226,58 @@ namespace AandmAuto
 			}
 		}
 
+		private void StartGlassAnim()
+		{
+			if (UiTheme.CurrentTheme != UiTheme.ThemeLiquidGlass) return;
+			if (!GlassAnimator.Enabled)
+			{
+				hoverT = hovered ? 1f : 0f;
+				pressT = pressed ? 1f : 0f;
+				sheenActive = false;
+				return;
+			}
+			if (animStep == null) animStep = StepGlassAnim;
+			GlassAnimator.Add(animStep);
+		}
+
+		private bool StepGlassAnim(float dt)
+		{
+			if (IsDisposed || !Visible) return false;
+			bool dirty = false;
+			float th = hovered ? 1f : 0f;
+			float tp = pressed ? 1f : 0f;
+			if (Math.Abs(hoverT - th) > 0.005f)
+			{
+				hoverT += (th - hoverT) * Math.Min(1f, dt * 5.8f);
+				if (Math.Abs(hoverT - th) <= 0.01f) hoverT = th;
+				dirty = true;
+			}
+			if (Math.Abs(pressT - tp) > 0.005f)
+			{
+				pressT += (tp - pressT) * Math.Min(1f, dt * 12f);
+				if (Math.Abs(pressT - tp) <= 0.01f) pressT = tp;
+				dirty = true;
+			}
+			if (sheenActive)
+			{
+				sheenT += dt * 2.4f;
+				if (sheenT >= 1f) { sheenT = 0f; sheenActive = false; }
+				dirty = true;
+			}
+			if (dirty) Invalidate();
+			return dirty;
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing && animStep != null) GlassAnimator.Remove(animStep);
+			base.Dispose(disposing);
+		}
+
 		protected override void OnMouseEnter(EventArgs e)
 		{
 			hovered = true;
+			StartGlassAnim();
 			Invalidate();
 			base.OnMouseEnter(e);
 		}
@@ -228,6 +286,7 @@ namespace AandmAuto
 		{
 			hovered = false;
 			pressed = false;
+			StartGlassAnim();
 			Invalidate();
 			base.OnMouseLeave(e);
 		}
@@ -237,7 +296,13 @@ namespace AandmAuto
 			if (e.Button == MouseButtons.Left)
 			{
 				pressed = true;
+				if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && GlassAnimator.Enabled)
+				{
+					sheenActive = true;
+					sheenT = 0.02f;
+				}
 				Focus();
+				StartGlassAnim();
 				Invalidate();
 			}
 			base.OnMouseDown(e);
@@ -246,6 +311,7 @@ namespace AandmAuto
 		protected override void OnMouseUp(MouseEventArgs e)
 		{
 			pressed = false;
+			StartGlassAnim();
 			Invalidate();
 			base.OnMouseUp(e);
 		}

@@ -215,7 +215,7 @@ namespace AandmAuto
 				Text = "风格:",
 				Dock = DockStyle.Fill,
 				ForeColor = MutedColor,
-				Font = UiTheme.UiFont(8f, FontStyle.Regular),
+				Font = UiTheme.GameFont(8f, FontStyle.Regular),
 				TextAlign = ContentAlignment.MiddleLeft
 			}, 0, 0);
 
@@ -244,7 +244,7 @@ namespace AandmAuto
 				Dock = DockStyle.Fill,
 				Skin = GameButtonSkin.Stone,
 				StretchWide = true,
-				Font = UiTheme.UiFont(7.8f, FontStyle.Regular),
+				Font = UiTheme.GameFont(7.8f, FontStyle.Regular),
 				Margin = new Padding(4, 1, 0, 1)
 			};
 			btnLegacy.Click += delegate
@@ -282,30 +282,50 @@ namespace AandmAuto
 				Rectangle r = new Rectangle(0, 0, Math.Max(4, Width - 1), Math.Max(4, Height - 2));
 				Dictionary<string, object> form = GetFormation != null ? GetFormation() : null;
 				bool hasForm = form != null;
+				bool isGlass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 
-				Color fill = ParchmentMode ? Color.FromArgb(40, 30, 18) : Color.FromArgb(29, 23, 13);
-				Color border = hasForm ? Color.FromArgb(118, 198, 92) : Color.FromArgb(196, 158, 72);
-				using (GraphicsPath path = UiTheme.RoundedRect(r, 6))
+				if (isGlass)
 				{
-					using (var bg = new SolidBrush(fill)) g.FillPath(bg, path);
-					using (var pen = new Pen(border, hasForm ? 1.6f : 1.3f))
+					UiSurface.PaintBackdrop(this, g);
+					using (GraphicsPath path = UiTheme.RoundedRect(r, 10))
 					{
-						if (!hasForm) pen.DashStyle = DashStyle.Dash;
-						g.DrawPath(pen, path);
+						UiTheme.DrawGlassCardSurface(g, this, path, 10, Color.FromArgb(14, 18, 24), true);
+						Color bdr = hasForm ? Color.FromArgb(215, 62, 224, 134) : LiquidGlassEngine.GlassHairline();
+						using (var pen = new Pen(bdr, hasForm ? 1.5f : 1.2f))
+						{
+							if (!hasForm) pen.DashStyle = DashStyle.Dash;
+							g.DrawPath(pen, path);
+						}
+					}
+				}
+				else
+				{
+					Color fill = ParchmentMode ? Color.FromArgb(40, 30, 18) : Color.FromArgb(29, 23, 13);
+					Color border = hasForm ? Color.FromArgb(118, 198, 92) : Color.FromArgb(196, 158, 72);
+					using (GraphicsPath path = UiTheme.RoundedRect(r, 6))
+					{
+						using (var bg = new SolidBrush(fill)) g.FillPath(bg, path);
+						using (var pen = new Pen(border, hasForm ? 1.6f : 1.3f))
+						{
+							if (!hasForm) pen.DashStyle = DashStyle.Dash;
+							g.DrawPath(pen, path);
+						}
 					}
 				}
 
 				if (!hasForm)
 				{
 					TextFormatFlags fMain = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
+					Color cTitle = isGlass ? LiquidGlassEngine.GlassInk(true) : Color.FromArgb(245, 211, 118);
+					Color cSub = isGlass ? LiquidGlassEngine.GlassMutedInk() : Color.FromArgb(182, 168, 136);
 					GameText.Draw(g, "拖入「一图流 PNG」到这里（或点击选文件 / 选预设）",
 						UiTheme.GameFont(9f, FontStyle.Bold),
 						new Rectangle(10, Math.Max(4, Height / 2 - 20), Math.Max(10, Width - 20), 20),
-						Color.FromArgb(245, 211, 118), fMain);
+						cTitle, fMain);
 					GameText.Draw(g, "<1ms 零误差解析 30格阵容 · 武器 · 5符文 · 洗练要求",
-						UiTheme.UiFont(8f, FontStyle.Regular),
+						UiTheme.GameFont(8f, FontStyle.Regular),
 						new Rectangle(10, Math.Max(24, Height / 2 + 2), Math.Max(10, Width - 20), 18),
-						Color.FromArgb(182, 168, 136), fMain);
+						cSub, fMain);
 					return;
 				}
 

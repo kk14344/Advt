@@ -111,6 +111,56 @@ namespace AandmAuto
         return (style & WS_EX_TOOLWINDOW) != 0 && (style & WS_EX_APPWINDOW) == 0;
     }
 
+		[DllImport("dwmapi.dll")]
+		private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+		/// <summary>
+		/// Applies native Windows 10/11 DWM immersive dark mode, rounded corners, and caption/border tint
+		/// so the window chrome blends seamlessly with Liquid Glass and dark themes without fragile borderless hacks.
+		/// Silently degrades on older Windows versions.
+		/// </summary>
+		internal static void ApplyThemeChrome(System.Windows.Forms.Form form)
+		{
+			if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
+			try
+			{
+				bool dark = !UiTheme.ExtremePerformanceMode
+					&& (UiTheme.CurrentTheme == UiTheme.ThemeClassic
+						|| (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && !LiquidGlassEngine.IsBrightBackdrop()));
+				int useDark = dark ? 1 : 0;
+				if (DwmSetWindowAttribute(form.Handle, 20, ref useDark, sizeof(int)) != 0)
+				{
+					DwmSetWindowAttribute(form.Handle, 19, ref useDark, sizeof(int));
+				}
+
+				// Win11 rounded window corners (DWMWCP_ROUND = 2)
+				int roundPref = 2;
+				DwmSetWindowAttribute(form.Handle, 33, ref roundPref, sizeof(int));
+
+				// Win11 caption & border color (COLORREF = 0x00BBGGRR; 0xFFFFFFFF = system default)
+				int captionColor = unchecked((int)0xFFFFFFFF);
+				int borderColor = unchecked((int)0xFFFFFFFF);
+				if (!UiTheme.ExtremePerformanceMode && UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
+				{
+					bool bright = LiquidGlassEngine.IsBrightBackdrop();
+					Color cap = bright ? Color.FromArgb(228, 238, 248) : Color.FromArgb(16, 24, 38);
+					Color bdr = bright ? Color.FromArgb(182, 204, 224) : Color.FromArgb(52, 74, 104);
+					captionColor = (cap.B << 16) | (cap.G << 8) | cap.R;
+					borderColor = (bdr.B << 16) | (bdr.G << 8) | bdr.R;
+				}
+				else if (!UiTheme.ExtremePerformanceMode && UiTheme.CurrentTheme == UiTheme.ThemeClassic)
+				{
+					Color cap = Color.FromArgb(46, 37, 22);
+					captionColor = (cap.B << 16) | (cap.G << 8) | cap.R;
+				}
+				DwmSetWindowAttribute(form.Handle, 35, ref captionColor, sizeof(int));
+				DwmSetWindowAttribute(form.Handle, 34, ref borderColor, sizeof(int));
+			}
+			catch
+			{
+			}
+		}
+
 		public static void SetTaskbarVisible(IntPtr handle, bool visible)
 		{
 			if (handle == IntPtr.Zero) return;

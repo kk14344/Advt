@@ -24,6 +24,7 @@ namespace AandmAuto
 		private static extern IntPtr AddFontMemResourceEx(IntPtr data, uint size, IntPtr reserved, ref uint count);
 		private static readonly string gameFontFamily = ResolveGameFontFamily();
 		private static readonly string uiCleanFontFamily = ResolveCleanUiFontFamily();
+		private static readonly string glassUiFontFamily = ResolveGlassUiFontFamily();
 
 		public static string GameFontFamily { get { return gameFontFamily; } }
 		internal static string ButtonLabelStyle = "B";
@@ -65,9 +66,14 @@ namespace AandmAuto
 			get
 			{
 				int pct = Math.Max(10, Math.Min(90, CustomBackgroundOpacity));
-				int veilAlpha = CurrentTheme == ThemeLiquidGlass
-					? (int)Math.Round(86.0 * (1.0 - pct / 100.0))
-					: (int)Math.Round(255.0 * (1.0 - pct / 100.0));
+				if (CurrentTheme == ThemeLiquidGlass)
+				{
+					double scale = LiquidGlassEngine.Preset == LiquidGlassEngine.PresetCrystal ? 24.0
+						: (LiquidGlassEngine.Preset == LiquidGlassEngine.PresetDeep ? 115.0 : 52.0);
+					int va = (int)Math.Round(scale * (1.0 - pct / 100.0));
+					return Math.Max(4, Math.Min(160, va));
+				}
+				int veilAlpha = (int)Math.Round(255.0 * (1.0 - pct / 100.0));
 				return Math.Max(18, Math.Min(235, veilAlpha));
 			}
 		}
@@ -388,17 +394,44 @@ namespace AandmAuto
 			return SystemFonts.MessageBoxFont.FontFamily.Name;
 		}
 
+		private static string ResolveGlassUiFontFamily()
+		{
+			try
+			{
+				string[] preferred =
+				{
+					"PingFang SC",
+					"SF Pro Text",
+					"MiSans",
+					"HarmonyOS Sans SC",
+					"Noto Sans SC",
+					"Noto Sans SC Medium",
+					"DengXian",
+					"Microsoft YaHei UI",
+					"Microsoft YaHei"
+				};
+				string[] installed = FontFamily.Families.Select(f => f.Name).ToArray();
+				foreach (string name in preferred)
+					if (installed.Contains(name)) return name;
+			}
+			catch { }
+			return ResolveCleanUiFontFamily();
+		}
+
 		public static Font GameFont(float size, FontStyle style = FontStyle.Regular)
 		{
 			if (ExtremePerformanceMode)
 			{
 				return new Font(uiCleanFontFamily, size, style, GraphicsUnit.Point);
 			}
-            if (CurrentTheme == ThemeLiquidGlass || CurrentTheme == ThemeNativeLight)
-            {
-                float scale = CurrentTheme == ThemeLiquidGlass ? 1.02f : 1.05f;
-                return new Font(uiCleanFontFamily, size * scale, style, GraphicsUnit.Point);
-            }
+			if (CurrentTheme == ThemeLiquidGlass)
+			{
+				return new Font(glassUiFontFamily, size * 1.01f, style, GraphicsUnit.Point);
+			}
+			if (CurrentTheme == ThemeNativeLight)
+			{
+				return new Font(uiCleanFontFamily, size * 1.05f, style, GraphicsUnit.Point);
+			}
 			float larger = size * 1.15f;
 			if (gameFonts.Families.Length > 0) return new Font(gameFonts.Families[0], larger, style, GraphicsUnit.Point);
 			return new Font(GameFontFamily, larger, style, GraphicsUnit.Point);
@@ -1074,6 +1107,19 @@ namespace AandmAuto
             return !HasCustomCrop && GlassBlur > 0 && blurredCacheSource == EngineFrame ? blurredCache : null;
         }
 
+		internal static bool UsesEngineCanvasPublic(System.Windows.Forms.Control ctrl) { return UsesEngineCanvas(ctrl); }
+		internal static bool IsOutsideEngineCanvasPublic(System.Windows.Forms.Control ctrl) { return IsOutsideEngineCanvas(ctrl); }
+		internal static Bitmap CurrentEngineGlassPublic() { return CurrentEngineGlass(); }
+		internal static Rectangle GlassSourceRectanglePublic(Image image, int canvasW, int canvasH, int ox, int oy)
+		{
+			return GlassSourceRectangle(image, canvasW, canvasH, ox, oy);
+		}
+		internal static void DrawGlassSamplePublic(Graphics g, Image sample, Rectangle area, int canvasW, int canvasH, int ox, int oy)
+		{
+			Rectangle dest = GlassSourceRectangle(sample, canvasW, canvasH, ox, oy);
+			DrawGlassSample(g, sample, area, dest);
+		}
+
 		internal static void DrawGlassCardSurface(Graphics g, System.Windows.Forms.Control ctrl, GraphicsPath clipPath, int cornerRadius, Color tintColor, bool subtle)
 		{
 			if (ExtremePerformanceMode)
@@ -1092,34 +1138,15 @@ namespace AandmAuto
 					g.DrawRectangle(p, 0, 0, ctrl.Width - 1, ctrl.Height - 1);
 				return;
 			}
-			Rectangle bounds = new Rectangle(0, 0, Math.Max(1, ctrl.Width - 1), Math.Max(1, ctrl.Height - 1));
-            bool live = UsesEngineCanvas(ctrl);
-            Bitmap sample = live ? CurrentEngineGlass() :
-                IsOutsideEngineCanvas(ctrl) ? null : GetBlurredGlassBackground();
-			GraphicsState state = g.Save();
-			try
-			{
-				if (clipPath != null) g.SetClip(clipPath, CombineMode.Intersect);
-				int width, height, x, y;
-				GetWindowCanvasMetrics(ctrl, out width, out height, out x, out y);
-				Rectangle dest = sample == null ? Rectangle.Empty : GlassSourceRectangle(sample, width, height, x, y);
-				if (live && (sample == null || CustomBackgroundFit == BgFitContain)) DrawCustomBackground(g, ctrl, bounds, BackgroundVeilColor);
-                else if (sample != null) DrawGlassSample(g, sample, bounds, dest);
-				int opacity = live ? (subtle ? 88 : 104) : LocalTintAlpha(sample, dest, bounds, subtle ? 54 : 72);
-				using (var tint = new SolidBrush(Color.FromArgb(opacity, Mix(BackgroundVeilColor, tintColor, 0.18f))))
-					g.FillRectangle(tint, bounds);
-			}
-			finally { g.Restore(state); }
-
-			if (clipPath == null) return;
-			g.SmoothingMode = SmoothingMode.AntiAlias;
-			using (var rim = new LinearGradientBrush(bounds, Color.FromArgb(subtle ? 39 : 62, Color.White),
-				Color.FromArgb(17, Color.White), 90f))
-			using (var pen = new Pen(rim, 1f))
-				g.DrawPath(pen, clipPath);
+			LiquidGlassEngine.DrawGlassCard(g, ctrl, clipPath, cornerRadius, tintColor, subtle);
 		}
 
 		internal static void DrawLiquidGlassPill(Graphics g, System.Windows.Forms.Control ctrl, Rectangle rect, int cornerRadius, Color tintColor, int tintAlpha, Color rimAccent, bool hovered, bool pressed, bool selected, bool enabled)
+		{
+			DrawLiquidGlassPill(g, ctrl, rect, cornerRadius, tintColor, tintAlpha, rimAccent, hovered, pressed, selected, enabled, hovered ? 1f : 0f, pressed ? 1f : 0f, 0f, new Point(-100, -100));
+		}
+
+		internal static void DrawLiquidGlassPill(Graphics g, System.Windows.Forms.Control ctrl, Rectangle rect, int cornerRadius, Color tintColor, int tintAlpha, Color rimAccent, bool hovered, bool pressed, bool selected, bool enabled, float hoverT, float pressT, float sheenT, Point pointerLocal)
 		{
 			if (rect.Width < 4 || rect.Height < 4) return;
 			if (ExtremePerformanceMode)
@@ -1150,69 +1177,7 @@ namespace AandmAuto
 					g.DrawRectangle(p, rect.X, rect.Y, Math.Max(1, rect.Width - 1), Math.Max(1, rect.Height - 1));
 				return;
 			}
-			int radius = Math.Max(3, Math.Min(cornerRadius, Math.Min(rect.Width, rect.Height) / 2));
-			int width, height, x, y;
-			GetWindowCanvasMetrics(ctrl, out width, out height, out x, out y);
-            bool live = UsesEngineCanvas(ctrl);
-            bool outside = IsOutsideEngineCanvas(ctrl);
-			Bitmap sample = live ? CurrentEngineGlass() : outside ? null : GetBlurredGlassBackground();
-			Image sharp = live || outside ? null : EffectiveStageBackground;
-			Rectangle dest = sample == null ? Rectangle.Empty : GlassSourceRectangle(sample, width, height, x, y);
-
-			g.SmoothingMode = SmoothingMode.AntiAlias;
-			using (var path = RoundedRect(rect, radius))
-			{
-				GraphicsState state = g.Save();
-				try
-				{
-					g.SetClip(path, CombineMode.Intersect);
-					Image edgeSrc = sharp ?? (Image)sample;
-					int edge = Math.Min(Math.Max(1, rect.Height / 4), Math.Max(2, (int)Math.Round(g.DpiX / 48f)));
-                    if (live)
-                    {
-                        if (sample != null && CustomBackgroundFit == BgFitCover) DrawGlassSample(g, sample, rect, dest);
-                        else DrawCustomBackground(g, ctrl, rect, BackgroundVeilColor);
-                    }
-					else if (edgeSrc != null && rect.Width > 2 * edge && rect.Height > 2 * edge)
-					{
-						Rectangle displaced = GlassSourceRectangle(edgeSrc, width, height, x, y);
-						displaced.Inflate(edge - 1, edge - 1);
-						DrawGlassSample(g, edgeSrc, rect, displaced);
-						if (sample != null)
-						{
-							Rectangle inner = Rectangle.Inflate(rect, -edge, -edge);
-							using (var innerPath = RoundedRect(inner, Math.Max(1, radius - edge)))
-							{
-								GraphicsState innerState = g.Save();
-								try
-								{
-									g.SetClip(innerPath, CombineMode.Intersect);
-									DrawGlassSample(g, sample, inner, dest);
-								}
-								finally { g.Restore(innerState); }
-							}
-						}
-					}
-					else if (sample != null)
-					{
-						DrawGlassSample(g, sample, rect, dest);
-					}
-
-					int alpha = live ? (!enabled || pressed ? 110 : 88) : LocalTintAlpha(sample, dest, rect, !enabled ? 78 : pressed ? 83 : 60);
-					using (var tint = new SolidBrush(Color.FromArgb(alpha, BackgroundVeilColor)))
-						g.FillRectangle(tint, rect);
-					int wash = !enabled ? 7 : (selected ? 14 : hovered ? 12 : 6) + Math.Min(9, tintAlpha / 12);
-					using (var accent = new SolidBrush(Color.FromArgb(wash, tintColor)))
-						g.FillRectangle(accent, rect);
-				}
-				finally { g.Restore(state); }
-
-				int highlight = !enabled ? 46 : pressed ? 67 : selected ? 167 : hovered ? 142 : 93;
-				using (var rim = new LinearGradientBrush(rect, Color.FromArgb(highlight, Color.White),
-					Color.FromArgb(selected ? 86 : 38, rimAccent), 95f))
-				using (var pen = new Pen(rim, selected ? 1.35f : 1f))
-					g.DrawPath(pen, path);
-			}
+			LiquidGlassEngine.DrawCrystalPill(g, ctrl, rect, cornerRadius, tintColor, tintAlpha, hovered, pressed, selected, enabled, hoverT, pressT, sheenT, pointerLocal);
 		}
 
 		private static System.Windows.Forms.Control FindRootBackdropOwner(System.Windows.Forms.Control ctrl)
@@ -1328,11 +1293,7 @@ namespace AandmAuto
 					ox = -bounds.X;
 					oy = -bounds.Y;
 				}
-				int pct = Math.Max(10, Math.Min(90, CustomBackgroundOpacity));
-				int rawVeilAlpha = CurrentTheme == ThemeLiquidGlass
-					? (int)Math.Round(86.0 * (1.0 - pct / 100.0))
-					: (int)Math.Round(255.0 * (1.0 - pct / 100.0));
-				int clampedVeilAlpha = Math.Max(18, Math.Min(235, rawVeilAlpha));
+				int clampedVeilAlpha = EffectiveVeilAlpha;
 				if (bg == EngineFrame && EngineVeiledFrame != null && CustomBackgroundFit == BgFitCover
 					&& bg.Width == canvasW && bg.Height == canvasH && veilColor == engineVeilColor && clampedVeilAlpha == engineVeilAlpha)
 				{

@@ -21,12 +21,12 @@ namespace AandmAuto
 				case UiTheme.ThemeNativeLight: return Color.FromArgb(248, 247, 244);
 				case UiTheme.ThemeWarmWood: return Color.FromArgb(110, 56, 22);
 				case UiTheme.ThemeParchment: return Color.FromArgb(72, 57, 38);
-				case UiTheme.ThemeLiquidGlass: return Color.FromArgb(22, 30, 46);
+				case UiTheme.ThemeLiquidGlass: return Color.Transparent;
 				default: return Color.FromArgb(52, 42, 26);
 				}
 			}
 		}
-		private static Color ContentBg { get { return UiTheme.Palette.CardColor; } }
+		private static Color ContentBg { get { return UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? Color.Transparent : UiTheme.Palette.CardColor; } }
 		private static Color CardBorder { get { return UiTheme.Palette.BorderColor; } }
 		private static Color GoldText { get { return UiTheme.Palette.GoldColor; } }
 		private static Color BodyText { get { return UiTheme.Palette.TextColor; } }
@@ -367,6 +367,13 @@ namespace AandmAuto
 
 			initializing = false;
 			SetCategory(initialCategory);
+			GlassControlStyler.ApplyToForm(this);
+		}
+
+		protected override void OnHandleCreated(EventArgs e)
+		{
+			base.OnHandleCreated(e);
+			WindowStyle.ApplyThemeChrome(this);
 		}
 
 		private void ClampDefaults(int currentResearchMask)
@@ -396,6 +403,8 @@ namespace AandmAuto
 			numbers["customBgCropW"] = cw;
 			numbers["customBgCropH"] = ch;
 			numbers["glassBlur"] = Clamp(GetNum("glassBlur", 12), 0, 24);
+			numbers["glassPreset"] = Clamp(GetNum("glassPreset", LiquidGlassEngine.PresetBalanced), 0, 2);
+			if (!values.ContainsKey("glassMotion")) values["glassMotion"] = true;
 			numbers["auditRetentionDays"] = Clamp(GetNum("auditRetentionDays", 14), 3, 90);
 		}
 
@@ -1724,7 +1733,7 @@ namespace AandmAuto
 				DropDownStyle = ComboBoxStyle.DropDownList,
 				BackColor = UiTheme.Palette.InputBackColor,
 				ForeColor = BodyText,
-				Font = UiTheme.UiFont(8.25f)
+				Font = UiTheme.GameFont(8.25f)
 			};
 			cmbBgMode.Items.AddRange(new object[]
 			{
@@ -1754,7 +1763,7 @@ namespace AandmAuto
 				DropDownStyle = ComboBoxStyle.DropDownList,
 				BackColor = UiTheme.Palette.InputBackColor,
 				ForeColor = BodyText,
-				Font = UiTheme.UiFont(8.25f)
+				Font = UiTheme.GameFont(8.25f)
 			};
 			cmbBgFit.Items.AddRange(new object[]
 			{
@@ -1979,7 +1988,7 @@ namespace AandmAuto
                     Name = "WallpaperSettingsDialog", Text = "助手壁纸设置", StartPosition = FormStartPosition.CenterParent,
                     ClientSize = new Size(794, 301), MinimumSize = new Size(660, 245),
                     BackColor = UiTheme.Palette.InsetColor, AutoScroll = true, ShowInTaskbar = false,
-                    AutoScaleMode = AutoScaleMode.Dpi, Font = UiTheme.UiFont(9f)
+                    AutoScaleMode = AutoScaleMode.Dpi, Font = UiTheme.GameFont(9f)
                 })
                 using (var timer = new Timer { Interval = 500 })
                 {
@@ -1992,6 +2001,7 @@ namespace AandmAuto
                     editor.Controls.Add(back);
                     editor.CancelButton = back;
                     bgBox.Visible = true;
+                    GlassControlStyler.ApplyToForm(editor);
                     timer.Tick += delegate { refresh(); };
                     timer.Start();
                     try { editor.ShowDialog(this); }
@@ -2011,9 +2021,39 @@ namespace AandmAuto
                 Skin = GameButtonSkin.Stone, Font = UiTheme.GameFont(9f, FontStyle.Bold)
             };
             page.Controls.Add(appearanceButton);
+
+            page.Controls.Add(new SmoothLabel
+            {
+                Text = "玻璃质感",
+                Location = new Point(12, 148),
+                Size = new Size(68, 26),
+                BackColor = Color.Transparent,
+                ForeColor = BodyText,
+                Font = UiTheme.GameFont(8.5f),
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            var cmbGlassPreset = new ComboBox
+            {
+                Name = "GlassPresetCombo",
+                Location = new Point(82, 147),
+                Size = new Size(156, 26),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = UiTheme.Palette.InputBackColor,
+                ForeColor = BodyText,
+                Font = UiTheme.GameFont(8.5f)
+            };
+            cmbGlassPreset.Items.AddRange(new object[] { "极清透", "标准通透（默认）", "深邃护眼" });
+            cmbGlassPreset.SelectedIndex = Clamp(GetNum("glassPreset", LiquidGlassEngine.PresetBalanced), 0, 2);
+            cmbGlassPreset.SelectedIndexChanged += delegate { numbers["glassPreset"] = cmbGlassPreset.SelectedIndex; };
+            page.Controls.Add(cmbGlassPreset);
+
+            var chkGlassMotion = OptionCheck(page, "glassMotion", "玻璃微交互动画", 258, 147, 176, true);
+            chkGlassMotion.Name = "GlassMotionCheck";
+            chkGlassMotion.Font = UiTheme.GameFont(8.5f);
+
             var appearance = new Panel
             {
-                Location = new Point(8, 152), Size = new Size(777, 357),
+                Location = new Point(8, 184), Size = new Size(777, 357),
                 BackColor = Color.Transparent, Visible = true
             };
             appearanceButton.Selected = true;
@@ -2063,7 +2103,7 @@ namespace AandmAuto
 				themeSwatches[i] = swatch;
 				tCard.Controls.Add(swatch);
 
-                var choice = new RadioButton
+                var choice = new GlassRadioButton
                 {
                     Text = themeTitles[i], Location = new Point(8, 68), Size = new Size(131, 25),
                     ForeColor = GoldText, BackColor = Color.Transparent, AutoCheck = false
@@ -2104,7 +2144,7 @@ namespace AandmAuto
 				layoutThumbs[i] = thumb;
 				card.Controls.Add(thumb);
 
-                var choice = new RadioButton
+                var choice = new GlassRadioButton
                 {
                     Text = names[i], Location = new Point(8, 137), Size = new Size(173, 23),
                     ForeColor = GoldText, BackColor = Color.Transparent, AutoCheck = false

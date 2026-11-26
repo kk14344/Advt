@@ -32,7 +32,7 @@ namespace AandmAuto
             playback.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             section.Controls.Add(playback, 0, 1);
             Color playbackInk = UiTheme.CurrentTheme == UiTheme.ThemeNativeLight ? TextColor
-                : UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? Color.White : Color.FromArgb(255, 238, 204);
+                : UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? LiquidGlassEngine.GlassInk(true) : Color.FromArgb(255, 238, 204);
             playback.Controls.Add(new SmoothLabel {
                 Text = "倍速", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
                 Margin = Padding.Empty, BackColor = Color.Transparent,

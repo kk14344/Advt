@@ -87,6 +87,9 @@ namespace AandmAuto
         [DllImport("user32.dll", EntryPoint = "SendMessageW")]
         private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr value, ref CharacterFormat format);
 
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
+
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
@@ -96,6 +99,20 @@ namespace AandmAuto
             options &= ~(ImfAutoFont | ImfAutoFontSizeAdjust | ImfDualFont);
             SendMessage(Handle, EmSetLanguageOptions, IntPtr.Zero, new IntPtr(options));
             ApplyBodyFont();
+            RefreshGlassChrome();
+        }
+
+        internal void RefreshGlassChrome()
+        {
+            if (!IsHandleCreated || IsDisposed) return;
+            try
+            {
+                if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
+                {
+                    SetWindowTheme(Handle, LiquidGlassEngine.IsBrightBackdrop() ? "Explorer" : "DarkMode_Explorer", null);
+                }
+            }
+            catch { }
         }
 
         internal void SetBodyText(string text)

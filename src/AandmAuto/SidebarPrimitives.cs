@@ -339,12 +339,16 @@ namespace AandmAuto
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
 				Rectangle rg = new Rectangle(0, selected ? 0 : 2, Width - 1, Height - (selected ? 0 : 2) - 2);
-				UiTheme.DrawLiquidGlassPill(g, this, rg, rg.Height / 2, Color.White, selected ? 42 : 16, Color.White, hovered, false, selected, Enabled);
-				Color tcg = selected ? Color.White : Color.FromArgb(228, 255, 255, 255);
+				Color tintC = selected ? Color.FromArgb(14, 132, 255) : Color.White;
+				int tintA = selected ? 94 : 0;
+				UiTheme.DrawLiquidGlassPill(g, this, rg, rg.Height / 2, tintC, tintA, Color.White, hovered, false, selected, Enabled);
+				Color tcg = selected ? Color.White : LiquidGlassEngine.GlassInk(Enabled);
+				Color shg = selected ? Color.FromArgb(145, 0, 0, 0) : LiquidGlassEngine.GlassTextShadow();
 				Rectangle tbg = TextBounds;
 				if (!selected) tbg.Y += 1;
 				TextFormatFlags fg = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding;
-				GameText.Draw(g, Text, Font, new Rectangle(tbg.X + 1, tbg.Y + 1, tbg.Width, tbg.Height), Color.FromArgb(155, 0, 0, 0), fg);
+				if (shg.A > 0)
+					GameText.Draw(g, Text, Font, new Rectangle(tbg.X + 1, tbg.Y + 1, tbg.Width, tbg.Height), shg, fg);
 				GameText.Draw(g, Text, Font, tbg, tcg, fg);
 				return;
 			}
@@ -559,20 +563,22 @@ namespace AandmAuto
 
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
-				using (GraphicsPath tr = UiTheme.RoundedRect(r, 4))
-				using (var bgG = new SolidBrush(Color.FromArgb(110, 14, 20, 32)))
-				using (var brG = new Pen(Color.FromArgb(85, 215, 235, 255), 1f))
+				int pr = Math.Max(3, r.Height / 2);
+				using (GraphicsPath tr = UiTheme.RoundedRect(r, pr))
+				using (var bgG = new SolidBrush(LiquidGlassEngine.GlassTrackFill()))
+				using (var brG = new Pen(LiquidGlassEngine.GlassHairline(), 1f))
 				{
 					g.SmoothingMode = SmoothingMode.AntiAlias;
 					g.FillPath(bgG, tr);
 					g.DrawPath(brG, tr);
 				}
 				int fwG = (int)Math.Round((r.Width - 2) * fraction);
-				if (fwG > 1 && r.Height > 2)
+				if (fwG > 2 && r.Height > 2)
 				{
-					Rectangle fgRect = new Rectangle(r.X + 1, r.Y + 1, fwG, r.Height - 1);
-					using (GraphicsPath fp = UiTheme.RoundedRect(fgRect, 3))
-					using (var br = new LinearGradientBrush(fgRect, UiTheme.Mix(FillTop, Color.White, 0.2f), FillBottom, 0f))
+					Rectangle fgRect = new Rectangle(r.X + 1, r.Y + 1, fwG, r.Height - 2);
+					int fr = Math.Max(2, fgRect.Height / 2);
+					using (GraphicsPath fp = UiTheme.RoundedRect(fgRect, fr))
+					using (var br = new LinearGradientBrush(fgRect, UiTheme.Mix(FillTop, Color.White, 0.25f), FillBottom, 0f))
 						g.FillPath(br, fp);
 				}
 				return;
@@ -686,27 +692,28 @@ namespace AandmAuto
 			}
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass || UiTheme.CustomBackground != null)
 			{
+				bool brightGlass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && LiquidGlassEngine.IsBrightBackdrop();
 				Color baseColor = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass
-					? Color.FromArgb(14, 20, 32)
+					? (brightGlass ? Color.FromArgb(236, 242, 248) : Color.FromArgb(14, 20, 32))
 					: UiTheme.Palette.SideOuterColor;
 				using (var bg = new SolidBrush(baseColor)) graphics.FillRectangle(bg, r);
 				UiTheme.DrawCustomBackground(graphics, this, r, baseColor);
-				using (var frost = new SolidBrush(Color.FromArgb(UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? 22 : 16, 255, 255, 255)))
+				int frostA = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass
+					? (LiquidGlassEngine.Preset == LiquidGlassEngine.PresetCrystal ? 12 : (brightGlass ? 36 : 18))
+					: 16;
+				using (var frost = new SolidBrush(Color.FromArgb(frostA, 255, 255, 255)))
 					graphics.FillRectangle(frost, r);
-				int glossH = Math.Min(12, Math.Max(4, r.Height / 3));
+				int glossH = Math.Min(10, Math.Max(4, r.Height / 3));
 				using (var gloss = new LinearGradientBrush(
 					new Rectangle(0, 0, Math.Max(1, r.Width), glossH),
-					Color.FromArgb(32, 255, 255, 255),
+					Color.FromArgb(brightGlass ? 48 : 26, 255, 255, 255),
 					Color.FromArgb(0, 255, 255, 255), 90f))
 				{
 					gloss.WrapMode = WrapMode.TileFlipXY;
 					graphics.FillRectangle(gloss, 0, 0, r.Width, glossH);
 				}
-				if (UiTheme.CurrentTheme != UiTheme.ThemeLiquidGlass)
-				{
-					using (var pen = new Pen(Color.FromArgb(90, 255, 255, 255), 1f))
-						graphics.DrawLine(pen, 0, r.Height - 1, r.Width, r.Height - 1);
-				}
+				using (var pen = new Pen(UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? LiquidGlassEngine.GlassHairline() : Color.FromArgb(90, 255, 255, 255), 1f))
+					graphics.DrawLine(pen, 0, r.Height - 1, r.Width, r.Height - 1);
 				return;
 			}
 			if (UiTheme.CurrentTheme == UiTheme.ThemeNativeLight)
@@ -980,6 +987,260 @@ namespace AandmAuto
 		{
 			if (w <= 0 || h <= 0) return;
 			using (var b = new SolidBrush(c)) g.FillRectangle(b, x, y, w, h);
+		}
+	}
+
+	/// <summary>
+	/// Apple iOS 26 Liquid Glass spring-driven segmented control.
+	/// Clicks glide smoothly from old index to new index (~400ms cushioned spring, zero teleport);
+	/// pointer drag (>6px threshold) slides the refracted crystal lens live across the wallpaper.
+	/// </summary>
+	internal sealed class GlassSegmentedBar : Control
+	{
+		private string[] items = new string[0];
+		private int selectedIndex;
+		private float pos;
+		private float velocity;
+		private float targetPos;
+		private int hoverIndex = -1;
+		private bool pointerDown;
+		private bool dragging;
+		private int downX;
+		private float dragStartPos;
+		private Func<float, bool> animStep;
+
+		public event EventHandler SelectedIndexChanged;
+
+		public string[] Items
+		{
+			get { return items; }
+			set
+			{
+				items = value ?? new string[0];
+				if (items.Length > 0 && selectedIndex >= items.Length)
+				{
+					selectedIndex = items.Length - 1;
+					pos = targetPos = selectedIndex;
+				}
+				Invalidate();
+			}
+		}
+
+		public int SelectedIndex
+		{
+			get { return selectedIndex; }
+			set { SetSelectedIndex(value, true, false); }
+		}
+
+		public GlassSegmentedBar(params string[] labels)
+		{
+			items = labels ?? new string[0];
+			DoubleBuffered = true;
+			SetStyle(ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint
+				| ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+			BackColor = Color.Transparent;
+			Cursor = Cursors.Hand;
+			Font = UiTheme.GameFont(8.75f, FontStyle.Regular);
+			Height = 32;
+		}
+
+		public void SetSelectedIndex(int idx, bool animate, bool raiseEvent)
+		{
+			if (items.Length == 0) return;
+			int clamped = Math.Max(0, Math.Min(items.Length - 1, idx));
+			bool changed = clamped != selectedIndex;
+			selectedIndex = clamped;
+			targetPos = clamped;
+			if (!animate || !GlassAnimator.Enabled)
+			{
+				pos = clamped;
+				velocity = 0f;
+				Invalidate();
+			}
+			else
+			{
+				StartSpring();
+			}
+			if (changed && raiseEvent)
+			{
+				EventHandler h = SelectedIndexChanged;
+				if (h != null) h(this, EventArgs.Empty);
+			}
+		}
+
+		private void StartSpring()
+		{
+			if (animStep == null) animStep = StepSpring;
+			GlassAnimator.Add(animStep);
+		}
+
+		private bool StepSpring(float dt)
+		{
+			if (IsDisposed || !Visible) return false;
+			if (dragging) return false;
+			// Cushioned Apple iOS 26 spring: stiffness=145, damping=17.5 (~400ms smooth glide)
+			float force = (targetPos - pos) * 145f;
+			velocity += (force - velocity * 17.5f) * dt;
+			pos += velocity * dt;
+			if (Math.Abs(targetPos - pos) < 0.002f && Math.Abs(velocity) < 0.01f)
+			{
+				pos = targetPos;
+				velocity = 0f;
+				Invalidate();
+				return false;
+			}
+			Invalidate();
+			return true;
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing && animStep != null) GlassAnimator.Remove(animStep);
+			base.Dispose(disposing);
+		}
+
+		protected override void OnPaintBackground(PaintEventArgs e) { }
+
+		protected override void OnPaint(PaintEventArgs e)
+		{
+			UiSurface.PaintWhole(this, e, PaintContent);
+		}
+
+		private void PaintContent(Graphics g)
+		{
+			UiSurface.PaintBackdrop(this, g);
+			int count = items.Length;
+			if (Width < 16 || Height < 12 || count == 0) return;
+
+			g.SmoothingMode = SmoothingMode.HighQuality;
+			Rectangle track = new Rectangle(0, 0, Width - 1, Height - 1);
+			int trackRad = Math.Max(6, track.Height / 2);
+
+			// Recessed glass track
+			using (GraphicsPath tp = UiTheme.RoundedRect(track, trackRad))
+			using (var tb = new SolidBrush(LiquidGlassEngine.GlassTrackFill()))
+			using (var tpen = new Pen(LiquidGlassEngine.GlassHairline(), 1f))
+			{
+				g.FillPath(tb, tp);
+				g.DrawPath(tpen, tp);
+			}
+
+			int pad = 3;
+			float innerW = Math.Max(4f, track.Width - pad * 2);
+			float segW = innerW / count;
+			float clampedPos = Math.Max(-0.08f, Math.Min(count - 0.92f, pos));
+			int thumbX = (int)Math.Round(pad + clampedPos * segW);
+			int thumbW = Math.Max(12, (int)Math.Round(segW));
+			if (thumbX < pad) thumbX = pad;
+			if (thumbX + thumbW > track.Width - pad) thumbX = Math.Max(pad, track.Width - pad - thumbW);
+			Rectangle thumbRect = new Rectangle(thumbX, pad, thumbW, Math.Max(8, track.Height - pad * 2));
+			int thumbRad = Math.Max(5, thumbRect.Height / 2);
+
+			// Sliding crystal lens thumb (live wallpaper refraction while sliding, cached when settled!)
+			bool bright = LiquidGlassEngine.IsBrightBackdrop();
+			Color thumbTint = bright ? Color.White : Color.FromArgb(245, 250, 255);
+			int thumbAlpha = bright ? 95 : 42;
+			UiTheme.DrawLiquidGlassPill(
+				g, this, thumbRect, thumbRad,
+				thumbTint, thumbAlpha, Color.White,
+				dragging, false, true, Enabled);
+
+			// Labels
+			Color activeInk = LiquidGlassEngine.GlassInk(Enabled);
+			Color mutedInk = LiquidGlassEngine.GlassMutedInk();
+			Color shadowInk = LiquidGlassEngine.GlassTextShadow();
+			TextFormatFlags flags = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine
+				| TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding;
+
+			for (int i = 0; i < count; i++)
+			{
+				int sx = (int)Math.Round(pad + i * segW);
+				int sw = (int)Math.Round(segW);
+				Rectangle sr = new Rectangle(sx, 1, Math.Max(4, sw), Math.Max(4, track.Height - 2));
+				float dist = Math.Abs(pos - i);
+				float activeMix = Math.Max(0f, Math.Min(1f, 1f - dist * 1.15f));
+				bool isHov = (i == hoverIndex && !dragging);
+				Color ink = activeMix > 0.5f ? activeInk : (isHov ? activeInk : mutedInk);
+				if (shadowInk.A > 0 && activeMix > 0.35f)
+					GameText.Draw(g, items[i], Font, new Rectangle(sr.X + 1, sr.Y + 1, sr.Width, sr.Height), shadowInk, flags);
+				GameText.Draw(g, items[i], Font, sr, ink, flags);
+			}
+		}
+
+		private int IndexFromX(int x)
+		{
+			if (items.Length == 0 || Width <= 6) return 0;
+			int pad = 3;
+			float segW = Math.Max(1f, (Width - 1 - pad * 2) / (float)items.Length);
+			int idx = (int)Math.Floor((x - pad) / segW);
+			return Math.Max(0, Math.Min(items.Length - 1, idx));
+		}
+
+		protected override void OnMouseDown(MouseEventArgs e)
+		{
+			if (e.Button == MouseButtons.Left && items.Length > 0)
+			{
+				// Never teleport pos on pointerdown! Wait for either >6px drag or mouseup click.
+				pointerDown = true;
+				dragging = false;
+				downX = e.X;
+				dragStartPos = pos;
+				Capture = true;
+			}
+			base.OnMouseDown(e);
+		}
+
+		protected override void OnMouseMove(MouseEventArgs e)
+		{
+			if (items.Length == 0) { base.OnMouseMove(e); return; }
+			if (pointerDown)
+			{
+				if (!dragging && Math.Abs(e.X - downX) > 6)
+				{
+					dragging = true;
+					velocity = 0f;
+				}
+				if (dragging)
+				{
+					float segW = Math.Max(1f, (Width - 7) / (float)items.Length);
+					float delta = (e.X - downX) / segW;
+					pos = Math.Max(-0.08f, Math.Min(items.Length - 0.92f, dragStartPos + delta));
+					Invalidate();
+				}
+			}
+			else
+			{
+				int h = IndexFromX(e.X);
+				if (h != hoverIndex)
+				{
+					hoverIndex = h;
+					Invalidate();
+				}
+			}
+			base.OnMouseMove(e);
+		}
+
+		protected override void OnMouseUp(MouseEventArgs e)
+		{
+			if (pointerDown)
+			{
+				pointerDown = false;
+				Capture = false;
+				int targetIdx = dragging ? (int)Math.Round(Math.Max(0f, Math.Min(items.Length - 1, pos))) : IndexFromX(e.X);
+				dragging = false;
+				SetSelectedIndex(targetIdx, true, true);
+			}
+			base.OnMouseUp(e);
+		}
+
+		protected override void OnMouseLeave(EventArgs e)
+		{
+			if (hoverIndex != -1)
+			{
+				hoverIndex = -1;
+				Invalidate();
+			}
+			base.OnMouseLeave(e);
 		}
 	}
 }

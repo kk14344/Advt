@@ -151,6 +151,7 @@ namespace AandmAuto {
     button.FlatAppearance.MouseOverBackColor=UiTheme.Mix(palette.InsetColor,palette.AccentColor,0.18f);
    }
    applyThemeButton.FlatAppearance.BorderColor=palette.GoldColor;
+   WindowStyle.ApplyThemeChrome(this);
    Invalidate(true);
   }
 

@@ -14,6 +14,8 @@ namespace AandmAuto
 		private int value;
 
 		private bool hovered;
+		private int glassHoverZone; // -1 = minus, 0 = center, 1 = plus, -2 = none
+		private int glassPressZone = -2;
 
 		private bool editing;
 
@@ -98,6 +100,11 @@ namespace AandmAuto
             UiSurface.PaintWhole(this,e,PaintContent);
         }
 
+		private int GlassStepButtonWidth()
+		{
+			return Math.Max(22, Math.Min(34, base.Width / 3));
+		}
+
         private void PaintContent(Graphics graphics)
 		{
             UiSurface.PaintBackdrop(this,graphics);
@@ -105,19 +112,63 @@ namespace AandmAuto
 			Rectangle bounds = new Rectangle(0, 0, base.Width - 1, base.Height - 1);
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
-				UiTheme.DrawLiquidGlassPill(graphics, this, bounds, bounds.Height / 2, Color.White, 18, Color.White, hovered, false, Focused, base.Enabled);
-				int aLeft = base.Width - 20;
-				using (var ab = new SolidBrush(Color.FromArgb(235, 255, 255, 255)))
+				int rad = Math.Max(6, Math.Min(bounds.Height / 2, 16));
+				UiTheme.DrawLiquidGlassPill(graphics, this, bounds, rad, Color.White, 0, Color.White, hovered, false, Focused, base.Enabled);
+
+				int btnW = GlassStepButtonWidth();
+				bool canMinus = base.Enabled && value > minimum;
+				bool canPlus = base.Enabled && value < maximum;
+				bool bright = LiquidGlassEngine.IsBrightBackdrop();
+
+				// Subtle hover / press highlight on minus or plus zone
+				if (base.Enabled && (glassHoverZone == -1 || glassHoverZone == 1))
 				{
-					int cx = aLeft + 10;
-					graphics.FillPolygon(ab, new Point[] { new Point(cx - 4, base.Height / 2 - 5), new Point(cx + 4, base.Height / 2 - 5), new Point(cx, base.Height / 2 - 2) });
-					graphics.FillPolygon(ab, new Point[] { new Point(cx - 4, base.Height / 2 + 5), new Point(cx + 4, base.Height / 2 + 5), new Point(cx, base.Height / 2 + 2) });
+					Rectangle zoneRect = glassHoverZone == -1
+						? new Rectangle(bounds.X + 2, bounds.Y + 2, btnW - 3, Math.Max(4, bounds.Height - 4))
+						: new Rectangle(bounds.Right - btnW + 1, bounds.Y + 2, btnW - 3, Math.Max(4, bounds.Height - 4));
+					int zRad = Math.Max(4, Math.Min(rad - 2, zoneRect.Height / 2));
+					int alpha = (glassPressZone == glassHoverZone) ? (bright ? 52 : 64) : (bright ? 36 : 34);
+					using (GraphicsPath zp = UiTheme.RoundedRect(zoneRect, zRad))
+					using (var zb = new SolidBrush(Color.FromArgb(alpha, bright ? Color.Black : Color.White)))
+						graphics.FillPath(zb, zp);
 				}
+
+				// Hairline dividers between - | value | +
+				using (var sep = new Pen(LiquidGlassEngine.GlassHairline(), 1f))
+				{
+					int padY = Math.Max(5, bounds.Height / 4);
+					graphics.DrawLine(sep, btnW, padY, btnW, bounds.Height - padY);
+					graphics.DrawLine(sep, bounds.Right - btnW, padY, bounds.Right - btnW, bounds.Height - padY);
+				}
+
+				// Crisp vector minus & plus glyphs
+				Color minusInk = LiquidGlassEngine.GlassInk(canMinus);
+				Color plusInk = LiquidGlassEngine.GlassInk(canPlus);
+				float midY = bounds.Y + bounds.Height / 2f;
+				float leftCx = bounds.X + btnW / 2f;
+				float rightCx = bounds.Right - btnW / 2f;
+				float halfBar = Math.Min(5.2f, Math.Max(3.6f, btnW * 0.18f));
+				using (var mp = new Pen(minusInk, 1.75f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+				{
+					graphics.DrawLine(mp, leftCx - halfBar, midY, leftCx + halfBar, midY);
+				}
+				using (var pp = new Pen(plusInk, 1.75f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+				{
+					graphics.DrawLine(pp, rightCx - halfBar, midY, rightCx + halfBar, midY);
+					graphics.DrawLine(pp, rightCx, midY - halfBar, rightCx, midY + halfBar);
+				}
+
 				string t = editing ? editBuffer : value.ToString();
 				if (string.IsNullOrEmpty(t)) t = "0";
-				Rectangle tb = new Rectangle(8, 1, Math.Max(1, aLeft - 8), Math.Max(1, base.Height - 2));
-				GameText.Draw(graphics, t, Font, tb, base.Enabled ? Color.White : Color.FromArgb(170, 255, 255, 255),
-					UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+				Rectangle tb = new Rectangle(btnW + 2, 1, Math.Max(1, bounds.Width - btnW * 2 - 4), Math.Max(1, bounds.Height - 2));
+				Font numFont = base.Height >= 32 ? UiTheme.GameFont(10.5f, FontStyle.Bold) : Font;
+				Color textInk = LiquidGlassEngine.GlassInk(base.Enabled);
+				Color shadowInk = LiquidGlassEngine.GlassTextShadow();
+				TextFormatFlags tf = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.SingleLine;
+				if (shadowInk.A > 0)
+					GameText.Draw(graphics, t, numFont, new Rectangle(tb.X + 1, tb.Y + 1, tb.Width, tb.Height), shadowInk, tf);
+				GameText.Draw(graphics, t, numFont, tb, textInk, tf);
+				if (numFont != Font) numFont.Dispose();
 				return;
 			}
 			if (UiTheme.IsLightTheme)
@@ -214,12 +265,27 @@ namespace AandmAuto
 		protected override void OnMouseLeave(EventArgs e)
 		{
 			hovered = false;
+			glassHoverZone = -2;
+			glassPressZone = -2;
 			Invalidate();
 			base.OnMouseLeave(e);
 		}
 
 		protected override void OnMouseMove(MouseEventArgs e)
 		{
+			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
+			{
+				int btnW = GlassStepButtonWidth();
+				int zone = e.X < btnW ? -1 : (e.X >= base.Width - btnW ? 1 : 0);
+				if (zone != glassHoverZone)
+				{
+					glassHoverZone = zone;
+					Invalidate();
+				}
+				Cursor = zone != 0 ? Cursors.Hand : Cursors.IBeam;
+				base.OnMouseMove(e);
+				return;
+			}
 			bool overArrow = e.X >= base.Width - 20;
 			Cursor = overArrow ? Cursors.Hand : Cursors.IBeam;
 			base.OnMouseMove(e);
@@ -228,6 +294,32 @@ namespace AandmAuto
 		protected override void OnMouseDown(MouseEventArgs e)
 		{
 			Focus();
+			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
+			{
+				int btnW = GlassStepButtonWidth();
+				if (e.X < btnW)
+				{
+					glassPressZone = -1;
+					Step(-1);
+					Invalidate();
+				}
+				else if (e.X >= base.Width - btnW)
+				{
+					glassPressZone = 1;
+					Step(1);
+					Invalidate();
+				}
+				else
+				{
+					glassPressZone = 0;
+					editing = true;
+					editFresh = true;
+					editBuffer = value.ToString();
+					Invalidate();
+				}
+				base.OnMouseDown(e);
+				return;
+			}
 			if (e.X >= base.Width - 20)
 			{
 				Step(e.Y < base.Height / 2 ? 1 : -1);
@@ -240,6 +332,16 @@ namespace AandmAuto
 				Invalidate();
 			}
 			base.OnMouseDown(e);
+		}
+
+		protected override void OnMouseUp(MouseEventArgs e)
+		{
+			if (glassPressZone != -2)
+			{
+				glassPressZone = -2;
+				Invalidate();
+			}
+			base.OnMouseUp(e);
 		}
 
 		protected override void OnMouseWheel(MouseEventArgs e)

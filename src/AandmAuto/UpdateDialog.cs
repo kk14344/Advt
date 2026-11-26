@@ -5,13 +5,13 @@ using System.Windows.Forms;
 
 namespace AandmAuto
 {
-	internal sealed class UpdateDialog : Form
+	internal sealed class UpdateDialog : CompositedForm
 	{
 		private readonly Action<string, Color> logCallback;
 		private readonly SmoothLabel lblEdition;
 		private readonly SmoothLabel lblStatus;
 		private readonly TextBox txtNotes;
-		private readonly ProgressBar progressBar;
+		private readonly GameProgressBar progressBar;
 		private readonly SmoothLabel lblProgress;
 		private readonly GameButton btnRecheck;
 		private readonly GameButton btnOpenWeb;
@@ -35,6 +35,20 @@ namespace AandmAuto
 			BackColor = UiTheme.Palette.SideOuterColor;
 			ForeColor = UiTheme.Palette.TextColor;
 			Font = UiTheme.GameFont(9f);
+
+			var root = new SettingsRootPanel
+			{
+				Dock = DockStyle.Fill,
+				ColumnCount = 1,
+				RowCount = 1,
+				Margin = Padding.Empty,
+				Padding = Padding.Empty
+			};
+			root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			var host = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = Padding.Empty };
+			root.Controls.Add(host, 0, 0);
+			Controls.Add(root);
 
 			var headerCard = new InsetPanel
 			{
@@ -65,7 +79,7 @@ namespace AandmAuto
 			};
 			headerCard.Controls.Add(lblEdition);
 			headerCard.Controls.Add(lblStatus);
-			Controls.Add(headerCard);
+			host.Controls.Add(headerCard);
 
 			var lblNotesTitle = new SmoothLabel
 			{
@@ -76,7 +90,7 @@ namespace AandmAuto
 				ForeColor = UiTheme.Palette.MutedColor,
 				Font = UiTheme.GameFont(8.25f, FontStyle.Bold)
 			};
-			Controls.Add(lblNotesTitle);
+			host.Controls.Add(lblNotesTitle);
 
 			txtNotes = new TextBox
 			{
@@ -88,21 +102,21 @@ namespace AandmAuto
 				BackColor = UiTheme.Palette.InsetColor,
 				ForeColor = UiTheme.Palette.TextColor,
 				BorderStyle = BorderStyle.FixedSingle,
-				Font = UiTheme.UiFont(9f, FontStyle.Regular),
+				Font = UiTheme.GameFont(8.75f, FontStyle.Regular),
 				Text = "正在检查中，请稍候…"
 			};
-			Controls.Add(txtNotes);
+			host.Controls.Add(txtNotes);
 
-			progressBar = new ProgressBar
+			progressBar = new GameProgressBar
 			{
 				Location = new Point(14, 276),
-				Size = new Size(492, 16),
-				Style = ProgressBarStyle.Continuous,
-				Minimum = 0,
-				Maximum = 100,
+				Size = new Size(492, 14),
+				Fraction = 0f,
+				FillTop = Color.FromArgb(62, 184, 255),
+				FillBottom = Color.FromArgb(14, 132, 255),
 				Visible = false
 			};
-			Controls.Add(progressBar);
+			host.Controls.Add(progressBar);
 
 			lblProgress = new SmoothLabel
 			{
@@ -111,10 +125,10 @@ namespace AandmAuto
 				Size = new Size(492, 20),
 				BackColor = Color.Transparent,
 				ForeColor = UiTheme.Palette.MutedColor,
-				Font = UiTheme.UiFont(8.25f, FontStyle.Regular),
+				Font = UiTheme.GameFont(8.25f, FontStyle.Regular),
 				TextAlign = ContentAlignment.MiddleLeft
 			};
-			Controls.Add(lblProgress);
+			host.Controls.Add(lblProgress);
 
 			btnRecheck = new GameButton
 			{
@@ -125,7 +139,7 @@ namespace AandmAuto
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 			};
 			btnRecheck.Click += delegate { StartCheck(); };
-			Controls.Add(btnRecheck);
+			host.Controls.Add(btnRecheck);
 
 			btnOpenWeb = new GameButton
 			{
@@ -143,7 +157,7 @@ namespace AandmAuto
 					UpdateManager.OpenUrlInBrowser(currentResult.ReleaseUrl);
 				}
 			};
-			Controls.Add(btnOpenWeb);
+			host.Controls.Add(btnOpenWeb);
 
 			btnUpdate = new GameButton
 			{
@@ -165,7 +179,7 @@ namespace AandmAuto
 					StartDownloadAndApply();
 				}
 			};
-			Controls.Add(btnUpdate);
+			host.Controls.Add(btnUpdate);
 
 			btnClose = new GameButton
 			{
@@ -176,11 +190,18 @@ namespace AandmAuto
 				Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 			};
 			btnClose.Click += delegate { Close(); };
-			Controls.Add(btnClose);
+			host.Controls.Add(btnClose);
 
+			GlassControlStyler.ApplyToForm(this);
 			Shown += delegate { StartCheck(); };
 			FormClosing += delegate { CancelActive(); };
 			FormClosed += delegate { DisposeCts(); };
+		}
+
+		protected override void OnHandleCreated(EventArgs e)
+		{
+			base.OnHandleCreated(e);
+			WindowStyle.ApplyThemeChrome(this);
 		}
 
 		private void DisposeCts()
@@ -326,7 +347,7 @@ namespace AandmAuto
 			btnClose.Enabled = false;
 			btnUpdate.Text = "取消下载";
 			btnUpdate.Skin = GameButtonSkin.Orange;
-			progressBar.Value = 0;
+			progressBar.Fraction = 0f;
 			progressBar.Visible = true;
 			lblStatus.Text = "正在下载新版本 v" + currentResult.LatestVersion + "…";
 			lblProgress.Text = "正在连接下载源…";
@@ -342,7 +363,7 @@ namespace AandmAuto
 						{
 							SafeUi(delegate
 							{
-								progressBar.Value = Math.Max(0, Math.Min(100, pct));
+								progressBar.Fraction = Math.Max(0, Math.Min(100, pct)) / 100f;
 								string detail = total > 0
 									? string.Format("{0} · {1:0.00} MB / {2:0.00} MB ({3}%)", src, done / 1048576.0, total / 1048576.0, pct)
 									: string.Format("{0} · 已下载 {1:0.00} MB", src, done / 1048576.0);

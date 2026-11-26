@@ -239,6 +239,7 @@ namespace AandmAuto
 		public MainForm(bool preview = false)
 		{
 			previewMode = preview;
+			LiquidGlassEngine.PreviewStaticMode = preview;
 			Text = BuildEdition.WindowTitle;
             Text+=" · "+new AccountProfiles(AppPaths.BaseRoot).Label(AppPaths.ProfileId??"main");
 			AutoScaleDimensions = new SizeF(96f,96f);
@@ -268,6 +269,8 @@ namespace AandmAuto
 			{
 				UiTheme.CurrentTheme = GetNumberOption("uiTheme", 0);
 				UiTheme.GlassBlur = GetNumberOption("glassBlur", 12);
+				LiquidGlassEngine.Preset = GetNumberOption("glassPreset", LiquidGlassEngine.PresetBalanced);
+				LiquidGlassEngine.MotionEnabled = !options.ContainsKey("glassMotion") || options["glassMotion"];
 				UiTheme.CustomBackgroundFit = GetNumberOption("customBgFit", 0);
 				UiTheme.SetCustomCrop(
 					GetNumberOption("customBgCropX", 0),
@@ -307,6 +310,12 @@ namespace AandmAuto
 				base.Shown += OnShown;
 			}
 			base.FormClosing += OnFormClosing;
+		}
+
+		protected override void OnHandleCreated(EventArgs e)
+		{
+			base.OnHandleCreated(e);
+			WindowStyle.ApplyThemeChrome(this);
 		}
 
 
@@ -552,6 +561,8 @@ namespace AandmAuto
 				int prevCropW = UiTheme.CustomBgCropW;
 				int prevCropH = UiTheme.CustomBgCropH;
 				int prevBlur = UiTheme.GlassBlur;
+				int prevGlassPreset = LiquidGlassEngine.Preset;
+				bool prevGlassMotion = LiquidGlassEngine.MotionEnabled;
 				bool prevStage = !options.ContainsKey("stageWallpaperBg") || options["stageWallpaperBg"];
 				foreach (var pair in dialog.Values) options[pair.Key] = pair.Value;
 				foreach (var pair in dialog.Numbers) numberOptions[pair.Key] = pair.Value;
@@ -577,6 +588,10 @@ namespace AandmAuto
 				int nextCropW = GetNumberOption("customBgCropW", 10000);
 				int nextCropH = GetNumberOption("customBgCropH", 10000);
 				int nextBlur = GetNumberOption("glassBlur", 12);
+				int nextGlassPreset = GetNumberOption("glassPreset", LiquidGlassEngine.PresetBalanced);
+				bool nextGlassMotion = !options.ContainsKey("glassMotion") || options["glassMotion"];
+				LiquidGlassEngine.Preset = nextGlassPreset;
+				LiquidGlassEngine.MotionEnabled = nextGlassMotion;
 				bool nextStage = !options.ContainsKey("stageWallpaperBg") || options["stageWallpaperBg"];
 
 				bool refineEnabled;
@@ -616,7 +631,7 @@ namespace AandmAuto
 						AddLog("主题与壁纸配置已保存，关闭极致性能模式后将恢复生效。", BlueColor);
 					}
 				}
-				else if (projectChanged || dialog.WallpaperEngineSelectionChanged || nextLayout != prevLayout || nextTheme != prevTheme || !string.Equals(customBgPath, prevBg, StringComparison.OrdinalIgnoreCase) || nextOpacity != prevOpacity || nextBgMode != prevBgMode || nextBgFit != prevBgFit || cropChanged || nextBlur != prevBlur || nextStage != prevStage)
+				else if (projectChanged || dialog.WallpaperEngineSelectionChanged || nextLayout != prevLayout || nextTheme != prevTheme || !string.Equals(customBgPath, prevBg, StringComparison.OrdinalIgnoreCase) || nextOpacity != prevOpacity || nextBgMode != prevBgMode || nextBgFit != prevBgFit || cropChanged || nextBlur != prevBlur || nextStage != prevStage || nextGlassPreset != prevGlassPreset || nextGlassMotion != prevGlassMotion)
 				{
 					UiTheme.SetCustomCrop(nextCropX, nextCropY, nextCropW, nextCropH);
 					SwitchUiAppearance(nextLayout, nextTheme, customBgPath, nextOpacity, nextBgMode, nextBlur, nextBgFit);
@@ -3428,7 +3443,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
                 "dailyMysteryShop",
                 "autoMysticStoneReset","lowDefinitionLive",
                 "cartUpgradeMax","cartBuyEscort","cartPaidTargetRefresh",
-                "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg","autoSelfHeal"});
+                "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg","autoSelfHeal","glassMotion"});
             array=optionKeys.ToArray();
 			for (int i = 0; i < array.Length; i++)
 			{
@@ -3480,6 +3495,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
             numberOptions["customBgCropW"] = 10000;
             numberOptions["customBgCropH"] = 10000;
             numberOptions["glassBlur"] = 12;
+            numberOptions["glassPreset"] = LiquidGlassEngine.PresetBalanced;
             numberOptions["auditRetentionDays"] = 14;
             customBgPath = "";
             customBgLabel = "";
@@ -3509,7 +3525,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 						options[key] = (bool)value;
 					}
 				}
-				foreach (string key in new[] { BattleReplaySpeedOption, "horizontalStartDepth", "miningTntMinSaving", "mysteryBuyBudget", "mysteryRefreshBudget", "mysticStoneThreshold", "mysticStoneResetTier", "workshopDepth", "workshopMinutes", "guildBossCount", "refineReserve", "spendBase", "spendDay", "mineResearch", "mineResearchMask", "dailyAlchemyTier", "dailyTrollLevel", "dailyUndergroundLevel", "uiLayout", "uiTheme", "pvpUiStyle", "customBgOpacity", "customBgMode", "customBgFit", "customBgCropX", "customBgCropY", "customBgCropW", "customBgCropH", "glassBlur", "wallpaperQuality", "wallpaperFps", "wallpaperPauseHidden", "auditRetentionDays" })
+				foreach (string key in new[] { BattleReplaySpeedOption, "horizontalStartDepth", "miningTntMinSaving", "mysteryBuyBudget", "mysteryRefreshBudget", "mysticStoneThreshold", "mysticStoneResetTier", "workshopDepth", "workshopMinutes", "guildBossCount", "refineReserve", "spendBase", "spendDay", "mineResearch", "mineResearchMask", "dailyAlchemyTier", "dailyTrollLevel", "dailyUndergroundLevel", "uiLayout", "uiTheme", "pvpUiStyle", "customBgOpacity", "customBgMode", "customBgFit", "customBgCropX", "customBgCropY", "customBgCropW", "customBgCropH", "glassBlur", "glassPreset", "wallpaperQuality", "wallpaperFps", "wallpaperPauseHidden", "auditRetentionDays" })
 				{
 					object value;
 					if (dictionary.TryGetValue(key, out value) && value != null)
@@ -3583,6 +3599,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
             numberOptions["customBgCropW"] = cw;
             numberOptions["customBgCropH"] = ch;
             numberOptions["glassBlur"] = Math.Max(0, Math.Min(24, GetNumberOption("glassBlur", 12)));
+            numberOptions["glassPreset"] = Math.Max(0, Math.Min(2, GetNumberOption("glassPreset", LiquidGlassEngine.PresetBalanced)));
             numberOptions["wallpaperQuality"] = Math.Max(0, Math.Min(2, GetNumberOption("wallpaperQuality", 0)));
             numberOptions["wallpaperFps"] = Math.Max(5, Math.Min(60, GetNumberOption("wallpaperFps", 30)));
             numberOptions["wallpaperPauseHidden"] = GetNumberOption("wallpaperPauseHidden", 1) == 0 ? 0 : 1;

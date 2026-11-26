@@ -30,6 +30,10 @@ namespace AandmAuto
 
 		private GameButton tabCamp;
 
+		private GlassSegmentedBar segMainTabs;
+
+		private GlassSegmentedBar segBottomTabs;
+
 		private GameButton btnMine;
 
 		private GameButton btnMineResearch;
@@ -255,8 +259,8 @@ namespace AandmAuto
 			};
 			Font titleFont = UiTheme.GameFont(13f, FontStyle.Bold);
 			Font subFont = UiTheme.GameFont(7.5f, FontStyle.Regular);
-			Font nativeTitleFont = UiTheme.UiFont(11f, FontStyle.Bold);
-			Font nativeSubFont = UiTheme.UiFont(7.75f, FontStyle.Regular);
+			Font nativeTitleFont = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? UiTheme.GameFont(11.25f, FontStyle.Bold) : UiTheme.UiFont(11f, FontStyle.Bold);
+			Font nativeSubFont = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? UiTheme.GameFont(7.75f, FontStyle.Regular) : UiTheme.UiFont(7.75f, FontStyle.Regular);
 			header.Paint += delegate(object sender, PaintEventArgs e)
 			{
 				Graphics g = e.Graphics;
@@ -266,17 +270,21 @@ namespace AandmAuto
 				{
 					UiSurface.PaintBackdrop(header, g);
 					Rectangle hr = new Rectangle(0, 0, Math.Max(1, header.Width - 1), Math.Max(1, header.Height - 1));
-					using (GraphicsPath hp = UiTheme.RoundedRect(hr, 9))
-						UiTheme.DrawGlassCardSurface(g, header, hp, 9, Color.FromArgb(14, 18, 24), false);
+					using (GraphicsPath hp = UiTheme.RoundedRect(hr, 12))
+						UiTheme.DrawGlassCardSurface(g, header, hp, 12, Color.FromArgb(14, 18, 24), true);
 					if (icon != null)
 					{
 						g.InterpolationMode = InterpolationMode.HighQualityBicubic;
 						g.DrawImage(icon, new Rectangle(12, 13, 30, 30));
 					}
+					Color titleInk = LiquidGlassEngine.GlassInk(true);
+					Color subInk = LiquidGlassEngine.GlassMutedInk();
+					Color shInk = LiquidGlassEngine.GlassTextShadow();
 					TextFormatFlags gFlags = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter;
-					GameText.Draw(g, "冒险与挖矿助手", nativeTitleFont, new Rectangle(49, 11, 210, 22), Color.FromArgb(150, 0, 0, 0), gFlags);
-					GameText.Draw(g, "冒险与挖矿助手", nativeTitleFont, new Rectangle(48, 10, 210, 22), Color.White, gFlags);
-					GameText.Draw(g, BuildEdition.HeaderSubtitle, nativeSubFont, new Rectangle(48, 33, 210, 16), Color.FromArgb(215, 255, 255, 255), gFlags);
+					if (shInk.A > 0)
+						GameText.Draw(g, "冒险与挖矿助手", nativeTitleFont, new Rectangle(49, 11, 210, 22), shInk, gFlags);
+					GameText.Draw(g, "冒险与挖矿助手", nativeTitleFont, new Rectangle(48, 10, 210, 22), titleInk, gFlags);
+					GameText.Draw(g, BuildEdition.HeaderSubtitle, nativeSubFont, new Rectangle(48, 33, 210, 16), subInk, gFlags);
 					return;
 				}
 				if (mode == UiTheme.ThemeNativeLight)
@@ -427,13 +435,29 @@ namespace AandmAuto
 		{
 			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 			var row = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = glass ? new Padding(0, 3, 0, 5) : new Padding(0, 2, 0, 4), BackColor = Color.Transparent };
-			row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-			row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+			row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, glass ? 54f : 50f));
+			row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, glass ? 46f : 50f));
 			row.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-			btnMain = new GameButton { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 5, 0), Text = "▶ 开始挖矿", Skin = GameButtonSkin.Green, Enabled = false };
+			btnMain = new GameButton
+			{
+				Dock = DockStyle.Fill,
+				Margin = new Padding(0, 0, 5, 0),
+				Text = "▶ 开始挖矿",
+				Skin = GameButtonSkin.Green,
+				PrimaryHero = glass,
+				Enabled = false
+			};
 			btnMain.Click += BtnMain_Click;
 			hints.SetToolTip(btnMain, "自动挖掘；先处理魔像与宝箱，再向下探索。再次点击暂停。");
-			btnDaily = new GameButton { Dock = DockStyle.Fill, Margin = new Padding(5, 0, 0, 0), Text = "一键日常", Skin = GameButtonSkin.Gold, Enabled = false };
+			btnDaily = new GameButton
+			{
+				Dock = DockStyle.Fill,
+				Margin = new Padding(5, 0, 0, 0),
+				Text = "一键日常",
+				Skin = GameButtonSkin.Gold,
+				SemanticDotColor = glass ? Color.FromArgb(245, 198, 72) : Color.Empty,
+				Enabled = false
+			};
 			btnDaily.Click += BtnDaily_Click;
 			hints.SetToolTip(btnDaily, "按日常清单执行，购买次数按实际余额处理。");
 			row.Controls.Add(btnMain, 0, 0);
@@ -444,7 +468,24 @@ namespace AandmAuto
 		private Control BuildTabs()
 		{
 			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
-			var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = glass ? new Padding(0, 0, 0, 6) : new Padding(0, 0, 0, 4), BackColor = Color.Transparent };
+			if (glass)
+			{
+				var host = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 6), Padding = new Padding(0, 1, 0, 1), BackColor = Color.Transparent };
+				segMainTabs = new GlassSegmentedBar("任务", "设置")
+				{
+					Dock = DockStyle.Fill,
+					Font = UiTheme.GameFont(9.25f, FontStyle.Regular)
+				};
+				segMainTabs.SelectedIndexChanged += delegate
+				{
+					SwitchTab(segMainTabs.SelectedIndex == 1 ? "camp" : "tasks");
+				};
+				tabTasks = null;
+				tabCamp = null;
+				host.Controls.Add(segMainTabs);
+				return host;
+			}
+			var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 0, 0, 4), BackColor = Color.Transparent };
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
 			grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -499,15 +540,176 @@ namespace AandmAuto
 		private Control BuildTasksPage()
 		{
 			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
+			if (glass)
+			{
+				return BuildLiquidGlassTasksPage();
+			}
 			var page = NewPage();
 			page.RowCount = 3;
-			page.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 98f : 96f));
-			page.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 86f : 84f));
-			page.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 128f : 124f));
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 96f));
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 84f));
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 124f));
 			page.Controls.Add(BuildArenaCard(), 0, 0);
 			page.Controls.Add(BuildCombatCard(), 0, 1);
 			page.Controls.Add(BuildProductionGrowthCard(), 0, 2);
 			return page;
+		}
+
+		private Control BuildLiquidGlassTasksPage()
+		{
+			var page = NewPage();
+			page.RowCount = 2;
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 104f));
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 210f));
+
+			// Top glass card: generous 36px iOS horizontal stepper + balanced Arena capsule
+			var arenaCard = new CardPanel
+			{
+				Dock = DockStyle.Fill,
+				Padding = new Padding(10, 6, 10, 6),
+				Margin = new Padding(0, 0, 0, 6),
+				BackColor = Color.Transparent,
+				CornerRadius = 12
+			};
+			var arenaBody = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent, Margin = Padding.Empty };
+			arenaBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			arenaBody.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
+			arenaBody.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
+			arenaBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			arenaBody.Controls.Add(new GameHeader { Title = "竞技场", Hint = "", Dock = DockStyle.Fill, Margin = Padding.Empty }, 0, 0);
+
+			var arenaRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent, Margin = new Padding(0, 2, 0, 0) };
+			arenaRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52f));
+			arenaRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48f));
+			arenaRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+			var countWrap = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(2, 1, 6, 1) };
+			countWrap.Controls.Add(new SmoothLabel
+			{
+				Text = "轮次",
+				Dock = DockStyle.Left,
+				Width = 42,
+				ForeColor = LiquidGlassEngine.GlassMutedInk(),
+				TextAlign = ContentAlignment.MiddleLeft,
+				Font = UiTheme.GameFont(8.75f),
+				BackColor = Color.Transparent
+			});
+			numArenaCount = new GameNumber
+			{
+				Minimum = 1,
+				Maximum = 99,
+				Value = savedArenaCount,
+				Width = 114,
+				Dock = DockStyle.Right,
+				Font = UiTheme.GameFont(10f, FontStyle.Bold)
+			};
+			countWrap.Controls.Add(numArenaCount);
+
+			btnArena = new GameButton
+			{
+				Text = "开始竞技场",
+				Dock = DockStyle.Fill,
+				Font = UiTheme.GameFont(9.25f, FontStyle.Bold),
+				Skin = GameButtonSkin.Orange,
+				SemanticDotColor = Color.FromArgb(255, 149, 64),
+				Enabled = false,
+				Margin = new Padding(6, 0, 0, 0)
+			};
+			btnArena.Click += BtnArena_Click;
+
+			arenaRow.Controls.Add(countWrap, 0, 0);
+			arenaRow.Controls.Add(btnArena, 1, 0);
+			arenaBody.Controls.Add(arenaRow, 0, 1);
+
+			chkArenaRefresh = new GameCheckBox
+			{
+				Text = "允许血钻刷新",
+				Dock = DockStyle.Fill,
+				Margin = new Padding(2, 2, 0, 0),
+				BackColor = Color.Transparent,
+				ForeColor = LiquidGlassEngine.GlassInk(true),
+				Font = UiTheme.GameFont(8.5f),
+				Checked = options.ContainsKey("arenaAllowBloodRefresh") && options["arenaAllowBloodRefresh"],
+				Tag = "arenaAllowBloodRefresh"
+			};
+			chkArenaRefresh.CheckedChanged += Option_CheckedChanged;
+			optionChecks["arenaAllowBloodRefresh"] = chkArenaRefresh;
+			hints.SetToolTip(chkArenaRefresh, "每轮依次挑战九名对手；结束后先免费刷新，再按游戏当前费用使用血钻。");
+			arenaBody.Controls.Add(chkArenaRefresh, 0, 2);
+			arenaCard.Controls.Add(arenaBody);
+
+			// Unified wide 2-column sleek capsule grid (2 cols x 4 rows — no cramped 3-col pills)
+			var taskCard = new CardPanel
+			{
+				Dock = DockStyle.Fill,
+				Padding = new Padding(10, 6, 10, 8),
+				Margin = Padding.Empty,
+				BackColor = Color.Transparent,
+				CornerRadius = 12
+			};
+			var taskWrap = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Color.Transparent, Margin = Padding.Empty };
+			taskWrap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			taskWrap.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
+			taskWrap.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			taskWrap.Controls.Add(new GameHeader { Title = "快捷委托", Hint = "", Dock = DockStyle.Fill, Margin = Padding.Empty }, 0, 0);
+
+			var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, BackColor = Color.Transparent, Margin = new Padding(0, 3, 0, 0) };
+			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+			for (int r = 0; r < 4; r++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
+
+			Color dotCombat = Color.FromArgb(255, 149, 64);
+			Color dotProd = Color.FromArgb(245, 198, 72);
+			Color dotGrow = Color.FromArgb(52, 211, 128);
+
+			btnGuildBoss = GlassTaskButton("工会首领", BtnGuildBoss_Click, GameButtonSkin.Orange, dotCombat);
+			btnEarth = GlassTaskButton("矿区首领", BtnEarth_Click, GameButtonSkin.Orange, dotCombat);
+			btnPush = GlassTaskButton("自动推关", BtnPush_Click, GameButtonSkin.Orange, dotCombat);
+			btnOrePacks = GlassTaskButton("使用矿石包", BtnOrePacks_Click, GameButtonSkin.Green, dotGrow);
+			btnWorkshop = GlassTaskButton("工坊", BtnWorkshop_Click, GameButtonSkin.Gold, dotProd);
+			btnMine = GlassTaskButton("矿山采集", BtnMine_Click, GameButtonSkin.Gold, dotProd);
+			btnMine.Enabled = false;
+			btnRune = GlassTaskButton("符文连抽", BtnRune_Click, GameButtonSkin.Green, dotGrow);
+			btnDestiny = GlassTaskButton("宿命强化", BtnDestiny_Click, GameButtonSkin.Green, dotGrow);
+
+			hints.SetToolTip(btnGuildBoss, "按设定次数挑战当前工会首领（使用已有许可证，不自动购买）。");
+			hints.SetToolTip(btnEarth, "使用恶魔勋章连续挑战矿区首领。");
+			hints.SetToolTip(btnPush, "简单 · 普通 · 困难，未通关主线持续重试。");
+			hints.SetToolTip(btnOrePacks, "连续批量用完低级、中级、高级矿石包，并自动关闭获得窗口。");
+			hints.SetToolTip(btnWorkshop, "先自动收取全部已完成工程，再按工坊设置生产补满空槽位。");
+			hints.SetToolTip(btnMine, "先收成熟矿队奖励、再升级研究并按材料缺口派遣矿队。");
+			hints.SetToolTip(btnDestiny, "使用游戏一键强化，优先强化升星期望结晶较低的宿命武器。");
+
+			grid.Controls.Add(btnGuildBoss, 0, 0);
+			grid.Controls.Add(btnEarth, 1, 0);
+			grid.Controls.Add(btnPush, 0, 1);
+			grid.Controls.Add(btnOrePacks, 1, 1);
+			grid.Controls.Add(btnWorkshop, 0, 2);
+			grid.Controls.Add(btnMine, 1, 2);
+			grid.Controls.Add(btnRune, 0, 3);
+			grid.Controls.Add(btnDestiny, 1, 3);
+
+			taskWrap.Controls.Add(grid, 0, 1);
+			taskCard.Controls.Add(taskWrap);
+
+			page.Controls.Add(arenaCard, 0, 0);
+			page.Controls.Add(taskCard, 0, 1);
+			return page;
+		}
+
+		private GameButton GlassTaskButton(string text, EventHandler click, GameButtonSkin skin, Color dotColor)
+		{
+			var button = new GameButton
+			{
+				Text = text,
+				Dock = DockStyle.Fill,
+				Skin = skin,
+				SemanticDotColor = dotColor,
+				Margin = new Padding(4, 2, 4, 2),
+				Font = UiTheme.GameFont(9f, FontStyle.Regular)
+			};
+			button.Click += click;
+			return button;
 		}
 
 		private Control BuildArenaCard()
@@ -697,10 +899,11 @@ namespace AandmAuto
 
 		private Control BuildCampPage()
 		{
+			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 			var page = NewPage();
 			page.RowCount = 2;
-			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 122f));
-			page.RowStyles.Add(new RowStyle(SizeType.Absolute, 178f));
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 126f : 122f));
+			page.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 188f : 178f));
 
 			// 上卡：配置总览 + 打开大设置窗口总入口
 			var overviewCard = new CardPanel
@@ -740,6 +943,7 @@ namespace AandmAuto
 				Text = "全部设置",
 				Dock = DockStyle.Fill,
 				Skin = GameButtonSkin.Gold,
+				SemanticDotColor = glass ? Color.FromArgb(64, 166, 255) : Color.Empty,
 				Margin = new Padding(6, 12, 2, 12),
 				Font = UiTheme.GameFont(9.5f, FontStyle.Bold)
 			};
@@ -882,14 +1086,6 @@ namespace AandmAuto
 			layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
 			var bar = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = Padding.Empty };
-			var tabFlow = new FlowLayoutPanel { Dock = DockStyle.Left, Width = glass ? 316 : 290, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, Margin = Padding.Empty };
-			tabBottomStatus = BottomTabBtn("营地状态", delegate { SwitchBottomTab("status"); });
-			tabBottomStats = BottomTabBtn("挖矿统计", delegate { SwitchBottomTab("stats"); });
-			tabBottomLog = BottomTabBtn("冒险日志", delegate { SwitchBottomTab("log"); });
-			tabFlow.Controls.Add(tabBottomStatus);
-			tabFlow.Controls.Add(tabBottomStats);
-			tabFlow.Controls.Add(tabBottomLog);
-
 			var rightActions = new Panel { Dock = DockStyle.Right, Width = glass ? 94 : 92, BackColor = Color.Transparent };
 			btnBottomReview = new GameButton
 			{
@@ -897,7 +1093,7 @@ namespace AandmAuto
 				Location = glass ? new Point(2, 2) : new Point(6, 3),
 				Size = glass ? new Size(90, 32) : new Size(84, 28),
 				Skin = GameButtonSkin.Stone,
-				Font = UiTheme.GameFont(glass ? 8f : 7.5f, FontStyle.Bold)
+				Font = UiTheme.GameFont(glass ? 8.25f : 7.5f, FontStyle.Bold)
 			};
 			btnBottomReview.Click += OpenReview;
 			btnBottomClearLog = new GameButton
@@ -906,7 +1102,7 @@ namespace AandmAuto
 				Location = glass ? new Point(2, 2) : new Point(6, 3),
 				Size = glass ? new Size(90, 32) : new Size(84, 28),
 				Skin = GameButtonSkin.Stone,
-				Font = UiTheme.GameFont(glass ? 8f : 7.5f, FontStyle.Bold),
+				Font = UiTheme.GameFont(glass ? 8.25f : 7.5f, FontStyle.Bold),
 				Visible = false
 			};
 			btnBottomClearLog.Click += BtnClearLog_Click;
@@ -914,8 +1110,38 @@ namespace AandmAuto
 			rightActions.Controls.Add(btnBottomReview);
 			rightActions.Controls.Add(btnBottomClearLog);
 
-			bar.Controls.Add(tabFlow);
-			bar.Controls.Add(rightActions);
+			if (glass)
+			{
+				var segWrap = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 2, 8, 2), BackColor = Color.Transparent };
+				segBottomTabs = new GlassSegmentedBar("营地状态", "挖矿统计", "冒险日志")
+				{
+					Dock = DockStyle.Fill,
+					Font = UiTheme.GameFont(8.5f, FontStyle.Regular)
+				};
+				segBottomTabs.SelectedIndexChanged += delegate
+				{
+					int idx = segBottomTabs.SelectedIndex;
+					SwitchBottomTab(idx == 1 ? "stats" : (idx == 2 ? "log" : "status"));
+				};
+				tabBottomStatus = null;
+				tabBottomStats = null;
+				tabBottomLog = null;
+				segWrap.Controls.Add(segBottomTabs);
+				bar.Controls.Add(segWrap);
+				bar.Controls.Add(rightActions);
+			}
+			else
+			{
+				var tabFlow = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 290, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, Margin = Padding.Empty };
+				tabBottomStatus = BottomTabBtn("营地状态", delegate { SwitchBottomTab("status"); });
+				tabBottomStats = BottomTabBtn("挖矿统计", delegate { SwitchBottomTab("stats"); });
+				tabBottomLog = BottomTabBtn("冒险日志", delegate { SwitchBottomTab("log"); });
+				tabFlow.Controls.Add(tabBottomStatus);
+				tabFlow.Controls.Add(tabBottomStats);
+				tabFlow.Controls.Add(tabBottomLog);
+				bar.Controls.Add(tabFlow);
+				bar.Controls.Add(rightActions);
+			}
 
 			var divider = new Panel { Dock = DockStyle.Fill, BackColor = glass ? Color.Transparent : Color.FromArgb(110, LineColor), Margin = new Padding(0, 1, 0, 2) };
 
@@ -965,6 +1191,7 @@ namespace AandmAuto
 				SetTabState(tabBottomStatus, tab == "status");
 				SetTabState(tabBottomStats, tab == "stats");
 				SetTabState(tabBottomLog, tab == "log");
+				if (segBottomTabs != null) segBottomTabs.SetSelectedIndex(tab == "stats" ? 1 : (tab == "log" ? 2 : 0), true, false);
 				if (topTabBottomStatus != null) topTabBottomStatus.Selected = tab == "status";
 				if (topTabBottomStats != null) topTabBottomStats.Selected = tab == "stats";
 				if (topTabBottomLog != null) topTabBottomLog.Selected = tab == "log";
@@ -1029,6 +1256,7 @@ namespace AandmAuto
 				pageCamp.Visible = tab == "camp";
 				SetTabState(tabTasks, tab == "tasks");
 				SetTabState(tabCamp, tab == "camp");
+				if (segMainTabs != null) segMainTabs.SetSelectedIndex(tab == "camp" ? 1 : 0, true, false);
 				if (topTabTasks != null) topTabTasks.Selected = tab == "tasks";
 				if (topTabCamp != null) topTabCamp.Selected = tab == "camp";
 			});

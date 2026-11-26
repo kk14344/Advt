@@ -90,8 +90,8 @@ namespace AandmAuto
 				Rectangle titleRect = new Rectangle(6, 108, Width - 12, 24);
 				Rectangle typeRect = new Rectangle(6, 132, Width - 12, 20);
 				TextFormatFlags flags = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
-				using (var titleFont = UiTheme.UiFont(8.25f, FontStyle.Bold))
-				using (var typeFont = UiTheme.UiFont(7.5f))
+				using (var titleFont = UiTheme.GameFont(8.25f, FontStyle.Bold))
+				using (var typeFont = UiTheme.GameFont(7.5f))
 				{
 					GameText.Draw(g, Item != null ? (Item.Title ?? "") : "", titleFont, titleRect, UiTheme.Palette.TextColor, flags);
 					string sub = Item != null ? (Item.TypeLabel + (Item.HasAnimatedPreview ? " · 含动图" : "")) : "";

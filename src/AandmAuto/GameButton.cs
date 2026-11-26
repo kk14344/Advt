@@ -21,6 +21,12 @@ namespace AandmAuto
 		private bool hovered;
 		private bool pressed;
 		private bool selected;
+		private float hoverT;
+		private float pressT;
+		private float sheenT;
+		private bool sheenActive;
+		private Point pointerLocal = new Point(-999, -999);
+		private Func<float, bool> animStep;
 		private Font cachedLabelFont;
 		private string cachedLabelText;
 		private Size cachedLabelBox;
@@ -41,6 +47,16 @@ namespace AandmAuto
 		}
 
 		public bool StretchWide { get; set; }
+
+		/// <summary>
+		/// Optional subtle semantic dot color shown left of text on clear Liquid Glass secondary pills.
+		/// </summary>
+		public Color SemanticDotColor { get; set; }
+
+		/// <summary>
+		/// Marks a primary hero CTA button so Liquid Glass applies its restrained emerald crystal tint.
+		/// </summary>
+		public bool PrimaryHero { get; set; }
 
 		public GameButton()
 		{
@@ -240,12 +256,90 @@ namespace AandmAuto
 
 		private void PaintLiquidGlass(Graphics graphics, Rectangle target)
 		{
-			bool activeState = selected || (!string.IsNullOrEmpty(Text) && (Text.StartsWith("■") || Text.StartsWith("停止")));
-			Color ink = Enabled ? Color.White : Color.FromArgb(170, 255, 255, 255);
-			int rad = Math.Min(target.Height / 2, 16);
+			string txt = Text ?? string.Empty;
+			bool isStop = txt.StartsWith("■") || txt.StartsWith("停止");
+			bool isPrimary = PrimaryHero || (skin == GameButtonSkin.Green && (Height >= 48 || txt == "确定" || txt == "保存设置" || txt == "立即更新" || txt == "安装更新" || txt == "应用" || txt == "保存"));
+			bool activeState = selected || isStop;
+
+			Color tintColor = Color.White;
+			int tintAlpha = 0;
+			bool useWhiteInk = false;
+			if (Enabled)
+			{
+				if (isStop)
+				{
+					tintColor = Color.FromArgb(235, 78, 56);
+					tintAlpha = 108;
+					useWhiteInk = true;
+				}
+				else if (isPrimary)
+				{
+					tintColor = Color.FromArgb(28, 178, 102);
+					tintAlpha = 94;
+					useWhiteInk = true;
+				}
+				else if (selected)
+				{
+					tintColor = Color.FromArgb(14, 132, 255);
+					tintAlpha = 96;
+					useWhiteInk = true;
+				}
+			}
+
+			Color ink = useWhiteInk
+				? Color.White
+				: LiquidGlassEngine.GlassInk(Enabled);
+			Color shadowInk = useWhiteInk
+				? Color.FromArgb(150, 0, 0, 0)
+				: LiquidGlassEngine.GlassTextShadow();
+
+			int rad = Math.Min(target.Height / 2, target.Height >= 42 ? 18 : 14);
 			Rectangle rect = new Rectangle(target.X, target.Y, Math.Max(4, target.Width - 1), Math.Max(4, target.Height));
-			UiTheme.DrawLiquidGlassPill(graphics, this, rect, rad, Color.White, activeState ? 42 : 16, Color.White, hovered, pressed, activeState, Enabled);
-			DrawLabelColored(graphics, ink, Color.FromArgb(165, 0, 0, 0));
+			UiTheme.DrawLiquidGlassPill(
+				graphics, this, rect, rad,
+				tintColor, tintAlpha, Color.White,
+				hovered, pressed, activeState, Enabled,
+				hoverT, pressT, sheenActive ? sheenT : 0f, pointerLocal);
+
+			bool showDot = SemanticDotColor.A > 0 && Enabled && !isStop && !isPrimary && !selected;
+			if (showDot)
+			{
+				DrawLabelWithDot(graphics, ink, shadowInk, SemanticDotColor);
+			}
+			else
+			{
+				DrawLabelColored(graphics, ink, shadowInk);
+			}
+		}
+
+		private void DrawLabelWithDot(Graphics graphics, Color ink, Color shadowInk, Color dotColor)
+		{
+			Rectangle bounds = LabelBounds;
+			if (pressed) bounds.Y += 1;
+			Font font = GetCachedLabelFont();
+			Size measured = TextRenderer.MeasureText(Text, font, new Size(10000, 10000),
+				TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+			int dotSize = 6;
+			int gap = 6;
+			if (measured.Width + dotSize + gap + 4 > bounds.Width)
+			{
+				DrawLabelColored(graphics, ink, shadowInk);
+				return;
+			}
+			int totalW = dotSize + gap + measured.Width;
+			int startX = bounds.X + (bounds.Width - totalW) / 2;
+			float dotY = bounds.Y + (bounds.Height - dotSize) / 2f;
+
+			graphics.SmoothingMode = SmoothingMode.AntiAlias;
+			using (var db = new SolidBrush(Color.FromArgb(228, dotColor)))
+				graphics.FillEllipse(db, startX, dotY, dotSize, dotSize);
+
+			Rectangle textRect = new Rectangle(startX + dotSize + gap, bounds.Y, Math.Max(1, bounds.Right - (startX + dotSize + gap)), bounds.Height);
+			TextFormatFlags flags = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+				TextFormatFlags.NoPadding | TextFormatFlags.Left;
+			if (shadowInk.A > 0 && !UiTheme.ExtremePerformanceMode)
+				GameText.Draw(graphics, Text, font, new Rectangle(textRect.X + 1, textRect.Y + 1, textRect.Width, textRect.Height), shadowInk, flags);
+			GameText.Draw(graphics, Text, font, textRect, ink, flags);
 		}
 
 		private void PaintExtremePerf(Graphics graphics, Rectangle target)
@@ -447,12 +541,67 @@ namespace AandmAuto
 			return cachedLabelFont;
 		}
 
+		private void StartGlassAnim()
+		{
+			if (UiTheme.CurrentTheme != UiTheme.ThemeLiquidGlass) return;
+			if (!GlassAnimator.Enabled)
+			{
+				hoverT = hovered ? 1f : 0f;
+				pressT = pressed ? 1f : 0f;
+				sheenActive = false;
+				sheenT = 0f;
+				return;
+			}
+			if (animStep == null) animStep = StepGlassAnim;
+			GlassAnimator.Add(animStep);
+		}
+
+		private bool StepGlassAnim(float dt)
+		{
+			if (IsDisposed || !Visible) return false;
+			bool dirty = false;
+			float targetH = hovered ? 1f : 0f;
+			float targetP = pressed ? 1f : 0f;
+
+			if (Math.Abs(hoverT - targetH) > 0.005f)
+			{
+				float rate = Math.Min(1f, dt * 5.2f);
+				hoverT += (targetH - hoverT) * rate;
+				if (Math.Abs(hoverT - targetH) <= 0.01f) hoverT = targetH;
+				dirty = true;
+			}
+			if (Math.Abs(pressT - targetP) > 0.005f)
+			{
+				float rate = Math.Min(1f, dt * 11.5f);
+				pressT += (targetP - pressT) * rate;
+				if (Math.Abs(pressT - targetP) <= 0.01f) pressT = targetP;
+				dirty = true;
+			}
+			if (sheenActive)
+			{
+				sheenT += dt * 2.15f;
+				if (sheenT >= 1f)
+				{
+					sheenT = 0f;
+					sheenActive = false;
+				}
+				dirty = true;
+			}
+
+			if (dirty) Invalidate();
+			return dirty;
+		}
+
 		protected override void Dispose(bool disposing)
 		{
-			if (disposing && cachedLabelFont != null)
+			if (disposing)
 			{
-				cachedLabelFont.Dispose();
-				cachedLabelFont = null;
+				if (animStep != null) GlassAnimator.Remove(animStep);
+				if (cachedLabelFont != null)
+				{
+					cachedLabelFont.Dispose();
+					cachedLabelFont = null;
+				}
 			}
 			base.Dispose(disposing);
 		}
@@ -469,10 +618,61 @@ namespace AandmAuto
 			GameText.Draw(graphics, Text, font, bounds, ink, flags);
 		}
 
-		protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
-		protected override void OnMouseLeave(EventArgs e) { hovered = false; pressed = false; Invalidate(); base.OnMouseLeave(e); }
-		protected override void OnMouseDown(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { pressed = true; Invalidate(); } base.OnMouseDown(e); }
-		protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
+		protected override void OnMouseEnter(EventArgs e)
+		{
+			hovered = true;
+			StartGlassAnim();
+			Invalidate();
+			base.OnMouseEnter(e);
+		}
+
+		protected override void OnMouseMove(MouseEventArgs e)
+		{
+			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && hovered && GlassAnimator.Enabled)
+			{
+				if (Math.Abs(pointerLocal.X - e.X) >= 3 || Math.Abs(pointerLocal.Y - e.Y) >= 3)
+				{
+					pointerLocal = e.Location;
+					Invalidate();
+				}
+			}
+			base.OnMouseMove(e);
+		}
+
+		protected override void OnMouseLeave(EventArgs e)
+		{
+			hovered = false;
+			pressed = false;
+			pointerLocal = new Point(-999, -999);
+			StartGlassAnim();
+			Invalidate();
+			base.OnMouseLeave(e);
+		}
+
+		protected override void OnMouseDown(MouseEventArgs e)
+		{
+			if (e.Button == MouseButtons.Left)
+			{
+				pressed = true;
+				pointerLocal = e.Location;
+				if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass && GlassAnimator.Enabled)
+				{
+					sheenActive = true;
+					sheenT = 0.02f;
+				}
+				StartGlassAnim();
+				Invalidate();
+			}
+			base.OnMouseDown(e);
+		}
+
+		protected override void OnMouseUp(MouseEventArgs e)
+		{
+			pressed = false;
+			StartGlassAnim();
+			Invalidate();
+			base.OnMouseUp(e);
+		}
 		protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
 		protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
 		protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }

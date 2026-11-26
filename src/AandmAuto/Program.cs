@@ -11,16 +11,54 @@ namespace AandmAuto
 	internal static class Program
 	{
 		private static Mutex singleInstanceMutex;
+        internal static string BuildId
+        {
+            get
+            {
+                var assembly = typeof(Program).Assembly;
+                var value = (AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(
+                    assembly, typeof(AssemblyInformationalVersionAttribute));
+                return value == null ? assembly.GetName().Version.ToString() : value.InformationalVersion;
+            }
+        }
+        internal static string DisplayVersion
+        {
+            get
+            {
+#if VERSIONED_RELEASE
+                return BuildId.Split('+')[0];
+#else
+                return typeof(Program).Assembly.GetName().Version.ToString(2);
+#endif
+            }
+        }
+        internal static readonly bool QuietResourceTest =
+            Environment.GetEnvironmentVariable("AANDM_LOW_RESOURCE_TEST") == "1" &&
+            Array.IndexOf(Environment.GetCommandLineArgs(),"--no-schtasks") >= 0 &&
+            Array.IndexOf(Environment.GetCommandLineArgs(),"--data-root") >= 0;
         internal static bool ScheduledLaunch;
         internal static bool CheckinLaunch;
         internal static bool HarvestLaunch;
         internal static bool NoWindowsTaskRegistration;
         internal static EventWaitHandle ScheduleSignal;
         internal static EventWaitHandle ActivationSignal;
+        internal static string[] StartupArgs { get; private set; }
+
+        internal static void ReleaseSingleInstanceForRestart()
+        {
+            Mutex mutex = singleInstanceMutex;
+            singleInstanceMutex = null;
+            if (mutex == null) return;
+            try { mutex.ReleaseMutex(); }
+            catch { }
+            try { mutex.Dispose(); }
+            catch { }
+        }
 
 		[STAThread]
 		private static void Main(string[] commandArgs)
 		{
+            StartupArgs = commandArgs ?? new string[0];
             CheckinLaunch=Array.IndexOf(commandArgs,"--checkin-run")>=0;
             HarvestLaunch=Array.IndexOf(commandArgs,"--harvest-run")>=0;
 			ScheduledLaunch=CheckinLaunch||HarvestLaunch||Array.IndexOf(commandArgs,"--scheduled-run")>=0;
@@ -97,7 +135,7 @@ namespace AandmAuto
 			{
 				string dataRoot = AppPaths.DataRoot;
 				Directory.CreateDirectory(dataRoot);
-				File.AppendAllText(Path.Combine(dataRoot, "startup-error.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n" + ((ex == null) ? "unknown" : ex.ToString()) + "\r\n\r\n", Encoding.UTF8);
+				File.AppendAllText(Path.Combine(dataRoot, "startup-error.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " · " + BuildId + "\r\n" + ((ex == null) ? "unknown" : ex.ToString()) + "\r\n\r\n", Encoding.UTF8);
 			}
 			catch
 			{
@@ -110,12 +148,18 @@ namespace AandmAuto
 			try
 			{
 				var form=new MainForm();
+				if (QuietResourceTest)
+				{
+					form.StartPosition = FormStartPosition.Manual;
+					form.Location = new System.Drawing.Point(-30000,-30000);
+					form.ShowInTaskbar = false;
+				}
 				if(ScheduledLaunch)form.WindowState=FormWindowState.Minimized;
 				Application.Run(form);
 			}
 			finally
 			{
-				try { if (singleInstanceMutex != null) { singleInstanceMutex.ReleaseMutex(); singleInstanceMutex.Dispose(); singleInstanceMutex = null; } } catch { }
+				ReleaseSingleInstanceForRestart();
 #if TEST_PVP_EDITION
 				Environment.Exit(0);
 #endif

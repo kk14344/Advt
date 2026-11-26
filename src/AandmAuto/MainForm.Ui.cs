@@ -225,7 +225,7 @@ namespace AandmAuto
 			bool glass = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass;
 			side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
-			side.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 58f : 56f));
+			side.RowStyles.Add(new RowStyle(SizeType.Absolute, (glass ? 58f : 56f) + BattlePlaybackRowHeight));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 42f : 38f));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 322f : 308f));
 			side.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -233,7 +233,7 @@ namespace AandmAuto
 			activeSidePanel = side;
 
 			side.Controls.Add(BuildHeader(), 0, 0);
-			side.Controls.Add(BuildPrimaryAction(), 0, 1);
+			side.Controls.Add(BuildPrimaryActionsWithPlayback(BuildPrimaryAction()), 0, 1);
 			side.Controls.Add(BuildTabs(), 0, 2);
 			side.Controls.Add(BuildPages(), 0, 3);
 			side.Controls.Add(BuildBottomDock(), 0, 4);
@@ -796,7 +796,7 @@ namespace AandmAuto
 					Text = cats[i, 1],
 					Dock = DockStyle.Fill,
 					Skin = GameButtonSkin.Stone,
-					Margin = new Padding(3, 3, 3, 3),
+					Margin = new Padding(3, 2, 3, 2),
 					Font = UiTheme.GameFont(8.5f, FontStyle.Bold)
 				};
 				btn.Click += async delegate { await OpenUnifiedSettingsAsync(key); };
@@ -993,7 +993,7 @@ namespace AandmAuto
 				TextAlign = ContentAlignment.MiddleLeft,
 				BackColor = Color.Transparent,
 				ForeColor = (UiTheme.IsLightTheme || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass) ? TextColor : Color.FromArgb(228, 216, 185),
-				Font = new Font(Font.FontFamily, fontSize),
+				Font = UiTheme.GameFont(fontSize),
 				FlatStyle = FlatStyle.Flat,
 				Margin = new Padding(0, 1, 5, 1),
 				Checked = !options.ContainsKey(actual) || options[actual]

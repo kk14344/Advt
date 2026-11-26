@@ -77,6 +77,8 @@ namespace AandmAuto
 			internal readonly IntPtr VeiledBits;
 			internal readonly Bitmap RawBitmap;
 			internal readonly Bitmap VeiledBitmap;
+            internal readonly int[] ScaleColumns;
+            internal readonly int[] ScaleRows;
 
 			internal long Sequence;
 			internal double CaptureMs;
@@ -93,6 +95,11 @@ namespace AandmAuto
 				CaptureHeight = captureHeight;
 				Width = outputWidth;
 				Height = outputHeight;
+                if (captureWidth != outputWidth || captureHeight != outputHeight)
+                {
+                    ScaleColumns = BuildScaleMap(captureWidth, outputWidth);
+                    ScaleRows = BuildScaleMap(captureHeight, outputHeight);
+                }
 				var bmi = new BITMAPINFO
 				{
 					biSize = 40,
@@ -101,14 +108,34 @@ namespace AandmAuto
 					biPlanes = 1,
 					biBitCount = 32
 				};
-				Hdc = CreateCompatibleDC(IntPtr.Zero);
-				Dib = CreateDIBSection(Hdc, ref bmi, 0, out CaptureBits, IntPtr.Zero, 0);
-				OldObj = SelectObject(Hdc, Dib);
-				RawBits = Marshal.AllocHGlobal(outputWidth * outputHeight * 4);
-				VeiledBits = Marshal.AllocHGlobal(outputWidth * outputHeight * 4);
-				RawBitmap = new Bitmap(outputWidth, outputHeight, outputWidth * 4, PixelFormat.Format32bppPArgb, RawBits);
-				VeiledBitmap = new Bitmap(outputWidth, outputHeight, outputWidth * 4, PixelFormat.Format32bppPArgb, VeiledBits);
+                try
+                {
+                    Hdc = CreateCompatibleDC(IntPtr.Zero);
+                    if (Hdc == IntPtr.Zero) throw new InvalidOperationException("无法创建采集设备");
+                    Dib = CreateDIBSection(Hdc, ref bmi, 0, out CaptureBits, IntPtr.Zero, 0);
+                    if (Dib == IntPtr.Zero || CaptureBits == IntPtr.Zero)
+                        throw new InvalidOperationException("无法分配壁纸采集缓冲区");
+                    OldObj = SelectObject(Hdc, Dib);
+                    RawBits = Marshal.AllocHGlobal(outputWidth * outputHeight * 4);
+                    VeiledBits = Marshal.AllocHGlobal(outputWidth * outputHeight * 4);
+                    RawBitmap = new Bitmap(outputWidth, outputHeight, outputWidth * 4, PixelFormat.Format32bppPArgb, RawBits);
+                    VeiledBitmap = new Bitmap(outputWidth, outputHeight, outputWidth * 4, PixelFormat.Format32bppPArgb, VeiledBits);
+                }
+                catch
+                {
+                    Dispose();
+                    throw;
+                }
 			}
+
+            private static int[] BuildScaleMap(int source, int target)
+            {
+                int[] indices = new int[target];
+                long step = ((long)source << 16) / target;
+                for (int i = 0; i < target; i++)
+                    indices[i] = Math.Min(source - 1, (int)((i * step) >> 16));
+                return indices;
+            }
 
 			internal void ReleaseGlass()
 			{
@@ -123,20 +150,27 @@ namespace AandmAuto
 			public void Dispose()
 			{
 				ReleaseGlass();
-				RawBitmap.Dispose();
-				VeiledBitmap.Dispose();
+				if (RawBitmap != null) RawBitmap.Dispose();
+				if (VeiledBitmap != null) VeiledBitmap.Dispose();
 				Marshal.FreeHGlobal(RawBits);
 				Marshal.FreeHGlobal(VeiledBits);
-				SelectObject(Hdc, OldObj);
-				DeleteObject(Dib);
-				DeleteDC(Hdc);
+				if (OldObj != IntPtr.Zero) SelectObject(Hdc, OldObj);
+				if (Dib != IntPtr.Zero) DeleteObject(Dib);
+				if (Hdc != IntPtr.Zero) DeleteDC(Hdc);
 			}
 		}
 
 		private readonly string executable;
+		internal string WindowTitle { get { return title; } }
+        internal bool TaskbarWindowHidden { get { return WindowStyle.IsPlaybackToolWindow(FindWindow(null, title)); } }
+        private int droppedBlackFrames;
+        internal int DroppedBlackFrames { get { return Volatile.Read(ref droppedBlackFrames); } }
 		private readonly string title = "AandmWallpaper-" + Guid.NewGuid().ToString("N");
 		private Size renderSize;
 		private Size desiredSize;
+        private Size desiredCaptureSize;
+        private volatile string captureStage = "等待引擎创建播放窗口";
+        internal string CaptureStage { get { return captureStage; } }
 		private IntPtr positionedWindow;
 		private volatile bool warmedUp;
 		private volatile bool disposed;
@@ -148,6 +182,36 @@ namespace AandmAuto
 		private FrameSlot latestReadySlot;
 		private FrameSlot currentUiSlot;
 		private long nextSequence;
+        private int settingsRevision;
+        private readonly object captureHistoryLock = new object();
+        private IntPtr captureHistory;
+        private int captureHistoryBytes, captureHistoryWidth, captureHistoryHeight, captureHistoryRevision = -1;
+        private long lastSuccessfulCapture;
+        internal bool AwaitingNonBlackFrame { get { return capturedBlackAtStartup && !warmedUp; } }
+        private volatile bool capturedBlackAtStartup;
+        private readonly object captureCallLock = new object();
+        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr memset(IntPtr destination, int value, UIntPtr bytes);
+
+        private static bool ReadWindowPixels(IntPtr window, FrameSlot slot)
+        {
+            // PrintWindow can report success while a DirectX surface has written nothing.
+            uint bytes = (uint)(slot.CaptureWidth * slot.CaptureHeight * 4);
+            memset(slot.CaptureBits, 0, new UIntPtr(bytes));
+            return PrintWindow(window, slot.Hdc, RenderClient);
+        }
+
+        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int memcmp(IntPtr left, IntPtr right, UIntPtr length);
+
+        [DllImport("kernel32.dll", EntryPoint = "RtlMoveMemory")]
+        private static extern void CopyCapture(IntPtr destination, IntPtr source, UIntPtr length);
+
+        internal bool HasRecentCapture(int seconds)
+        {
+            long stamp = Interlocked.Read(ref lastSuccessfulCapture);
+            return stamp != 0 && Stopwatch.GetTimestamp() - stamp <= seconds * Stopwatch.Frequency;
+        }
 
 		private Color desiredVeilColor;
 		private int desiredVeilAlpha;
@@ -155,9 +219,10 @@ namespace AandmAuto
 		private int desiredBlurLevel;
 
 		private Thread[] pipelineThreads;
-		private long lastCaptureStartMs = -100;
+		private double nextCaptureMs;
+        private double desiredCaptureIntervalMs;
+        private double lastPublishedCaptureMs = -1;
 		private Stopwatch pipelineClock;
-		private DateTime nextGlassBuildUtc = DateTime.MinValue;
 		private readonly object startGate = new object();
 		private readonly object windowPosLock = new object();
 		private bool timerPeriodActive;
@@ -172,15 +237,16 @@ namespace AandmAuto
 		{
 			this.executable = executable;
 			desiredSize = size;
+            desiredCaptureSize = size;
 			// A unique title lets this instance close only its own Wallpaper Engine window.
 			SendCommand(string.Format(CultureInfo.InvariantCulture,
 				"openWallpaper -file \"{0}\" -playInWindow {1} -width {2} -height {3} -x {4} -y {4} -borderless",
 				source, title, size.Width, size.Height, OffScreen));
 		}
 
-		internal void StartPipeline(Size targetSize, Color veilColor, int veilAlpha, bool prepareGlass, int blurLevel)
+		internal void StartPipeline(Size targetSize, Color veilColor, int veilAlpha, bool prepareGlass, int blurLevel, double fps, Size captureSize)
 		{
-			UpdatePipelineConfig(targetSize, veilColor, veilAlpha, prepareGlass, blurLevel);
+			UpdatePipelineConfig(targetSize, veilColor, veilAlpha, prepareGlass, blurLevel, fps, captureSize);
 			lock (stateLock)
 			{
 				if (disposed || pipelineThreads != null) return;
@@ -191,8 +257,8 @@ namespace AandmAuto
 					timerPeriodActive = true;
 				}
 				catch { }
-				pipelineThreads = new Thread[2];
-				for (int i = 0; i < 2; i++)
+				pipelineThreads = new Thread[captureSize.Width * (long)captureSize.Height > 3000000 ? 1 : 2];
+				for (int i = 0; i < pipelineThreads.Length; i++)
 				{
 					int workerId = i;
 					var t = new Thread(PipelineWorkerLoop) { IsBackground = true, Name = "AandmWallpaperCap-" + workerId };
@@ -207,16 +273,21 @@ namespace AandmAuto
 			paused = true;
 		}
 
-		internal void UpdatePipelineConfig(Size targetSize, Color veilColor, int veilAlpha, bool prepareGlass, int blurLevel)
+		internal void UpdatePipelineConfig(Size targetSize, Color veilColor, int veilAlpha, bool prepareGlass, int blurLevel, double fps, Size captureSize)
 		{
 			lock (stateLock)
 			{
 				paused = false;
+                if (desiredSize != targetSize || desiredCaptureSize != captureSize || desiredVeilColor != veilColor || desiredVeilAlpha != veilAlpha ||
+                    desiredPrepareGlass != prepareGlass || desiredBlurLevel != blurLevel)
+                    settingsRevision++;
 				desiredSize = targetSize;
+                desiredCaptureSize = captureSize;
 				desiredVeilColor = veilColor;
 				desiredVeilAlpha = veilAlpha;
 				desiredPrepareGlass = prepareGlass;
 				desiredBlurLevel = blurLevel;
+                desiredCaptureIntervalMs = 1000.0 / Math.Max(5, Math.Min(72, fps));
 			}
 		}
 
@@ -227,8 +298,7 @@ namespace AandmAuto
 				if (latestReadySlot == null) return null;
 				if (currentUiSlot != null && currentUiSlot != latestReadySlot)
 				{
-					currentUiSlot.ReleaseGlass();
-					currentUiSlot.State = 0;
+					ReleaseSlot(currentUiSlot);
 				}
 				currentUiSlot = latestReadySlot;
 				currentUiSlot.State = 3;
@@ -245,6 +315,7 @@ namespace AandmAuto
 			if (window == IntPtr.Zero) return IntPtr.Zero;
 			lock (windowPosLock)
 			{
+                if (window != positionedWindow) WindowStyle.HidePlaybackTaskbarWindow(window);
 				if (window != positionedWindow || size != renderSize)
 				{
 					if (!SetWindowPos(window, IntPtr.Zero, OffScreen, OffScreen,
@@ -261,11 +332,11 @@ namespace AandmAuto
 			return window;
 		}
 
-		private FrameSlot CheckoutFreeSlot(int captureWidth, int captureHeight, int outputWidth, int outputHeight)
+		private FrameSlot CheckoutFreeSlot(int captureWidth, int captureHeight, int outputWidth, int outputHeight, int revision)
 		{
 			lock (stateLock)
 			{
-				if (disposed) return null;
+				if (disposed || revision != settingsRevision) return null;
 				if (slots == null || slotsSize.Width != outputWidth || slotsSize.Height != outputHeight
 					|| slots[0].CaptureWidth != captureWidth || slots[0].CaptureHeight != captureHeight)
 				{
@@ -273,11 +344,20 @@ namespace AandmAuto
 					{
 						for (int i = 0; i < slots.Length; i++)
 						{
-							if (slots[i] != currentUiSlot && slots[i] != null) slots[i].Dispose();
+							if (slots[i] != currentUiSlot && slots[i] != null && slots[i].State != 1) slots[i].Dispose();
 						}
 					}
-					slots = new FrameSlot[4];
-					for (int i = 0; i < 4; i++) slots[i] = new FrameSlot(captureWidth, captureHeight, outputWidth, outputHeight);
+					slots = new FrameSlot[pipelineThreads.Length + 2];
+                    try
+                    {
+                        for (int i = 0; i < slots.Length; i++) slots[i] = new FrameSlot(captureWidth, captureHeight, outputWidth, outputHeight);
+                    }
+                    catch
+                    {
+                        foreach (FrameSlot slot in slots) if (slot != null) slot.Dispose();
+                        slots = null;
+                        throw;
+                    }
 					slotsSize = new Size(outputWidth, outputHeight);
 					latestReadySlot = null;
 				}
@@ -302,12 +382,24 @@ namespace AandmAuto
 			}
 		}
 
-		private static Size ChooseCaptureSize(Size target)
-		{
-			const int maxEdge = 1280;
-			int longEdge = Math.Max(target.Width, target.Height);
-			if (longEdge <= maxEdge) return target;
-			double sc = maxEdge / (double)longEdge;
+        private bool OwnsSlot(FrameSlot slot)
+        {
+            return slots != null && Array.IndexOf(slots, slot) >= 0;
+        }
+
+        private void ReleaseSlot(FrameSlot slot)
+        {
+            if (!OwnsSlot(slot)) { slot.Dispose(); return; }
+            slot.ReleaseGlass();
+            slot.State = 0;
+        }
+
+		internal static Size ChooseCaptureSize(Size target, int maxEdge)
+        {
+            int longEdge = Math.Max(target.Width, target.Height);
+            double pixels = (double)target.Width * target.Height;
+            double sc = Math.Min(1, Math.Min(maxEdge / (double)longEdge, Math.Sqrt(8847360 / pixels)));
+            if (sc >= 1) return target;
 			return new Size(Math.Max(16, (int)Math.Round(target.Width * sc)),
 				Math.Max(16, (int)Math.Round(target.Height * sc)));
 		}
@@ -319,7 +411,7 @@ namespace AandmAuto
 			{
 				RunPipelineWorker(workerId);
 			}
-			catch { }
+			catch (Exception ex) { captureStage = "采集线程错误 · " + ex.Message; }
 		}
 
 		private void RunPipelineWorker(int workerId)
@@ -337,44 +429,42 @@ namespace AandmAuto
 					continue;
 				}
 				Size size;
+                Size captureTarget;
 				Color veilColor;
 				int veilAlpha;
 				bool prepareGlass;
 				int blurLevel;
+                double intervalMs;
+                int revision;
 				lock (stateLock)
 				{
 					size = desiredSize;
+                    captureTarget = desiredCaptureSize;
 					veilColor = desiredVeilColor;
 					veilAlpha = desiredVeilAlpha;
 					prepareGlass = desiredPrepareGlass;
 					blurLevel = desiredBlurLevel;
+                    intervalMs = desiredCaptureIntervalMs;
+                    revision = settingsRevision;
 				}
 
-				int wait = 0;
-				lock (startGate)
-				{
-					long now = pipelineClock.ElapsedMilliseconds;
-					long gap = now - lastCaptureStartMs;
-					int minGap = warmedUp ? 13 : 25;
-					if (gap < minGap)
-					{
-						wait = (int)(minGap - gap);
-						lastCaptureStartMs = now + wait;
-					}
-					else
-					{
-						lastCaptureStartMs = now;
-					}
-				}
-				if (wait > 0) Thread.Sleep(wait);
-				if (disposed) break;
+                double startAt;
+                lock (startGate)
+                {
+                    double now = pipelineClock.Elapsed.TotalMilliseconds;
+                    startAt = Math.Max(now, nextCaptureMs);
+                    nextCaptureMs = startAt + (warmedUp ? intervalMs : Math.Max(25, intervalMs));
+                }
+                int wait = (int)Math.Round(startAt - pipelineClock.Elapsed.TotalMilliseconds);
+                if (wait > 0) Thread.Sleep(wait);
+                if (disposed || paused || revision != settingsRevision) continue;
 
 				bool firstPosition = positionedWindow == IntPtr.Zero;
-				Size captureTarget = ChooseCaptureSize(size);
 				int capW, capH;
 				IntPtr window = EnsureTargetWindow(captureTarget, out capW, out capH);
 				if (window == IntPtr.Zero)
 				{
+                    captureStage = "播放窗口尚未就绪";
 					Thread.Sleep(30);
 					continue;
 				}
@@ -383,57 +473,66 @@ namespace AandmAuto
 					Thread.Sleep(60);
 				}
 
-				FrameSlot slot = CheckoutFreeSlot(capW, capH, size.Width, size.Height);
+				FrameSlot slot = CheckoutFreeSlot(capW, capH, size.Width, size.Height, revision);
 				if (slot == null)
 				{
 					Thread.Sleep(4);
 					continue;
 				}
 
-				double t0 = pipelineClock.Elapsed.TotalMilliseconds;
-				bool captured = PrintWindow(window, slot.Hdc, RenderClient);
+                double t0;
+                bool captured;
+                lock (captureCallLock)
+                {
+                    t0 = pipelineClock.Elapsed.TotalMilliseconds;
+                    captureStage = "引擎窗口已就绪，等待采集";
+                    captured = !disposed && revision == settingsRevision && ReadWindowPixels(window, slot);
+                }
+                if (!captured) captureStage = "播放窗口拒绝采集";
+                if (disposed)
+                {
+                    lock (stateLock) ReleaseSlot(slot);
+                    return;
+                }
 				double tCap = pipelineClock.Elapsed.TotalMilliseconds;
 				bool valid = false;
 				if (captured)
 				{
-					bool hasColor = ProcessSlotPixels(slot.CaptureBits, capW, capH, slot.RawBits, slot.VeiledBits,
-						size.Width, size.Height, veilColor, veilAlpha);
-					if (warmedUp || hasColor)
+                    if (warmedUp && IsRepeatedCapture(slot, revision))
+                    {
+                        Interlocked.Exchange(ref lastSuccessfulCapture, Stopwatch.GetTimestamp());
+                        lock (stateLock) ReleaseSlot(slot);
+                        continue;
+                    }
+					bool hasColor = ProcessSlotPixels(slot, veilColor, veilAlpha);
+                    if (!hasColor)
+                    {
+                        if (!warmedUp) capturedBlackAtStartup = true;
+                        else Interlocked.Increment(ref droppedBlackFrames);
+                        captureStage = "采集画面全黑，保留上一帧";
+                    }
+					if (hasColor)
 					{
 						warmedUp = true;
+                        captureStage = "已收到有效画面";
 						valid = true;
+                        Interlocked.Exchange(ref lastSuccessfulCapture, Stopwatch.GetTimestamp());
 					}
 				}
 				if (!valid || disposed)
 				{
 					lock (stateLock)
 					{
-						if (slot.Width == slotsSize.Width && slot.Height == slotsSize.Height) slot.State = 0;
-						else slot.Dispose();
+						ReleaseSlot(slot);
 					}
 					if (!captured) Thread.Sleep(25);
 					continue;
 				}
 
-				bool needGlass = false;
-				if (prepareGlass && DateTime.UtcNow >= nextGlassBuildUtc)
-				{
-					lock (stateLock)
-					{
-						if (DateTime.UtcNow >= nextGlassBuildUtc)
-						{
-							nextGlassBuildUtc = DateTime.UtcNow.AddMilliseconds(300);
-							needGlass = true;
-						}
-					}
-				}
-				if (needGlass)
+                if (prepareGlass && blurLevel > 0)
 				{
 					float[] lumGrid;
-					using (var tmpRaw = new Bitmap(size.Width, size.Height, size.Width * 4, PixelFormat.Format32bppPArgb, slot.RawBits))
-					{
-						slot.GlassBitmap = UiTheme.CreateBlurredBitmap(tmpRaw, blurLevel, blurLevel > 0 ? 256 : 0, out lumGrid);
-					}
+					slot.GlassBitmap = UiTheme.CreateBlurredBitmap(slot.RawBitmap, blurLevel, 256, out lumGrid);
 					slot.LuminanceGrid = lumGrid;
 				}
 
@@ -446,24 +545,19 @@ namespace AandmAuto
 				bool notify = false;
 				lock (stateLock)
 				{
-					if (disposed || slot.Width != slotsSize.Width || slot.Height != slotsSize.Height)
+					if (disposed || paused || revision != settingsRevision || !OwnsSlot(slot) || t0 <= lastPublishedCaptureMs)
 					{
-						slot.Dispose();
+						ReleaseSlot(slot);
 					}
 					else
 					{
 						if (latestReadySlot != null && latestReadySlot != slot)
 						{
-							if (latestReadySlot.GlassBitmap != null && slot.GlassBitmap == null)
-							{
-								slot.GlassBitmap = latestReadySlot.GlassBitmap;
-								slot.LuminanceGrid = latestReadySlot.LuminanceGrid;
-								latestReadySlot.GlassBitmap = null;
-								latestReadySlot.LuminanceGrid = null;
-							}
 							latestReadySlot.ReleaseGlass();
 							latestReadySlot.State = 0;
 						}
+                        RememberCapture(slot, revision);
+                        lastPublishedCaptureMs = t0;
 						slot.Sequence = ++nextSequence;
 						slot.State = 2;
 						latestReadySlot = slot;
@@ -478,76 +572,71 @@ namespace AandmAuto
 			}
 		}
 
-		private static unsafe bool ProcessSlotPixels(IntPtr captureBits, int capW, int capH,
-			IntPtr rawBits, IntPtr veiledBits, int outW, int outH, Color veilColor, int veilAlpha)
-		{
-			int inv = 256 - veilAlpha;
-			uint addR = (uint)(veilColor.R * veilAlpha);
-			uint addG = (uint)(veilColor.G * veilAlpha);
-			uint addB = (uint)(veilColor.B * veilAlpha);
-			int nonZero = 0;
-			if (capW == outW && capH == outH)
-			{
-				int total = outW * outH;
-				Parallel.For(0, 4, band =>
-				{
-					int start = (total * band) / 4;
-					int end = (total * (band + 1)) / 4;
-					uint* src = (uint*)captureBits;
-					uint* raw = (uint*)rawBits;
-					uint* dst = (uint*)veiledBits;
-					uint localOr = 0;
-					for (int i = start; i < end; i++)
-					{
-						uint c = src[i];
-						localOr |= (c & 0x00FFFFFFu);
-						raw[i] = c | 0xFF000000u;
-						uint b = (((c & 0xFFu) * (uint)inv + addB) >> 8);
-						uint g = ((((c >> 8) & 0xFFu) * (uint)inv + addG) >> 8);
-						uint r = ((((c >> 16) & 0xFFu) * (uint)inv + addR) >> 8);
-						dst[i] = 0xFF000000u | (r << 16) | (g << 8) | b;
-					}
-					if (localOr != 0) Interlocked.Increment(ref nonZero);
-				});
-				return nonZero > 0;
-			}
-			int stepX = (capW << 16) / outW;
-			int stepY = (capH << 16) / outH;
-			Parallel.For(0, 4, band =>
-			{
-				int yStart = (outH * band) / 4;
-				int yEnd = (outH * (band + 1)) / 4;
-				uint* src = (uint*)captureBits;
-				uint* raw = (uint*)rawBits;
-				uint* dst = (uint*)veiledBits;
-				uint localOr = 0;
-				for (int y = yStart; y < yEnd; y++)
-				{
-					int sy = (y * stepY) >> 16;
-					if (sy >= capH) sy = capH - 1;
-					uint* sRow = src + sy * capW;
-					int rowOff = y * outW;
-					uint* rRow = raw + rowOff;
-					uint* dRow = dst + rowOff;
-					int sxFp = 0;
-					for (int x = 0; x < outW; x++)
-					{
-						int sx = sxFp >> 16;
-						if (sx >= capW) sx = capW - 1;
-						uint c = sRow[sx];
-						sxFp += stepX;
-						localOr |= (c & 0x00FFFFFFu);
-						rRow[x] = c | 0xFF000000u;
-						uint b = (((c & 0xFFu) * (uint)inv + addB) >> 8);
-						uint g = ((((c >> 8) & 0xFFu) * (uint)inv + addG) >> 8);
-						uint r = ((((c >> 16) & 0xFFu) * (uint)inv + addR) >> 8);
-						dRow[x] = 0xFF000000u | (r << 16) | (g << 8) | b;
-					}
-				}
-				if (localOr != 0) Interlocked.Increment(ref nonZero);
-			});
-			return nonZero > 0;
-		}
+        private bool IsRepeatedCapture(FrameSlot slot, int revision)
+        {
+            lock (captureHistoryLock)
+                return captureHistory != IntPtr.Zero && captureHistoryRevision == revision &&
+                    captureHistoryWidth == slot.CaptureWidth && captureHistoryHeight == slot.CaptureHeight &&
+                    memcmp(captureHistory, slot.CaptureBits, new UIntPtr((uint)captureHistoryBytes)) == 0;
+        }
+
+        private void RememberCapture(FrameSlot slot, int revision)
+        {
+            int bytes = slot.CaptureWidth * slot.CaptureHeight * 4;
+            lock (captureHistoryLock)
+            {
+                if (captureHistoryBytes != bytes)
+                {
+                    if (captureHistory != IntPtr.Zero) Marshal.FreeHGlobal(captureHistory);
+                    captureHistory = IntPtr.Zero;
+                    captureHistoryBytes = 0;
+                    captureHistory = Marshal.AllocHGlobal(bytes);
+                    captureHistoryBytes = bytes;
+                }
+                CopyCapture(captureHistory, slot.CaptureBits, new UIntPtr((uint)bytes));
+                captureHistoryRevision = revision;
+                captureHistoryWidth = slot.CaptureWidth;
+                captureHistoryHeight = slot.CaptureHeight;
+            }
+        }
+
+        private static unsafe bool ProcessSlotPixels(FrameSlot slot, Color veilColor, int veilAlpha)
+        {
+            uint inv = (uint)(256 - veilAlpha);
+            uint addRb = (uint)veilColor.R * (uint)veilAlpha << 16 | (uint)veilColor.B * (uint)veilAlpha;
+            uint addG = (uint)veilColor.G * (uint)veilAlpha << 8;
+            int nonZero = 0;
+            int bands = slot.Height >= 640 ? 2 : 1;
+            Parallel.For(0, bands, band =>
+            {
+                int first = slot.Height * band / bands;
+                int last = slot.Height * (band + 1) / bands;
+                uint* src = (uint*)slot.CaptureBits;
+                uint* raw = (uint*)slot.RawBits;
+                uint* dst = (uint*)slot.VeiledBits;
+                uint seen = 0;
+                bool scaling = slot.ScaleColumns != null;
+                fixed (int* columns = slot.ScaleColumns)
+                {
+                    for (int y = first; y < last; y++)
+                    {
+                        uint* input = src + (scaling ? slot.ScaleRows[y] : y) * slot.CaptureWidth;
+                        int offset = y * slot.Width;
+                        for (int x = 0; x < slot.Width; x++)
+                        {
+                            uint pixel = input[scaling ? columns[x] : x];
+                            seen |= pixel;
+                            raw[offset + x] = pixel | 0xFF000000u;
+                            uint rb = (((pixel & 0x00FF00FFu) * inv + addRb) >> 8) & 0x00FF00FFu;
+                            uint g = (((pixel & 0x0000FF00u) * inv + addG) >> 8) & 0x0000FF00u;
+                            dst[offset + x] = 0xFF000000u | rb | g;
+                        }
+                    }
+                }
+                if ((seen & 0x00FFFFFFu) != 0) Interlocked.Increment(ref nonZero);
+            });
+            return nonZero != 0;
+        }
 
 		internal void RecycleFrame(Bitmap frame)
 		{
@@ -569,7 +658,7 @@ namespace AandmAuto
 				if (syncSlot != null) syncSlot.Dispose();
 				syncSlot = new FrameSlot(width, height, width, height);
 			}
-			if (!PrintWindow(window, syncSlot.Hdc, RenderClient)) return null;
+			if (!ReadWindowPixels(window, syncSlot)) return null;
 
 			Bitmap frame;
 			lock (frameLock)
@@ -584,7 +673,7 @@ namespace AandmAuto
 			}
 			if (frame == null) frame = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
 			bool hasColor = CopyRawToBitmap(syncSlot.CaptureBits, frame, width, height);
-			if (!warmedUp && !hasColor)
+			if (!hasColor)
 			{
 				RecycleFrame(frame);
 				return null;
@@ -659,11 +748,12 @@ namespace AandmAuto
 			}
 			lock (stateLock)
 			{
+                if (currentUiSlot != null && !OwnsSlot(currentUiSlot)) currentUiSlot.Dispose();
 				if (slots != null)
 				{
 					for (int i = 0; i < slots.Length; i++)
 					{
-						if (slots[i] != null) slots[i].Dispose();
+						if (slots[i] != null && slots[i].State != 1) slots[i].Dispose();
 					}
 					slots = null;
 				}
@@ -676,6 +766,12 @@ namespace AandmAuto
 				syncSlot = null;
 			}
 			RecycleFrame(null);
+            lock (captureHistoryLock)
+            {
+                if (captureHistory != IntPtr.Zero) Marshal.FreeHGlobal(captureHistory);
+                captureHistory = IntPtr.Zero;
+                captureHistoryBytes = 0;
+            }
 			try { SendCommand("closeWallpaper -location " + title); }
 			catch (System.ComponentModel.Win32Exception) { CloseNamedWindow(); }
 			catch (InvalidOperationException) { CloseNamedWindow(); }

@@ -105,8 +105,7 @@ function A:daily_activity_rewards()
         end
     end
     if hooks.revice_first_payment_ret then
-        local day
-        pcall(function()day=time_logic:GetNowDayTime()end)
+        local day=self:game_day_start()
         for _,info in pairs(c.first_payment_map or {}) do
             local conf=(config_manager.first_payment_config or {})[info.price]
             local token="firstpay:"..tostring(info.price)

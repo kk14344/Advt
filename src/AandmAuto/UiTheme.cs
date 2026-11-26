@@ -30,6 +30,7 @@ namespace AandmAuto
 
 		internal static int CurrentTheme = ThemeClassic;
 		internal static int GlassBlur = 12;
+		internal static bool ExtremePerformanceMode = false;
 		internal const int BgModeStatic = 0;
 		internal const int BgModeAnimated = 1;
 		internal const int BgModeDesktopPassthrough = 2;
@@ -39,6 +40,19 @@ namespace AandmAuto
 			get { return CurrentTheme == ThemeLiquidGlass ? Color.FromArgb(14, 20, 32) : Palette.SideOuterColor; }
 		}
 		internal static Bitmap EngineFrame { get; private set; }
+        internal static System.Windows.Forms.Form EngineCanvasOwner { get; set; }
+
+        internal static bool UsesEngineCanvas(System.Windows.Forms.Control control)
+        {
+            return EngineFrame != null && EngineCanvasOwner != null && control != null &&
+                !ExtremePerformanceMode && CustomBackgroundMode == BgModeEngine && control.FindForm() == EngineCanvasOwner;
+        }
+
+        private static bool IsOutsideEngineCanvas(System.Windows.Forms.Control control)
+        {
+            return EngineFrame != null && EngineCanvasOwner != null && control != null &&
+                control.FindForm() != EngineCanvasOwner;
+        }
 		internal static Bitmap EngineVeiledFrame { get; private set; }
 		internal static long WallpaperFrameSequence { get; private set; }
 		private static bool engineFrameOwned = true;
@@ -101,10 +115,10 @@ namespace AandmAuto
 				blurredCacheLevel = GlassBlur;
 				blurredLuminanceGrid = luminanceGrid;
 			}
-			else if (blurredCache != null)
-			{
-				blurredCacheSource = rawFrame;
-			}
+            else if (blurredCache != null)
+            {
+                InvalidateBlurCache();
+            }
 		}
 		internal const int BgFitCover = 0;
 		internal const int BgFitContain = 1;
@@ -113,6 +127,7 @@ namespace AandmAuto
 		private static AnimatedBackground animatedBackground;
 		private static Bitmap liveDesktopFrame;
 		private static Bitmap defaultGlassBackdrop;
+		private static Bitmap minimalGlassBackdrop;
 		private static Bitmap blurredCache;
 		private static Image blurredCacheSource;
 		private static int blurredCacheLevel = -1;
@@ -159,7 +174,8 @@ namespace AandmAuto
 		{
 			get
 			{
-				if (CustomBackgroundMode == BgModeEngine) return EngineFrame ?? staticBackground;
+				if (ExtremePerformanceMode) return null;
+				if (CustomBackgroundMode == BgModeEngine) return EngineFrame;
 				if (CustomBackgroundMode == BgModeDesktopPassthrough)
 				{
 					return liveDesktopFrame ?? staticBackground;
@@ -171,7 +187,7 @@ namespace AandmAuto
 
 		internal static bool HasAnimatedBackground
 		{
-			get { return CustomBackgroundMode == BgModeAnimated && animatedBackground != null; }
+			get { return !ExtremePerformanceMode && CustomBackgroundMode == BgModeAnimated && animatedBackground != null; }
 		}
 
 		internal static string BgModeName(int mode)
@@ -374,10 +390,15 @@ namespace AandmAuto
 
 		public static Font GameFont(float size, FontStyle style = FontStyle.Regular)
 		{
-			if (CurrentTheme == ThemeLiquidGlass)
+			if (ExtremePerformanceMode)
 			{
-				return new Font(uiCleanFontFamily, size * 1.02f, style, GraphicsUnit.Point);
+				return new Font(uiCleanFontFamily, size, style, GraphicsUnit.Point);
 			}
+            if (CurrentTheme == ThemeLiquidGlass || CurrentTheme == ThemeNativeLight)
+            {
+                float scale = CurrentTheme == ThemeLiquidGlass ? 1.02f : 1.05f;
+                return new Font(uiCleanFontFamily, size * scale, style, GraphicsUnit.Point);
+            }
 			float larger = size * 1.15f;
 			if (gameFonts.Families.Length > 0) return new Font(gameFonts.Families[0], larger, style, GraphicsUnit.Point);
 			return new Font(GameFontFamily, larger, style, GraphicsUnit.Point);
@@ -385,17 +406,8 @@ namespace AandmAuto
 
 		public static Font UiFont(float size, FontStyle style = FontStyle.Regular)
 		{
-			if (CurrentTheme == ThemeNativeLight || CurrentTheme == ThemeLiquidGlass)
-			{
-				return new Font(uiCleanFontFamily, size * 1.05f, style, GraphicsUnit.Point);
-			}
-			return GameFont(size, style);
-		}
-
-		internal static Font CleanFont(float size, FontStyle style = FontStyle.Regular)
-		{
-			return new Font(uiCleanFontFamily, size, style, GraphicsUnit.Point);
-		}
+            return GameFont(size, style);
+        }
 
 		internal static bool LoadCustomBackground(string path, int opacity)
 		{
@@ -404,9 +416,20 @@ namespace AandmAuto
 
 		internal static bool LoadCustomBackground(string path, int opacity, int mode)
 		{
+			if (ExtremePerformanceMode)
+			{
+				CustomBackgroundOpacity = Math.Max(10, Math.Min(90, opacity));
+				CustomBackgroundMode = BgModeStatic;
+				SetEngineFrame(null);
+				ClearStaticAndAnimated();
+				ClearLiveDesktopFrame();
+				CustomBackgroundPath = "";
+				return false;
+			}
 			CustomBackgroundOpacity = Math.Max(10, Math.Min(90, opacity));
+			bool keepEngineFrame = CustomBackgroundMode == BgModeEngine && mode == BgModeEngine;
 			CustomBackgroundMode = Math.Max(0, Math.Min(BgModeEngine, mode));
-			SetEngineFrame(null);
+			if (!keepEngineFrame) SetEngineFrame(null);
 			ClearStaticAndAnimated();
 			if (CustomBackgroundMode != BgModeDesktopPassthrough) ClearLiveDesktopFrame();
 			if (string.IsNullOrEmpty(path) || !File.Exists(path))
@@ -519,6 +542,22 @@ namespace AandmAuto
 			InvalidateBlurCache();
 		}
 
+		internal static void ReleasePerformanceCaches()
+		{
+			SetEngineFrame(null);
+			ClearStaticAndAnimated();
+			ClearLiveDesktopFrame();
+			Bitmap glass = defaultGlassBackdrop;
+			defaultGlassBackdrop = null;
+			if (glass != null) glass.Dispose();
+			Bitmap minimal = minimalGlassBackdrop;
+			minimalGlassBackdrop = null;
+			if (minimal != null) minimal.Dispose();
+			blurredLuminanceGrid = null;
+			CustomBackgroundPath = "";
+			GameText.ClearCache();
+		}
+
 		private static void ClearStaticAndAnimated()
 		{
 			if (staticBackground != null)
@@ -550,6 +589,7 @@ namespace AandmAuto
 			}
 			blurredCacheSource = null;
 			blurredCacheLevel = -1;
+			blurredLuminanceGrid = null;
 		}
 
 		internal static Bitmap CreateCroppedBitmap(Image src, int cx, int cy, int cw, int ch)
@@ -575,6 +615,7 @@ namespace AandmAuto
 
 		internal static string SyncCroppedWallpaperFile(string dataRoot)
 		{
+			if (ExtremePerformanceMode) return "";
 			if (string.IsNullOrEmpty(dataRoot)) return "";
 			string cropPath = Path.Combine(dataRoot, "custom-bg-crop.png");
 			if (!HasCustomCrop || staticBackground == null)
@@ -601,6 +642,7 @@ namespace AandmAuto
 		{
 			get
 			{
+				if (ExtremePerformanceMode) return null;
 				Image bg = CustomBackground;
 				if (bg != null)
 				{
@@ -629,6 +671,15 @@ namespace AandmAuto
 
 		internal static Bitmap EnsureDefaultGlassBackdrop()
 		{
+			if (ExtremePerformanceMode)
+			{
+				if (minimalGlassBackdrop == null)
+				{
+					minimalGlassBackdrop = new Bitmap(1, 1, PixelFormat.Format32bppArgb);
+					minimalGlassBackdrop.SetPixel(0, 0, NativeLightPalette.BgColor);
+				}
+				return minimalGlassBackdrop;
+			}
 			if (defaultGlassBackdrop != null) return defaultGlassBackdrop;
 			int w = 1280, h = 720;
 			var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
@@ -677,6 +728,7 @@ namespace AandmAuto
 
 		internal static Bitmap GetBlurredGlassBackground()
 		{
+			if (ExtremePerformanceMode) return null;
 			Image src = EffectiveStageBackground;
 			if (src == null) return null;
 			int blur = Math.Max(0, Math.Min(24, GlassBlur));
@@ -979,7 +1031,7 @@ namespace AandmAuto
 
 		internal static Color SampleGlassTextBackground(System.Windows.Forms.Control control)
 		{
-			Bitmap sample = GetBlurredGlassBackground();
+			Bitmap sample = IsOutsideEngineCanvas(control) ? null : GetBlurredGlassBackground();
 			if (sample == null) return Mix(BackgroundVeilColor, Color.White, 0.07f);
 			int width, height, x, y;
 			GetWindowCanvasMetrics(control, out width, out height, out x, out y);
@@ -1017,10 +1069,33 @@ namespace AandmAuto
 			return Math.Min(170, baseAlpha + (int)(Math.Max(0f, brightness - 0.43f) * 220f));
 		}
 
+        private static Bitmap CurrentEngineGlass()
+        {
+            return !HasCustomCrop && GlassBlur > 0 && blurredCacheSource == EngineFrame ? blurredCache : null;
+        }
+
 		internal static void DrawGlassCardSurface(Graphics g, System.Windows.Forms.Control ctrl, GraphicsPath clipPath, int cornerRadius, Color tintColor, bool subtle)
 		{
+			if (ExtremePerformanceMode)
+			{
+				if (ctrl == null || ctrl.Width < 2 || ctrl.Height < 2) return;
+				g.SmoothingMode = SmoothingMode.None;
+				Color fill = CurrentTheme == ThemeLiquidGlass
+					? (subtle ? LiquidGlassPalette.InsetColor : LiquidGlassPalette.CardColor)
+					: (subtle ? NativeLightPalette.InsetColor : NativeLightPalette.CardColor);
+				Color border = CurrentTheme == ThemeLiquidGlass
+					? Color.FromArgb(62, 78, 102)
+					: (subtle ? NativeLightPalette.LineColor : NativeLightPalette.BorderColor);
+				using (var b = new SolidBrush(fill))
+					g.FillRectangle(b, 0, 0, ctrl.Width, ctrl.Height);
+				using (var p = new Pen(border, 1f))
+					g.DrawRectangle(p, 0, 0, ctrl.Width - 1, ctrl.Height - 1);
+				return;
+			}
 			Rectangle bounds = new Rectangle(0, 0, Math.Max(1, ctrl.Width - 1), Math.Max(1, ctrl.Height - 1));
-			Bitmap sample = GetBlurredGlassBackground();
+            bool live = UsesEngineCanvas(ctrl);
+            Bitmap sample = live ? CurrentEngineGlass() :
+                IsOutsideEngineCanvas(ctrl) ? null : GetBlurredGlassBackground();
 			GraphicsState state = g.Save();
 			try
 			{
@@ -1028,8 +1103,9 @@ namespace AandmAuto
 				int width, height, x, y;
 				GetWindowCanvasMetrics(ctrl, out width, out height, out x, out y);
 				Rectangle dest = sample == null ? Rectangle.Empty : GlassSourceRectangle(sample, width, height, x, y);
-				if (sample != null) DrawGlassSample(g, sample, bounds, dest);
-				int opacity = LocalTintAlpha(sample, dest, bounds, subtle ? 54 : 72);
+				if (live && (sample == null || CustomBackgroundFit == BgFitContain)) DrawCustomBackground(g, ctrl, bounds, BackgroundVeilColor);
+                else if (sample != null) DrawGlassSample(g, sample, bounds, dest);
+				int opacity = live ? (subtle ? 88 : 104) : LocalTintAlpha(sample, dest, bounds, subtle ? 54 : 72);
 				using (var tint = new SolidBrush(Color.FromArgb(opacity, Mix(BackgroundVeilColor, tintColor, 0.18f))))
 					g.FillRectangle(tint, bounds);
 			}
@@ -1046,11 +1122,41 @@ namespace AandmAuto
 		internal static void DrawLiquidGlassPill(Graphics g, System.Windows.Forms.Control ctrl, Rectangle rect, int cornerRadius, Color tintColor, int tintAlpha, Color rimAccent, bool hovered, bool pressed, bool selected, bool enabled)
 		{
 			if (rect.Width < 4 || rect.Height < 4) return;
+			if (ExtremePerformanceMode)
+			{
+				g.SmoothingMode = SmoothingMode.None;
+				Color fill, border;
+				if (CurrentTheme == ThemeLiquidGlass)
+				{
+					fill = !enabled ? Color.FromArgb(30, 38, 50)
+						: pressed ? Color.FromArgb(24, 34, 48)
+						: selected ? Color.FromArgb(44, 98, 148)
+						: hovered ? Color.FromArgb(46, 58, 78)
+						: Color.FromArgb(34, 45, 64);
+					border = selected ? Color.FromArgb(94, 192, 255) : Color.FromArgb(82, 102, 130);
+				}
+				else
+				{
+					fill = !enabled ? Color.FromArgb(240, 239, 234)
+						: selected ? Color.FromArgb(44, 110, 73)
+						: pressed ? Color.FromArgb(232, 229, 222)
+						: hovered ? Color.FromArgb(239, 236, 230)
+						: Color.FromArgb(248, 247, 244);
+					border = selected ? Color.FromArgb(34, 88, 58) : Color.FromArgb(201, 197, 188);
+				}
+				using (var b = new SolidBrush(fill))
+					g.FillRectangle(b, rect);
+				using (var p = new Pen(border, 1f))
+					g.DrawRectangle(p, rect.X, rect.Y, Math.Max(1, rect.Width - 1), Math.Max(1, rect.Height - 1));
+				return;
+			}
 			int radius = Math.Max(3, Math.Min(cornerRadius, Math.Min(rect.Width, rect.Height) / 2));
 			int width, height, x, y;
 			GetWindowCanvasMetrics(ctrl, out width, out height, out x, out y);
-			Bitmap sample = GetBlurredGlassBackground();
-			Image sharp = EffectiveStageBackground;
+            bool live = UsesEngineCanvas(ctrl);
+            bool outside = IsOutsideEngineCanvas(ctrl);
+			Bitmap sample = live ? CurrentEngineGlass() : outside ? null : GetBlurredGlassBackground();
+			Image sharp = live || outside ? null : EffectiveStageBackground;
 			Rectangle dest = sample == null ? Rectangle.Empty : GlassSourceRectangle(sample, width, height, x, y);
 
 			g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -1062,7 +1168,12 @@ namespace AandmAuto
 					g.SetClip(path, CombineMode.Intersect);
 					Image edgeSrc = sharp ?? (Image)sample;
 					int edge = Math.Min(Math.Max(1, rect.Height / 4), Math.Max(2, (int)Math.Round(g.DpiX / 48f)));
-					if (edgeSrc != null && rect.Width > 2 * edge && rect.Height > 2 * edge)
+                    if (live)
+                    {
+                        if (sample != null && CustomBackgroundFit == BgFitCover) DrawGlassSample(g, sample, rect, dest);
+                        else DrawCustomBackground(g, ctrl, rect, BackgroundVeilColor);
+                    }
+					else if (edgeSrc != null && rect.Width > 2 * edge && rect.Height > 2 * edge)
 					{
 						Rectangle displaced = GlassSourceRectangle(edgeSrc, width, height, x, y);
 						displaced.Inflate(edge - 1, edge - 1);
@@ -1087,7 +1198,7 @@ namespace AandmAuto
 						DrawGlassSample(g, sample, rect, dest);
 					}
 
-					int alpha = LocalTintAlpha(sample, dest, rect, !enabled ? 78 : pressed ? 83 : 60);
+					int alpha = live ? (!enabled || pressed ? 110 : 88) : LocalTintAlpha(sample, dest, rect, !enabled ? 78 : pressed ? 83 : 60);
 					using (var tint = new SolidBrush(Color.FromArgb(alpha, BackgroundVeilColor)))
 						g.FillRectangle(tint, rect);
 					int wash = !enabled ? 7 : (selected ? 14 : hovered ? 12 : 6) + Math.Min(9, tintAlpha / 12);
@@ -1198,6 +1309,7 @@ namespace AandmAuto
 
 		internal static void DrawCustomBackground(Graphics g, System.Windows.Forms.Control owner, Rectangle bounds, Color veilColor)
 		{
+			if (ExtremePerformanceMode || IsOutsideEngineCanvas(owner)) return;
 			Image bg = EffectiveStageBackground;
 			if (bg == null || bounds.Width < 2 || bounds.Height < 2) return;
 			GraphicsState state = g.Save();
@@ -1240,8 +1352,9 @@ namespace AandmAuto
 						g.DrawImage(bg, area, source, GraphicsUnit.Pixel);
 				}
 				else
-					DrawAlignedBackdropImage(g, bg, CustomBackgroundFit == BgFitContain ? GetBlurredGlassBackground() : null,
-						bounds, canvasW, canvasH, ox, oy, 1f, PointF.Empty, CustomBackgroundMode != BgModeAnimated);
+					DrawAlignedBackdropImage(g, bg, CustomBackgroundFit == BgFitContain && GlassBlur > 0
+                        ? (UsesEngineCanvas(owner) ? CurrentEngineGlass() : GetBlurredGlassBackground()) : null,
+						bounds, canvasW, canvasH, ox, oy, 1f, PointF.Empty, CustomBackgroundMode != BgModeAnimated && !UsesEngineCanvas(owner));
 				using (var veil = new SolidBrush(Color.FromArgb(clampedVeilAlpha, veilColor)))
 				{
 					g.FillRectangle(veil, bounds);

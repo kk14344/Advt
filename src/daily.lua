@@ -177,6 +177,7 @@ function A:start_daily(manual_runes,scheduled_checkin,refine_followup)
     state.void_exchange=self.cfg.dailyVoidExchange~=false
     state.void_challenge=self.cfg.dailyVoidChallenge~=false
     state.market_exchange=self.cfg.dailyMarketExchange~=false
+    state.mystery_shop_enabled=self.cfg.dailyMysteryShop==true
     state.mail_enabled=self.cfg.dailyMail~=false
     state.mail_done=false;state.mail_attempted={};state.mail_claimed=0;state.mail_failures=0
     state.gold_enabled=self.cfg.dailyGoldSummon~=false
@@ -737,26 +738,6 @@ function A:daily_action(id,conf,item)
         return self:daily_cart_step(id)
     elseif id==11 then
         if self.cfg.mobileNoMining then return self:daily_skip(id,"手机版未包含自动挖矿") end
-        local loading=self:daily_mining_data();if loading then return loading end
-        if (tonumber(mining.event_count) or 0)<=0 then return self:daily_skip(id,"今日矿区奇遇次数已用完") end
-        state.mining_begin=state.mining_begin or task_now(self)
-        state.mining_steps=(state.mining_steps or 0)+1
-        if task_now(self)-state.mining_begin>900 then return self:daily_skip(id,"矿区奇遇执行15分钟仍未完成，请检查矿区路线") end
-        if (tonumber(mining.dig_count) or 0)<1 then
-            local tools=self:daily_add_tools(1,id);if tools then return tools end
-        end
-        local saved={}
-        for key,value in pairs(self.cfg) do saved[key]=value end
-        self.cfg.enabled=true;self.cfg.autoMine=true;self.cfg.autoGolem=true
-        self.cfg.autoCaveBoss=false;self.cfg.autoChest=false;self.cfg.autoEnter=true
-        local ok,err=pcall(function()self:step()end)
-        for key,value in pairs(saved) do self.cfg[key]=value end
-        if not ok then return self:daily_skip(id,"挖矿暂无法继续：" .. tostring(err)) end
-        if task_now(self)-(state.mining_sync_at or -99)>=4 then
-            state.mining_sync_at=task_now(self)
-            return self:daily_query("query_liveness_info_ret","query_liveness_info","liveness")
-        end
-        return reply(self,"自动挖矿触发奇遇，已完成" .. tostring(item.completion_count or 0) .. "/" .. conf.condition_count,{wait=true})
     end
     return self:daily_skip(id,"当前客户端未识别的任务类型")
 end
@@ -1223,7 +1204,7 @@ function A:daily_step()
     -- may enter a battle, cooldown, or mining wait.  In particular, a
     -- ladder cooldown must not hold up free arena, escort, or research
     -- preparation tasks behind it.
-    local order={1,3,8,15,4,2,13,7,6,5,9,10,12,11,14}
+    local order={1,3,8,15,4,2,13,7,6,5,9,10,12,14}
     for _,id in ipairs(order) do
         local item=daily_item(daily,id)
         local conf=daily_conf(id)
@@ -1255,7 +1236,7 @@ function A:daily_step()
     local completed,total,remaining=0,0,{}
     for _,item in pairs(daily.liveness_list or {}) do
         local conf=daily_conf(item.liveness_id)
-        if conf and self:daily_enabled(item.liveness_id) then
+        if conf and item.liveness_id~=11 and self:daily_enabled(item.liveness_id) then
             total=total+1
             if daily:CheckActivityComplet(item.liveness_id,item.completion_count or 0) then completed=completed+1
             else remaining[#remaining+1]=conf.active_title .. "（" .. (state.skipped[item.liveness_id] or "条件不足") .. "）" end

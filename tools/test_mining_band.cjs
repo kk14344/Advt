@@ -444,7 +444,9 @@ module.exports = () => {
       A._mine_event=nil;A._mine_event_done=nil;A.daily_state=nil;A.now=100;A.last_action_at=0;A.blocked_until=0
       A.cfg.enabled=true;A.cfg.autoUseMiningBag=true;A.cfg.refuseEvents=refuse~=false
       A.cfg.horizontalStartDepth=121 -- Legacy event/refill fixtures use their original depth band.
-      A.cfg.autoUseEarthHeart=true;A.cfg.earthUseAll=true;A.inBattle=false;A.fight=nil;A.pause_until=nil;A.cfg.actionInterval=0.03
+      A.cfg.workshopShallowMining=false;A.exploration_tip=nil;A.exploration_depth=nil
+      A.exploration_vision=nil;A.exploration_observation=nil;A._shallow_query_at=nil
+      A.cfg.autoUseEarthHeart=false;A.cfg.earthUseAll=true;A.inBattle=false;A.fight=nil;A.pause_until=nil;A.cfg.actionInterval=0.03
       A._mine_blast=nil;A.failed={};MINE.cur_position={x=5,y=130};MINE.dig_endtime=0;MINE.dig_count=count or 0;MINE.dig_max_count=1000
       MINE.golem_num=0;MINE.__mw_pending_monster=nil;MINE.pending_random_event=nil;MINE.show_random_event=nil
       MINE.block_list={[130]={[6]=1,[7]=1}}
@@ -476,10 +478,20 @@ module.exports = () => {
       return MINE.pending_random_event
     end
   `,'runtime fixtures');
-  test('automatic digging uses one bag when short and never starts heart-first batch refill', `
+  test('automatic digging falls back to one bag when heart use is disabled', `
       runtime_fixture(0,true);assert(A:try_use_mining_bag())
       assert(#RTSENT==1 and RTSENT[1].use_mining_tool.num==1 and not A.fast_refill)
       rt_bag();assert(not A.mine_refill and #RTSENT==1 and MINE.dig_count==5)
+  `);
+  test('ordinary mining prefers a heart and immediately resumes once its reply confirms enough picks', `
+      runtime_fixture(0,true);A.cfg.autoUseEarthHeart=true
+      local previous=package.loaded['logic.bag']
+      package.loaded['logic.bag']={capacity=20,item_list={{item_id=101,template_id=6000005,count=1}}}
+      RTNET.event_listener.use_item_ret=function(msg) if msg.item_id==101 and msg.result=='success' then MINE.dig_count=50 end end
+      assert(A:try_use_mining_bag() and #RTSENT==1 and RTSENT[1].use_item.item_id==101)
+      rt_reply('use_item_ret',{result='success',item_id=999});assert(A.mine_refill and #RTSENT==1)
+      rt_reply('use_item_ret',{result='success',item_id=101});assert(not A.mine_refill and #RTSENT==1)
+      package.loaded['logic.bag']=previous
   `);
   test('refuse mode does not refill forty available pickaxes to capacity', `
       runtime_fixture(40,true);assert(not A:try_use_mining_bag() and #RTSENT==0)
@@ -731,6 +743,7 @@ module.exports = () => {
     end
   end`);
   require('./test_mining_route_125.cjs')({run,test});
+  require('./test_mining_reset.cjs')({run,test});
   require('./test_mining_126.cjs')({run,test});
   require('./test_mining_127.cjs')({run,test});
   require('./test_mining_135.cjs')({run,test});

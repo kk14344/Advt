@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
 
 namespace AandmAuto
@@ -112,16 +113,20 @@ namespace AandmAuto
 		internal void SwitchUiAppearance(int layoutMode, int themeMode, string bgPath, int bgOpacity, int bgMode, int glassBlur, int bgFit)
 		{
 			if (themeMode < 0 || themeMode > 4) themeMode = 0;
+			int effectiveTheme = extremePerformanceMode ? UiTheme.ThemeNativeLight : themeMode;
+			string effectiveBgPath = extremePerformanceMode ? "" : bgPath;
+			int effectiveBgMode = extremePerformanceMode ? UiTheme.BgModeStatic : bgMode;
+			int effectiveBlur = extremePerformanceMode ? 0 : Math.Max(0, Math.Min(24, glassBlur));
 			bool wasDark = !UiTheme.IsLightTheme;
-			UiTheme.CurrentTheme = themeMode;
-			UiTheme.GlassBlur = Math.Max(0, Math.Min(24, glassBlur));
+			UiTheme.CurrentTheme = effectiveTheme;
+			UiTheme.GlassBlur = effectiveBlur;
 			UiTheme.CustomBackgroundFit = Math.Max(0, Math.Min(1, bgFit));
-			UiTheme.LoadCustomBackground(bgPath, bgOpacity, bgMode);
-			UiTheme.SyncCroppedWallpaperFile(DataRoot());
+			UiTheme.LoadCustomBackground(effectiveBgPath, bgOpacity, effectiveBgMode);
+			if (!extremePerformanceMode) UiTheme.SyncCroppedWallpaperFile(DataRoot());
 			if (!UiTheme.IsLightTheme != wasDark) RemapHistoryColorsForTheme();
 
-			bool unifiedBackdrop = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass || UiTheme.CustomBackground != null
-				|| bgMode == UiTheme.BgModeEngine || sharedWallpaper != null;
+			bool unifiedBackdrop = !extremePerformanceMode && (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass || UiTheme.CustomBackground != null
+				|| effectiveBgMode == UiTheme.BgModeEngine || sharedWallpaper != null);
 			BackColor = BgColor;
 			ForeColor = TextColor;
 			Font = UiTheme.GameFont(9f, FontStyle.Regular);
@@ -134,6 +139,9 @@ namespace AandmAuto
 			if (viewportBar != null && !viewportBar.IsDisposed)
 			{
 				viewportBar.BackColor = SideColor;
+                foreach (Control item in viewportBar.Controls)
+                    if (item is SmoothLabel && item.Font.FontFamily.Name != Font.FontFamily.Name)
+                        item.Font = Font;
 				viewportBar.Invalidate(true);
 			}
 			if (lblViewportTitle != null && !lblViewportTitle.IsDisposed)
@@ -150,7 +158,7 @@ namespace AandmAuto
 
 		private async void OnUnifiedResize(object sender, EventArgs e)
 		{
-			if (IsDisposed || previewMode) return;
+			if (IsDisposed || previewMode || extremePerformanceMode) return;
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass || UiTheme.CustomBackground != null || UseNativeStageBackdrop)
 			{
 				InvalidateSidebarBackdrop();
@@ -169,6 +177,22 @@ namespace AandmAuto
 				base.Resize += ResumeIndependentWallpaper;
 			}
 			if (previewMode) return;
+			if (extremePerformanceMode)
+			{
+				StopIndependentWallpaper();
+				activePlaybackProject = "";
+				playbackFailed = false;
+				playbackStatus = "";
+				if (bgRuntimeTimer != null) bgRuntimeTimer.Stop();
+				if (desktopCapture != null)
+				{
+					desktopCapture.Dispose();
+					desktopCapture = null;
+				}
+				UiTheme.ClearLiveDesktopFrame();
+				UiTheme.ReleasePerformanceCaches();
+				return;
+			}
 			if (sharedWallpaper != null)
 			{
 				if (bgRuntimeTimer != null) bgRuntimeTimer.Stop();
@@ -222,7 +246,7 @@ namespace AandmAuto
 
 		private void BgRuntimeTimer_Tick(object sender, EventArgs e)
 		{
-			if (bgRuntimeUpdating || IsDisposed || previewMode || sharedWallpaper != null) return;
+			if (bgRuntimeUpdating || IsDisposed || previewMode || sharedWallpaper != null || extremePerformanceMode) return;
 			if (!Visible || WindowState == FormWindowState.Minimized) return;
 			if (UiTheme.CustomBackgroundMode == UiTheme.BgModeEngine)
 			{
@@ -513,7 +537,8 @@ namespace AandmAuto
 		{
 			logHistoryLines.Add(formattedLine);
 			logHistoryColors.Add(color);
-			if (logHistoryLines.Count > 200)
+			int limit = LogHistoryLimit;
+			while (logHistoryLines.Count > limit)
 			{
 				logHistoryLines.RemoveAt(0);
 				logHistoryColors.RemoveAt(0);
@@ -523,6 +548,31 @@ namespace AandmAuto
 		private void ReplayLogHistoryToRtb()
 		{
 			if (txtLog == null || txtLog.IsDisposed || logHistoryLines.Count == 0) return;
+			if (extremePerformanceMode)
+			{
+				if (ShouldDeferLogUi())
+				{
+					logUiDirty = true;
+					return;
+				}
+				var sb = new StringBuilder();
+				for (int i = 0; i < logHistoryLines.Count; i++) sb.Append(logHistoryLines[i]);
+				string text = sb.ToString();
+				if (text.Length > 12000)
+				{
+					int cut = text.Length - 6000;
+					int nl = text.IndexOf('\n', cut);
+					if (nl > cut && nl < text.Length) cut = nl + 1;
+					text = text.Substring(cut);
+				}
+				txtLog.SelectionStart = txtLog.TextLength;
+				txtLog.SelectionLength = 0;
+				txtLog.AppendText(text);
+				txtLog.SelectionStart = txtLog.TextLength;
+				txtLog.ScrollToCaret();
+				logUiDirty = false;
+				return;
+			}
 			for (int i = 0; i < logHistoryLines.Count; i++)
 			{
 				txtLog.SelectionStart = txtLog.TextLength;
@@ -669,14 +719,14 @@ namespace AandmAuto
 			};
 			side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
-			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 76f));
+			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 76f + BattlePlaybackRowHeight));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass ? 296f : 280f));
 			side.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			sidebarLayout = side;
 			activeSidePanel = side;
 
 			side.Controls.Add(BuildHeader(), 0, 0);
-			side.Controls.Add(BuildBoxedPrimaryCard(54, 162), 0, 1);
+			side.Controls.Add(BuildPrimaryActionsWithPlayback(BuildBoxedPrimaryCard(54, 162)), 0, 1);
 
 			// 中部：GameTopTab + PixelBoxPanel
 			pageTasks = BuildGridTasksBodyA();
@@ -833,12 +883,12 @@ namespace AandmAuto
 		{
 			var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, BackColor = Color.Transparent, Margin = Padding.Empty };
 			layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 16f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54f));
-			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 16f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62f));
+			layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18f));
 			layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
 			// Row 0: title + detail side by side
@@ -935,7 +985,7 @@ namespace AandmAuto
 			side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 148f : 146f));
-			side.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 64f : 58f));
+			side.RowStyles.Add(new RowStyle(SizeType.Absolute, (glass ? 64f : 58f) + BattlePlaybackRowHeight));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 234f : 210f));
 			side.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			sidebarLayout = side;
@@ -959,7 +1009,7 @@ namespace AandmAuto
 			hints.SetToolTip(btnDaily, "按日常清单执行，购买次数按实际余额处理。");
 			priRow.Controls.Add(btnMain, 0, 0);
 			priRow.Controls.Add(btnDaily, 1, 0);
-			side.Controls.Add(priRow, 0, 2);
+			side.Controls.Add(BuildPrimaryActionsWithPlayback(priRow), 0, 2);
 
 			// Mid: GameTopTab (任务 / 设置)
 			pageTasks = BuildCompactStripTasksB();
@@ -1212,14 +1262,14 @@ namespace AandmAuto
 			};
 			side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 64f));
-			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 70f));
+			side.RowStyles.Add(new RowStyle(SizeType.Absolute, 70f + BattlePlaybackRowHeight));
 			side.RowStyles.Add(new RowStyle(SizeType.Absolute, ListTasksSectionHeight(compact, glass)));
 			side.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			sidebarLayout = side;
 			activeSidePanel = side;
 
 			side.Controls.Add(BuildHeader(), 0, 0);
-			side.Controls.Add(BuildBoxedPrimaryCard(50, 150), 0, 1);
+			side.Controls.Add(BuildPrimaryActionsWithPlayback(BuildBoxedPrimaryCard(50, 150)), 0, 1);
 
 			pageTasks = BuildListTasksBodyC(compact);
 			pageCamp = BuildCampPageBoxed(120);
@@ -1426,13 +1476,10 @@ namespace AandmAuto
 
 			layout.Controls.Add(BuildKpiTiles(false), 0, 1);
 
-			var infoBox = new InsetPanel { Dock = DockStyle.Fill, Padding = new Padding(8, 4, 8, 4), Margin = new Padding(0, 3, 0, 0) };
-			var infoStack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, BackColor = Color.Transparent, Margin = Padding.Empty };
+			var infoBox = new InsetPanel { Dock = DockStyle.Fill, Padding = new Padding(8, 3, 8, 3), Margin = new Padding(0, 3, 0, 0) };
+			var infoStack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent, Margin = Padding.Empty };
 			infoStack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
-			infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
-			infoStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
-			infoStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			for (int i = 0; i < 3; i++) infoStack.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
 			lblMinePlan = LineInfoLabel("推荐矿层：等待游戏数据", GoldColor);
 			lblStatusSchedule = LineInfoLabel("自动续跑与签到：等待读取", MutedColor);
 			lblStatusSchedShort = LineInfoLabel("定时：--", TextColor);
@@ -1496,7 +1543,7 @@ namespace AandmAuto
 					Font = UiTheme.GameFont(glass ? 8.5f : 8f, FontStyle.Bold)
 				};
 				if (isTopSection) tab.Click += delegate { SwitchTab(key); };
-				else tab.Click += delegate { SwitchBottomTab(key); };
+				else tab.Click += delegate { SwitchBottomTab(key); if (key == "log") FlushDeferredLogUi(); };
 				tabHost.Controls.Add(tab);
 				if (i == 0) tab0 = tab;
 				else if (i == 1) tab1 = tab;

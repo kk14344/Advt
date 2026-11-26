@@ -102,7 +102,7 @@ test('a locally rejected cave command cannot block the other projects in the fin
  network.Send=function(self,msg)if msg.solve_cave_event and msg.solve_cave_event.cave_type==3 then return false end;return send(self,msg)end
  A.daily_state.completion_phase='caves';A.daily_state.completion_result={done=true,message='test'}
  local result=run_119(500);network.Send=send
- assert(not result.done,'unaccepted commands must remain queued until accepted or manually stopped')
+ assert(result.done and result.partial and A.daily_state.retry_round==8,'unaccepted commands must remain unconfirmed after bounded retries')
  local buys,fights=cave127_counts();assert(not fights[3] and fights[4]==1 and fights[5]==1)
 `);
 test('completion cave work waits for a visible battle when skipping is disabled',`

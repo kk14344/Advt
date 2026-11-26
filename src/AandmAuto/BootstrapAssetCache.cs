@@ -145,7 +145,9 @@ namespace AandmAuto
         {
             if (bytes.Length == 0 || bytes.Length > PartLimit || Hash(bytes) != digest || File.Exists(path)) return false;
             Directory.CreateDirectory(directory);
-            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            // Both directory and final file names are content hashes. Keep the
+            // temporary name short so saving works under long profile paths.
+            string temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
             try
             {
                 File.WriteAllBytes(temporary, bytes);

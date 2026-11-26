@@ -81,6 +81,24 @@ namespace AandmAuto
         public List<ScheduleStep> Steps {get;set;}
         public bool Expired(DateTime now){return now>Due.AddMinutes(MaxWaitMinutes);}
     }
+    public sealed class ScheduleCheckpoint
+    {
+        public ScheduleRun Run { get; set; }
+        public string Account { get; set; }
+        public int NextStep { get; set; }
+        public bool StepInFlight { get; set; }
+        public int NeedsReview { get; set; }
+
+        public bool IsValid()
+        {
+            return Run != null && Run.Steps != null && Run.Steps.Count > 0
+                && !string.IsNullOrEmpty(Account) && Account != "0"
+                && NextStep >= 0 && NextStep <= Run.Steps.Count && (!StepInFlight || NextStep > 0)
+                && NeedsReview >= 0 && NeedsReview <= NextStep
+                && Run.Steps.TrueForAll(step => step != null && ScheduleBook.Known(step.Task));
+        }
+    }
+
     public sealed class HarvestRun
     {
         public string Task {get;set;}
@@ -96,6 +114,7 @@ namespace AandmAuto
         public bool LaunchWhenClosed {get;set;}
         public List<SchedulePlan> Plans {get;set;}
         public List<ScheduleRun> Pending {get;set;}
+        public ScheduleCheckpoint Checkpoint {get;set;}
         public bool MineFollowup {get;set;}
         public bool EscortFollowup {get;set;}
         public bool RefineFollowup {get;set;}
@@ -257,7 +276,7 @@ namespace AandmAuto
         }
         internal static bool HasDueFile(string root,DateTime now){
             string file=Path.Combine(root,"task-schedules-v2.json");if(!File.Exists(file))return true;
-            try{var book=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<ScheduleBook>(File.ReadAllText(file));book.NormalizeHarvestTimes();if(book.DueHarvest(now.ToUniversalTime())!=null)return true;if(!book.LaunchWhenClosed)return false;book.CollectDue(now);return book.Pending.Exists(r=>!r.Expired(now));}catch{return true;}
+            try{var book=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<ScheduleBook>(File.ReadAllText(file));book.NormalizeHarvestTimes();if(book.DueHarvest(now.ToUniversalTime())!=null)return true;if(!book.LaunchWhenClosed)return false;if(book.Checkpoint!=null&&book.Checkpoint.IsValid())return true;book.CollectDue(now);return book.Pending.Exists(r=>!r.Expired(now));}catch{return true;}
         }
         internal static bool HasDueCheckinFile(string root,DateTime utcNow)
         {

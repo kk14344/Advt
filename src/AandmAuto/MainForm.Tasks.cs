@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -19,6 +20,14 @@ namespace AandmAuto
 
         private void RecordUiTextIssues(Control control)
         {
+            if (control.Visible && (control is ButtonBase || control is Label || control is ComboBox ||
+                control is DateTimePicker || control is NumericUpDown || control is TextBoxBase || control is ListView))
+            {
+                using (var expected = UiTheme.GameFont(9f))
+                    if (control.Font.FontFamily.Name != expected.FontFamily.Name)
+                        uiTextProblems.Add(control.GetType().Name + "「" + control.Text + "」字体 " + control.Font.FontFamily.Name +
+                            "（应为 " + expected.FontFamily.Name + "）");
+            }
             var button=control as GameButton;
             if(button!=null && control.Visible) {
                 checkedButtons++;
@@ -38,8 +47,9 @@ namespace AandmAuto
             }
             else if(control.Visible && !string.IsNullOrEmpty(control.Text) && control is GameCheckBox) {
                 Size needed=TextRenderer.MeasureText(control.Text,control.Font,new Size(10000,10000),TextFormatFlags.SingleLine|TextFormatFlags.NoPadding);
-                if(needed.Width>control.ClientSize.Width-(control is GameCheckBox?30:10) || needed.Height>control.ClientSize.Height-3)
-                    uiTextProblems.Add(control.FindForm().Text+" / "+control.Text+" ["+needed.Width+"x"+needed.Height+" in "+control.ClientSize+"]");
+                Size bounds = ((GameCheckBox)control).LabelBounds.Size;
+                if(needed.Width>bounds.Width || needed.Height>bounds.Height)
+                    uiTextProblems.Add(control.FindForm().Text+" / "+control.Text+" ["+needed.Width+"x"+needed.Height+" in "+bounds+"]");
             }
             foreach(Control child in control.Controls)RecordUiTextIssues(child);
         }
@@ -118,7 +128,7 @@ namespace AandmAuto
             bool growthActive = IsTaskRunning(AssistantTaskKind.Growth);
             bool exchangeActive = IsTaskRunning(AssistantTaskKind.VoidExchange);
             if(btnDailyOptions!=null)btnDailyOptions.Enabled=!dailyActive;
-            btnMain.Enabled = coreReady && !any;
+            btnMain.Enabled = coreReady && (!any || (dailyActive && dailyEncounterPhase));
             btnDaily.Enabled = coreReady && !IsOtherTaskRunning(AssistantTaskKind.Daily);
             btnDaily.Text = dailyActive ? (escortFollowupRunning ? "停止矿车续跑" : (refineDaily ? "停止炼化续跑" : "停止日常")) : "一键日常";
             btnDaily.Selected = dailyActive;
@@ -230,7 +240,7 @@ namespace AandmAuto
 #if TEST_PVP_EDITION
             RenderTestPvpPreviews(path);
 #else
-            SwitchBottomTab("status"); LayoutAll(this); SavePreview(path);
+            SwitchBottomTab("status"); LayoutAll(this); VerifyBattlePlaybackControls(); VerifyRichContentFonts(); SavePreview(path);
             SwitchBottomTab("stats"); LayoutAll(this); SavePreview(Path.Combine(Path.GetDirectoryName(path),Path.GetFileNameWithoutExtension(path)+"-stats.png"));
             SwitchBottomTab("log"); LayoutAll(this); SavePreview(Path.Combine(Path.GetDirectoryName(path),Path.GetFileNameWithoutExtension(path)+"-log.png"));
             SwitchBottomTab("status");
@@ -245,6 +255,7 @@ namespace AandmAuto
                 SwitchTab("tasks");
                 SwitchBottomTab(mode == UiLayoutStatus ? "log" : "status");
                 LayoutAll(this); Application.DoEvents();
+                VerifyBattlePlaybackControls();
                 SaveSidebarPreview(Path.Combine(Path.GetDirectoryName(path), "preview-layout-" + mode + "-sidebar.png"));
                 SwitchTab("camp");
                 LayoutAll(this); Application.DoEvents();
@@ -258,6 +269,7 @@ namespace AandmAuto
             SwitchTab("tasks"); SwitchBottomTab("status"); LayoutAll(this);
 
             int savedTheme = UiTheme.CurrentTheme;
+            int savedUserTheme = GetNumberOption("uiTheme", 0);
             string savedBg = customBgPath;
             int savedOpacity = UiTheme.CustomBackgroundOpacity;
             int savedBlur = UiTheme.GlassBlur;
@@ -291,6 +303,8 @@ namespace AandmAuto
                 EnableAllPreviewButtons();
                 SwitchTab("tasks"); SwitchBottomTab("status");
                 LayoutAll(this); Application.DoEvents();
+                VerifyBattlePlaybackControls();
+                VerifyRichContentFonts();
                 SaveSidebarPreview(Path.Combine(outDir, "preview-theme-" + theme + "-sidebar.png"));
                 if (theme == UiTheme.ThemeLiquidGlass)
                 {
@@ -318,7 +332,22 @@ namespace AandmAuto
                     }
                 }
             }
-            numberOptions["uiTheme"] = savedTheme;
+            foreach (int mode in new[] { UiLayoutGrid, UiLayoutStatus, UiLayoutList })
+            {
+                SwitchUiAppearance(mode, UiTheme.ThemeLiquidGlass, sampleBg, 65, UiTheme.BgModeStatic, 12, UiTheme.BgFitCover);
+                EnableAllPreviewButtons();
+                SwitchTab("tasks");
+                SwitchBottomTab("log");
+                LayoutAll(this);
+                Application.DoEvents();
+                SaveSidebarPreview(Path.Combine(outDir, "glass-layout-" + mode + "-log.png"));
+                SwitchBottomTab("stats");
+                LayoutAll(this);
+                Application.DoEvents();
+                SaveSidebarPreview(Path.Combine(outDir, "glass-layout-" + mode + "-stats.png"));
+            }
+
+            numberOptions["uiTheme"] = savedUserTheme;
             SwitchUiAppearance(0, 2, sampleBg, 40, UiTheme.BgModeStatic, savedBlur, UiTheme.BgFitCover);
             EnableAllPreviewButtons();
             SwitchTab("tasks"); SwitchBottomTab("status");
@@ -359,7 +388,9 @@ namespace AandmAuto
                 researchTitles[kind*10+branch]=ResearchTitleOf(kind*10+branch)+"（25/100级）";
 
             using(var settings=new AssistantSettingsForm(options,numberOptions,ScheduleBook.Migrate(new ScheduleSettings(),DateTime.Now),researchTitles,4095,
-                lblMinePlan!=null?lblMinePlan.Text:"",lblMineSlots!=null?lblMineSlots.Text:"","mining")) {
+                lblMinePlan!=null?lblMinePlan.Text:"",lblMineSlots!=null?lblMineSlots.Text:"","mining",
+                customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, null,
+                extremePerformanceMode, webViewStartedExtremePerf)) {
                 settings.StartPosition=FormStartPosition.Manual;settings.Location=new Point(-30000,-30000);settings.ShowInTaskbar=false;settings.Show();
                 foreach(string category in new[]{"mining","resources","daily","workshop","growth","mine","schedule","game","advanced"}) {
                     settings.SetCategory(category);LayoutAll(settings);Application.DoEvents();RecordUiTextIssues(settings);
@@ -367,16 +398,67 @@ namespace AandmAuto
                         settings.Controls[0].DrawToBitmap(bitmap,new Rectangle(0,0,bitmap.Width,bitmap.Height));
                         bitmap.Save(Path.Combine(Path.GetDirectoryName(path),"unified-"+category+".png"));
                     }
+                    if (category == "game")
+                    {
+                        var wallpaper = (GameButton)settings.Controls.Find("WallpaperSettingsButton", true)[0];
+                        using (var closeAfterCapture = new Timer { Interval = 100 })
+                        {
+                            closeAfterCapture.Tick += delegate
+                            {
+                                Form editor = Application.OpenForms["WallpaperSettingsDialog"];
+                                if (editor == null) return;
+                                closeAfterCapture.Stop();
+                                try
+                                {
+                                    var mode = (ComboBox)editor.Controls.Find("CustomBgModeCombo", true)[0];
+                                    mode.SelectedIndex = UiTheme.BgModeEngine;
+                                    RecordUiTextIssues(editor);
+                                    using (var bitmap = new Bitmap(editor.Width, editor.Height))
+                                    {
+                                        editor.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+                                        bitmap.Save(Path.Combine(Path.GetDirectoryName(path), "wallpaper-settings.png"));
+                                    }
+                                }
+                                finally { editor.Close(); }
+                            };
+                            closeAfterCapture.Start();
+                            wallpaper.PerformClick();
+                        }
+                    }
+                    if(category=="game") {
+                        var live = (GameCheckBox)settings.Controls.Find("LowDefinitionLiveCheck", true)[0];
+                        bool wasEnabled = live.Checked;
+                        live.Checked = !wasEnabled;
+                        if (settings.Values["lowDefinitionLive"] != !wasEnabled)
+                            throw new InvalidOperationException("Live resolution control failed to update the profile option");
+                        live.Checked = wasEnabled;
+                    }
                     if(category=="daily") {
-                        foreach(string sub in new[]{"growth","battle","mine","tiers"}) {
+                        foreach(string sub in new[]{"growth","battle","mine","tiers","shop"}) {
                             settings.SetDailySubCategory(sub);LayoutAll(settings);Application.DoEvents();RecordUiTextIssues(settings);
-                            if(sub=="tiers") {
+                            if(sub=="tiers" || sub=="shop") {
                                 using(var bitmap=new Bitmap(settings.ClientSize.Width,settings.ClientSize.Height)) {
                                     settings.Controls[0].DrawToBitmap(bitmap,new Rectangle(0,0,bitmap.Width,bitmap.Height));
-                                    bitmap.Save(Path.Combine(Path.GetDirectoryName(path),"unified-daily-tiers.png"));
+                                    bitmap.Save(Path.Combine(Path.GetDirectoryName(path),"unified-daily-"+sub+".png"));
                                 }
                             }
                         }
+                        var products = (CheckedListBox)settings.Controls.Find("MysteryProducts", true)[0];
+                        if (products.Items.Count != 9 || settings.SelectedMysteryProducts().Count != 0)
+                            throw new InvalidOperationException("Mystery shop settings must show nine unchecked categories offline");
+                        settings.BindMysteryShop(new HashSet<string> { "2:29", "2:25", "2:39", "2:11" });
+                        if (!settings.SelectedMysteryProducts().SetEquals(new[] { "2:29", "2:39" }))
+                            throw new InvalidOperationException("Legacy selections must preserve supported items without authorizing extra ore packs");
+                        products.SetItemChecked(2, true);
+                        products.SetItemChecked(7, true);
+                        if (!settings.SelectedMysteryProducts().SetEquals(new[] { "2:29", "2:25", "2:26", "2:27", "2:39", "1:10000048" }))
+                            throw new InvalidOperationException("Mystery shop categories do not expand to the intended reward keys");
+                        var shopCheck = (GameCheckBox)settings.Controls.Find("DailyMysteryShopCheck", true)[0];
+                        var onlyMine = (GameButton)settings.Controls.Find("DailyOnlyMine", true)[0];
+                        shopCheck.Checked = true;
+                        onlyMine.PerformClick();
+                        if (settings.Values["dailyMysteryShop"])
+                            throw new InvalidOperationException("Mine-only daily selection retained paid mystery shop");
                         settings.SetDailySubCategory("rewards");
                     }
                 }
@@ -402,6 +484,58 @@ namespace AandmAuto
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(path),"ui-text-check.json"),json.Serialize(new {font=UiTheme.GameFontFamily,buttonFit=uiTextProblems.Count==0,issues=uiTextProblems}));
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(path),"button-layout-check.json"),json.Serialize(new {result=buttonRatioProblems.Count==0?"passed":"failed",ratio="3:1",ink="#000000",fontPoints=10.5,largeFontStyle=UiTheme.ButtonLabelStyle,primaryFontPoints=btnMain.LabelBasePoints,checkedButtons=checkedButtons,issues=buttonRatioProblems}));
 #endif
+        }
+
+        private void VerifyBattlePlaybackControls()
+        {
+            var speeds = BattleReplaySpeeds.Select(value =>
+                (GameButton)Controls.Find("BattleReplaySpeed" + value, true).Single()).ToArray();
+            var skip = (GameCheckBox)Controls.Find("MainBattleSkip", true).Single();
+            if (speeds.Any(speed => !speed.Visible || !speed.Parent.ClientRectangle.Contains(speed.Bounds))
+                || !skip.Visible || !skip.Parent.ClientRectangle.Contains(skip.Bounds))
+                throw new InvalidOperationException("Battle playback controls are clipped or unavailable");
+
+            var previousSpeed = speeds.Single(speed => speed.Selected);
+            bool previousSkip = skip.Checked;
+            speeds[3].PerformClick();
+            skip.Checked = !previousSkip;
+            if (GetNumberOption(BattleReplaySpeedOption, 100) != 200 || options["autoSkipBattle"] != !previousSkip
+                || speeds.Single(speed => speed.Selected) != speeds[3])
+                throw new InvalidOperationException("Main panel playback controls did not update options");
+            var saved = json.Deserialize<Dictionary<string, object>>(File.ReadAllText(OptionsPath()));
+            if (GetInt(saved, BattleReplaySpeedOption) != 200 || GetBool(saved, "autoSkipBattle") != !previousSkip)
+                throw new InvalidOperationException("Main panel playback controls did not save profile preferences");
+            numberOptions[BattleReplaySpeedOption] = 100;
+            LoadOptions();
+            if (GetNumberOption(BattleReplaySpeedOption, 100) != 200)
+                throw new InvalidOperationException("Battle replay speed did not survive loading the profile");
+            previousSpeed.PerformClick();
+            skip.Checked = previousSkip;
+        }
+
+        private void VerifyRichContentFonts()
+        {
+            string currentReport = rtbReport.Text;
+            rtbReport.SetBodyText("第 2 场 · 魔像 15 Lv · 战斗掉落 250");
+            try { VerifyVisibleRichContentFonts(); }
+            finally { rtbReport.SetBodyText(currentReport); }
+        }
+
+        private void VerifyVisibleRichContentFonts()
+        {
+            using (var expected = GlassRichTextBox.BodyFont())
+            {
+                foreach (var box in new[] { txtLog, rtbReport })
+                {
+                    int start = box.SelectionStart, length = box.SelectionLength;
+                    box.SelectAll();
+                    string effective;
+                    if (!((GlassRichTextBox)box).SelectionMatchesBodyFont(expected, out effective))
+                        throw new InvalidOperationException((box == txtLog ? "Log" : "Report") + " RichEdit font "
+                            + effective + ", expected " + expected.Name + " " + expected.SizeInPoints);
+                    box.Select(start, length);
+                }
+            }
         }
 
         private void VerifyMiningStartDepth(string directory)
@@ -487,7 +621,14 @@ namespace AandmAuto
             WallpaperEngineItem gifItem = scannedWe.Find(x => x.Title == "像素篝火·动态" && x.HasAnimatedPreview);
             if (gifItem == null) throw new InvalidOperationException("Mock Wallpaper Engine GIF item missing");
             string importedWePng = UiTheme.ImportWallpaperEngineItem(gifItem, Path.Combine(directory, "we-import-data"));
-            if (!File.Exists(importedWePng) || !UiTheme.LoadCustomBackground(importedWePng, 40, UiTheme.BgModeAnimated))
+            if (!File.Exists(importedWePng))
+                throw new InvalidOperationException("ImportWallpaperEngineItem failed");
+            if (UiTheme.ExtremePerformanceMode)
+            {
+                if (UiTheme.LoadCustomBackground(importedWePng, 40, UiTheme.BgModeAnimated))
+                    throw new InvalidOperationException("ExtremePerformanceMode should skip animated GIF background load");
+            }
+            else if (!UiTheme.LoadCustomBackground(importedWePng, 40, UiTheme.BgModeAnimated))
                 throw new InvalidOperationException("ImportWallpaperEngineItem or animated GIF load failed");
             UiTheme.ClearCustomBackground();
             UiTheme.LoadCustomBackground(customBgPath, GetNumberOption("customBgOpacity", 35), GetNumberOption("customBgMode", 0));

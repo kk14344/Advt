@@ -22,6 +22,11 @@ namespace AandmAuto
         private bool runtimePulseBusy;
         private DateTime lastRuntimePulse=DateTime.MinValue,lastLifecyclePulse=DateTime.MinValue;
         private object runtimeController;
+        private System.Reflection.PropertyInfo runtimeControllerVisibility;
+        private bool quietGamePresentation;
+        private bool runtimeFocusEmulation = true;
+        private DateTime nextLoginSleepProbeUtc;
+        private string loginSleepResult = "";
         private int runtimePulseCount,runtimePulseErrors,runtimeResumeCount;
 		private CoreWebView2 memoryPolicyCore;
 		private bool memoryPolicyUnsupported;
@@ -30,6 +35,12 @@ namespace AandmAuto
 		private readonly bool measureWithoutBrowserMemoryTarget = Environment.GetEnvironmentVariable("AANDM_IDLE_MEMORY_BASELINE") == "1";
 		private bool slowIdleFrames;
 		private int runtimeFramePolicyPage = -1;
+		private DateTime backgroundSinceUtc = DateTime.MinValue;
+		private bool extremePerfJsActive;
+		private bool extremePerfJsSuspend;
+		private bool extremePerfJsTask;
+        private bool lowDefinitionJsActive;
+		private bool pendingImmediatePulse;
 
         private bool wasMinimized;
         private bool repaintQueued;
@@ -44,6 +55,8 @@ namespace AandmAuto
 		{
 			if (previewMode) return;
 			base.Resize += Background_Resize;
+			base.Activated += Background_Activated;
+			base.Deactivate += Background_Deactivate;
             if(Environment.GetEnvironmentVariable("AANDM_BACKGROUND_BASELINE")!="1") {
                 runtimeHeartbeat=new Timer{Interval=100};
                 runtimeHeartbeat.Tick+=delegate{KeepPageRunning();};runtimeHeartbeat.Start();
@@ -77,20 +90,47 @@ namespace AandmAuto
 			backgroundRestoreBounds = base.Bounds;
 		}
 
+		private void Background_Activated(object sender, EventArgs e)
+		{
+			if (previewMode || IsDisposed) return;
+			backgroundSinceUtc = DateTime.MinValue;
+			if (extremePerformanceMode)
+			{
+				if (logUiDirty && currentBottomTab == "log") FlushDeferredLogUi();
+				UpdateGamePollInterval();
+				KeepPageRunning();
+			}
+		}
+
+		private void Background_Deactivate(object sender, EventArgs e)
+		{
+			if (previewMode || IsDisposed) return;
+			if (backgroundSinceUtc == DateTime.MinValue) backgroundSinceUtc = DateTime.UtcNow;
+			if (extremePerformanceMode)
+			{
+				UpdateGamePollInterval();
+				KeepPageRunning();
+			}
+		}
+
 		private void Background_Resize(object sender, EventArgs e)
 		{
 			if (previewMode || changingWindowState) return;
 			if (base.WindowState == FormWindowState.Minimized)
 			{
                 wasMinimized=true;
+				if (backgroundSinceUtc == DateTime.MinValue) backgroundSinceUtc = DateTime.UtcNow;
 				UpdateGamePollInterval();
 				// 最小化不再转入托盘：正常留在任务栏，只保证网页在后台继续运行。
 				KeepPageRunning();
+				if (extremePerformanceMode) TrimRuntimeMemory();
 				return;
 			}
             if(wasMinimized)
             {
                 wasMinimized=false;
+				backgroundSinceUtc = DateTime.MinValue;
+				if (logUiDirty && currentBottomTab == "log") FlushDeferredLogUi();
 				UpdateGamePollInterval();
 				KeepPageRunning();
                 if(Program.CheckinLaunch||Program.HarvestLaunch)keepScheduledWindowOpen=true;
@@ -132,64 +172,196 @@ namespace AandmAuto
 				|| (dockHost != 0 && DockWindow.IsIconic(new IntPtr(dockHost)));
 		}
 
-		private async void KeepPageRunning()
-		{
-			if (webView == null || previewMode || IsDisposed || webView.CoreWebView2==null || Environment.GetEnvironmentVariable("AANDM_BACKGROUND_BASELINE")=="1") return;
-            bool background = WindowState == FormWindowState.Minimized
-                || (dockHost != 0 ? !WindowStyle.IsForeground(new IntPtr(dockHost)) : !WindowStyle.IsForeground(Handle));
-            DateTime stamp=DateTime.UtcNow;
+        private async void KeepPageRunning()
+        {
+            if (webView == null || previewMode || IsDisposed || webView.CoreWebView2 == null ||
+                Environment.GetEnvironmentVariable("AANDM_BACKGROUND_BASELINE") == "1") return;
+            var core = webView.CoreWebView2;
+            bool minimized = IsMinimizedOrHostMinimized();
+            bool background = minimized ||
+                (dockHost != 0 ? !WindowStyle.IsForeground(new IntPtr(dockHost)) : !WindowStyle.IsForeground(Handle));
+            DateTime stamp = DateTime.UtcNow;
+            if (background)
+            {
+                if (backgroundSinceUtc == DateTime.MinValue) backgroundSinceUtc = stamp;
+            }
+            else
+            {
+                backgroundSinceUtc = DateTime.MinValue;
+            }
             bool active = AnyTaskRunning() || autoLoginReconnecting;
-			UpdateBrowserMemoryPolicy(webView.CoreWebView2, stamp, active);
-			if (runtimePulseBusy) return;
-			bool slowFrames = gameSnapshotReady && !active && IsMinimizedOrHostMinimized();
-			bool framePolicyChanged = slowFrames != slowIdleFrames || pageGeneration != runtimeFramePolicyPage;
-            int interval = active ? 100 : 400;
-            if (runtimeHeartbeat != null && runtimeHeartbeat.Interval != interval)
-                runtimeHeartbeat.Interval = interval;
-            int minimumGap = active ? 90 : (background ? 600 : 1000);
-            if (!framePolicyChanged && (stamp-lastRuntimePulse).TotalMilliseconds < minimumGap) return;
-            lastRuntimePulse=stamp;runtimePulseBusy=true;
-			try
-			{
-				object controller = runtimeController;
-				Type viewType = webView.GetType();
-				System.Reflection.PropertyInfo property = viewType.GetProperty("CoreWebView2Controller",
-					System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-				if (controller==null&&property != null) controller = property.GetValue(webView, null);
-				if (controller == null)
-				{
-					System.Reflection.FieldInfo field = viewType.GetField("_coreWebView2Controller",
-						System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-					if (field != null) controller = field.GetValue(webView);
-				}
-				System.Reflection.PropertyInfo visible = controller==null?null:controller.GetType().GetProperty("IsVisible");
-				if (visible != null && visible.CanWrite && !Equals(visible.GetValue(controller, null), true))
-				{
-					visible.SetValue(controller, true, null);
-					webViewAliveReasserts++;
-				}
-                runtimeController=controller;
-                var core=webView.CoreWebView2;
-                if(core.IsSuspended){core.Resume();runtimeResumeCount++;}
-                if((stamp-lastLifecyclePulse).TotalSeconds>=2) {
-                    lastLifecyclePulse=stamp;
-                    await ObserveRuntimeCall(core.CallDevToolsProtocolMethodAsync("Page.setWebLifecycleState","{\"state\":\"active\"}"));
-                    await ObserveRuntimeCall(core.CallDevToolsProtocolMethodAsync("Emulation.setFocusEmulationEnabled","{\"enabled\":true}"));
+            UpdateBrowserMemoryPolicy(core, stamp, active);
+            bool extreme = extremePerformanceMode;
+            bool lowDefinition = LowDefinitionLiveEnabled;
+            bool suspendRender = extreme && !lowDefinition && gameSnapshotReady && (minimized ||
+                (background && !autoLoginReconnecting && backgroundSinceUtc != DateTime.MinValue &&
+                 stamp - backgroundSinceUtc >= TimeSpan.FromSeconds(5)));
+            bool slowFrames = !lowDefinition && (extreme ? (suspendRender && !active) : (gameSnapshotReady && !active && minimized));
+            bool quiet = extreme
+                ? suspendRender
+                : (slowFrames && !autoLoginEnabled && minimizedIdleSinceUtc != DateTime.MinValue &&
+                   stamp - minimizedIdleSinceUtc >= TimeSpan.FromSeconds(20));
+            bool canSleepLogin = CanSleepLogin(stamp);
+            if (core.IsSuspended)
+            {
+                if (canSleepLogin) return;
+                try { core.Resume(); runtimeResumeCount++; }
+                catch (Exception error) { ReportRuntimePulseError(error); }
+            }
+            bool presentationChanged = quiet != quietGamePresentation;
+            bool extremePolicyChanged = extreme != extremePerfJsActive || suspendRender != extremePerfJsSuspend || active != extremePerfJsTask;
+            bool framePolicyChanged = lowDefinition != lowDefinitionJsActive || slowFrames != slowIdleFrames || extremePolicyChanged || pageGeneration != runtimeFramePolicyPage;
+            int interval = extreme
+                ? (suspendRender ? (active ? 250 : 1500) : (active ? 200 : 1000))
+                : (quiet ? 1500 : (active ? 100 : 400));
+            if (runtimeHeartbeat != null && runtimeHeartbeat.Interval != interval) runtimeHeartbeat.Interval = interval;
+
+            // Restore the WebView immediately on task start or window restore,
+            // even while a previous asynchronous pulse is finishing.
+            if (presentationChanged)
+            {
+                try
+                {
+                    SetRuntimeControllerVisible(!quiet);
+                    quietGamePresentation = quiet;
+                    UpdateGamePollInterval();
+                    lastLifecyclePulse = DateTime.MinValue;
                 }
-                int generation=pageGeneration;
+                catch (Exception error) { ReportRuntimePulseError(error); }
+            }
+            if (runtimePulseBusy)
+            {
+                if ((presentationChanged && !quiet) || extremePolicyChanged || lowDefinition != lowDefinitionJsActive) pendingImmediatePulse = true;
+                return;
+            }
+            int minimumGap = extreme
+                ? (suspendRender ? (active ? 220 : 1400) : (active ? 180 : 900))
+                : (quiet ? 1400 : (active ? 90 : (background ? 600 : 1000)));
+            if (!presentationChanged && !framePolicyChanged &&
+                (stamp - lastRuntimePulse).TotalMilliseconds < minimumGap) return;
+            lastRuntimePulse = stamp;
+            runtimePulseBusy = true;
+            try
+            {
+                SetRuntimeControllerVisible(!quiet);
+                if (core.IsSuspended) { core.Resume(); runtimeResumeCount++; }
+                bool needActiveLifecycle = !quiet || (extreme && active);
+                bool repairLifecycle = needActiveLifecycle && (stamp - lastLifecyclePulse).TotalSeconds >= 2;
+                if (repairLifecycle)
+                {
+                    lastLifecyclePulse = stamp;
+                    await ObserveRuntimeCall(core.CallDevToolsProtocolMethodAsync("Page.setWebLifecycleState","{\"state\":\"active\"}"));
+                }
+                bool wantFocusEmulation = !quiet || (extreme && active);
+                if (repairLifecycle || runtimeFocusEmulation != wantFocusEmulation)
+                {
+                    await ObserveRuntimeCall(core.CallDevToolsProtocolMethodAsync("Emulation.setFocusEmulationEnabled",
+                        wantFocusEmulation ? "{\"enabled\":true}" : "{\"enabled\":false}"));
+                    runtimeFocusEmulation = wantFocusEmulation;
+                }
+                if (canSleepLogin && await TrySleepIdleLoginAsync(core, stamp)) return;
+                int generation = pageGeneration;
                 await ObserveRuntimeCall(core.ExecuteScriptAsync("(function(){var b=window.__MWA_BACKGROUND;if(b){if(b.setIdle)b.setIdle("
-                    + (slowFrames ? "true" : "false") + ");b.pulse(performance.now());}var a=window.__MWA_APP;if(a&&typeof a.backgroundPulse==='function')a.backgroundPulse();})()"));
-                slowIdleFrames=slowFrames;
-                runtimeFramePolicyPage=generation;
+                    + (slowFrames ? "true" : "false")
+                    + ");if(b.setExtremePerf)b.setExtremePerf("
+                    + (extreme ? "true" : "false") + ","
+                    + (suspendRender ? "true" : "false") + ","
+                    + (active ? "true" : "false")
+                    + ");if(b.setLowDefinition)b.setLowDefinition(" + (lowDefinition ? "true" : "false")
+                    + ");b.pulse(performance.now());}var a=window.__MWA_APP;if(a&&typeof a.backgroundPulse==='function')a.backgroundPulse();})()"));
+                lowDefinitionJsActive = lowDefinition;
+                slowIdleFrames = slowFrames;
+                extremePerfJsActive = extreme;
+                extremePerfJsSuspend = suspendRender;
+                extremePerfJsTask = active;
+                runtimeFramePolicyPage = generation;
                 runtimePulseCount++;
-			}
-			catch(Exception error)
-			{
-                runtimeController=null;runtimePulseErrors++;
-                if(runtimePulseErrors==1&&!IsDisposed)AddLog("后台运行保护将自动重试："+error.Message,YellowColor);
-			}
-            finally{runtimePulseBusy=false;}
-		}
+            }
+            catch (Exception error) { ReportRuntimePulseError(error); }
+            finally
+            {
+                runtimePulseBusy = false;
+                if (pendingImmediatePulse && !IsDisposed && IsHandleCreated)
+                {
+                    pendingImmediatePulse = false;
+                    BeginInvoke((MethodInvoker)KeepPageRunning);
+                }
+            }
+        }
+
+        private bool LowDefinitionLiveEnabled
+        {
+            get { bool enabled; return options.TryGetValue("lowDefinitionLive", out enabled) && enabled; }
+        }
+
+        private bool CanSleepLogin(DateTime nowUtc)
+        {
+            TimeSpan idleWait = extremePerformanceMode ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(20);
+            return !LowDefinitionLiveEnabled && dockHost == 0 && gameSnapshotReady && WindowState == FormWindowState.Minimized &&
+                !autoLoginEnabled && !autoLoginReconnecting && !AnyTaskRunning() &&
+                minimizedIdleSinceUtc != DateTime.MinValue && nowUtc - minimizedIdleSinceUtc >= idleWait &&
+                scheduleBook.Pending.Count == 0 && !scheduleBook.CheckinDue(nowUtc) && scheduleBook.DueHarvest(nowUtc) == null;
+        }
+
+        private async Task<bool> TrySleepIdleLoginAsync(CoreWebView2 core, DateTime stamp)
+        {
+            if (stamp < nextLoginSleepProbeUtc || runtimeControllerVisibility == null) return false;
+            nextLoginSleepProbeUtc = stamp.AddSeconds(15);
+            try
+            {
+                int generation = pageGeneration;
+                string scene = await ExecuteLuaAsync("return require('scene.scene_manager'):GetCurrentSceneName()");
+                if (scene != "\"login\"" || generation != pageGeneration || !CanSleepLogin(DateTime.UtcNow))
+                {
+                    if (Program.QuietResourceTest) loginSleepResult = "scene=" + scene;
+                    return false;
+                }
+                bool asleep = await core.TrySuspendAsync();
+                if (Program.QuietResourceTest) loginSleepResult = asleep ? "suspended" : "declined";
+                if (asleep && (generation != pageGeneration || !CanSleepLogin(DateTime.UtcNow)))
+                {
+                    core.Resume();
+                    runtimeResumeCount++;
+                    return false;
+                }
+                return asleep;
+            }
+            catch (NotImplementedException) { if (Program.QuietResourceTest) loginSleepResult = "unavailable"; return false; }
+            catch (InvalidOperationException e) { if (Program.QuietResourceTest) loginSleepResult = e.Message; return false; }
+            catch (System.Runtime.InteropServices.COMException e) { if (Program.QuietResourceTest) loginSleepResult = e.Message; return false; }
+        }
+
+        private void SetRuntimeControllerVisible(bool visible)
+        {
+            if (runtimeController == null)
+            {
+                Type viewType = webView.GetType();
+                var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance;
+                var property = viewType.GetProperty("CoreWebView2Controller", flags);
+                if (property != null) runtimeController = property.GetValue(webView, null);
+                if (runtimeController == null)
+                {
+                    var field = viewType.GetField("_coreWebView2Controller", flags);
+                    if (field != null) runtimeController = field.GetValue(webView);
+                }
+                runtimeControllerVisibility = runtimeController == null ? null : runtimeController.GetType().GetProperty("IsVisible");
+            }
+            if (runtimeControllerVisibility != null && runtimeControllerVisibility.CanWrite &&
+                !Equals(runtimeControllerVisibility.GetValue(runtimeController, null), visible))
+            {
+                runtimeControllerVisibility.SetValue(runtimeController, visible, null);
+                if (visible) webViewAliveReasserts++;
+            }
+        }
+
+        private void ReportRuntimePulseError(Exception error)
+        {
+            runtimeController = null;
+            runtimeControllerVisibility = null;
+            runtimePulseErrors++;
+            if (runtimePulseErrors == 1 && !IsDisposed) AddLog("后台运行保护将自动重试：" + error.Message, YellowColor);
+        }
 
 		private void UpdateBrowserMemoryPolicy(CoreWebView2 core, DateTime stamp, bool active)
 		{
@@ -201,11 +373,11 @@ namespace AandmAuto
 				browserMemoryLow = false;
 				minimizedIdleSinceUtc = DateTime.MinValue;
 			}
-			if (memoryPolicyUnsupported) return;
 			bool idle = IsMinimizedOrHostMinimized() && !active;
 			if (!idle) minimizedIdleSinceUtc = DateTime.MinValue;
 			else if (minimizedIdleSinceUtc == DateTime.MinValue) minimizedIdleSinceUtc = stamp;
-			bool useLow = idle && stamp - minimizedIdleSinceUtc >= TimeSpan.FromSeconds(20);
+			if (memoryPolicyUnsupported) return;
+			bool useLow = extremePerformanceMode || (idle && stamp - minimizedIdleSinceUtc >= TimeSpan.FromSeconds(20));
 			if (browserMemoryLow == useLow) return;
 			try
 			{
@@ -307,12 +479,15 @@ namespace AandmAuto
 			if (!backgroundMode)
 			{
 				if (base.WindowState == FormWindowState.Minimized) base.WindowState = FormWindowState.Normal;
+				backgroundSinceUtc = DateTime.MinValue;
+				if (logUiDirty && currentBottomTab == "log") FlushDeferredLogUi();
 				base.Show();
 				DockWindow.Activate(base.Handle);
 				bool prevTop = TopMost;
 				TopMost = true;
 				TopMost = prevTop;
 				Activate();
+				KeepPageRunning();
 				QueueFullRepaint();
 				return;
 			}
@@ -320,6 +495,7 @@ namespace AandmAuto
 			try
 			{
 				backgroundMode = false;
+				backgroundSinceUtc = DateTime.MinValue;
 				WindowStyle.SetTaskbarVisible(base.Handle, true);
 				base.WindowState = FormWindowState.Normal;
 				if (backgroundRestoreBounds.Width > 40 && backgroundRestoreBounds.Height > 40)
@@ -329,7 +505,9 @@ namespace AandmAuto
 				base.Show();
 				base.WindowState = backgroundRestoreState == FormWindowState.Maximized
 					? FormWindowState.Maximized : FormWindowState.Normal;
+				if (logUiDirty && currentBottomTab == "log") FlushDeferredLogUi();
 				Activate();
+				KeepPageRunning();
 				QueueFullRepaint();
 			}
 			finally

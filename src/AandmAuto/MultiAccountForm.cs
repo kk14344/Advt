@@ -26,12 +26,14 @@ namespace AandmAuto {
   string wallpaperEngineDir = "";
   string sharedWallpaperTitle = "";
   int pageTheme;
+  bool extremePerformanceMode;
   bool applyingTheme;
   bool applyingWallpaper;
   internal MultiAccountForm(AccountProfiles store,IEnumerable<string> ids){
    var selected=ids.Select(AppPaths.ValidateProfileId).Distinct().ToList();
    if(selected.Count==0||selected.Count>MaxAccounts)throw new ArgumentException("请选择 1—"+MaxAccounts+" 个账号");
    if(Current!=null&&!Current.IsDisposed)throw new InvalidOperationException("已有同屏窗口，请先关闭它再重新选择账号");Current=this;profiles=store;
+   extremePerformanceMode=ExtremePerformanceSettings.Load(profiles.Root("main"));
    Text="冒险与挖矿 · 多账号同屏 "+BuildEdition.AppVersion;Size=new Size(1500,980);MinimumSize=new Size(1000,650);WindowState=FormWindowState.Maximized;BackColor=Color.FromArgb(41,32,20);ForeColor=Color.FromArgb(242,232,205);Font=UiTheme.GameFont(9f);
    DoubleBuffered = true;
    bar=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,Height=88,Padding=new Padding(12,8,8,0),BackColor=Color.Transparent};
@@ -54,7 +56,7 @@ namespace AandmAuto {
    pickWallpaperButton.Enabled=false;
    clearWallpaperButton=AddButton(bar,"恢复各自壁纸",async()=>{await ClearSharedWallpaperAsync();},148);
    clearWallpaperButton.Enabled=false;
-   wallpaperStatus=new SmoothLabel{Text="当前：各账号使用各自壁纸（同屏壁纸仅本页生效）",Size=new Size(500,34),TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true};
+   wallpaperStatus=new SmoothLabel{Text=extremePerformanceMode?"极致性能模式已开启：同屏壁纸已停用（关闭极致性能模式后可用）":"当前：各账号使用各自壁纸（同屏壁纸仅本页生效）",Size=new Size(500,34),TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true};
    bar.Controls.Add(wallpaperStatus);
    bar.SetFlowBreak(wallpaperStatus,true);
    var instructions=new SmoothLabel{Text="0 分钟表示直到完成或手动停止。繁忙账号会先排队，最长等待 30 分钟。",Size=new Size(760,28)};
@@ -73,8 +75,8 @@ namespace AandmAuto {
    }catch(System.IO.IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(System.Security.SecurityException){}catch(InvalidOperationException){}
    themePicker.SelectedIndex=pageTheme;
    StylePage(pageTheme);
-   timer=new Timer{Interval=1500};timer.Tick+=async delegate{if(polling)return;polling=true;try{await Task.WhenAll(tiles.Select(t=>RefreshTile(t)));UpdatePollInterval();}finally{polling=false;}};
-   Shown+=async delegate{await Task.WhenAll(tiles.Select(t=>ConnectTile(t)));if(!closing&&!IsDisposed){applyThemeButton.Enabled=true;pickWallpaperButton.Enabled=true;clearWallpaperButton.Enabled=wallpaperPlayer!=null;timer.Start();}};FormClosing+=OnClosing;
+   timer=new Timer{Interval=extremePerformanceMode?3000:1500};timer.Tick+=async delegate{if(polling)return;polling=true;try{await Task.WhenAll(tiles.Select(t=>RefreshTile(t)));UpdatePollInterval();}finally{polling=false;}};
+   Shown+=async delegate{await Task.WhenAll(tiles.Select(t=>ConnectTile(t)));if(!closing&&!IsDisposed){applyThemeButton.Enabled=true;pickWallpaperButton.Enabled=!extremePerformanceMode;clearWallpaperButton.Enabled=!extremePerformanceMode&&wallpaperPlayer!=null;timer.Start();}};FormClosing+=OnClosing;
   }
   Button AddButton(Control parent,string label,Func<Task> action,int width=108)
   {
@@ -90,6 +92,7 @@ namespace AandmAuto {
   public void PaintBackdrop(Graphics graphics)
   {
    using(var fill=new SolidBrush(BackColor))graphics.FillRectangle(fill,ClientRectangle);
+   if(extremePerformanceMode)return;
    if(wallpaperPlayer!=null&&wallpaperPlayer.Frames.Paint(graphics,ClientSize,Point.Empty,ClientRectangle))
    {
     using(var veil=new SolidBrush(Color.FromArgb(pageTheme==UiTheme.ThemeLiquidGlass?88:136,BackColor)))
@@ -99,18 +102,43 @@ namespace AandmAuto {
    if(pageTheme==UiTheme.ThemeLiquidGlass)graphics.DrawImage(UiTheme.EnsureDefaultGlassBackdrop(),ClientRectangle);
   }
 
+  internal void OnExtremePerformanceChanged(bool enabled)
+  {
+   if(IsDisposed||closing)return;
+   if(InvokeRequired){BeginInvoke(new Action<bool>(OnExtremePerformanceChanged),enabled);return;}
+   if(extremePerformanceMode==enabled)return;
+   extremePerformanceMode=enabled;
+   if(enabled)
+   {
+    ReleaseWallpaperPlayer();
+    sharedWallpaperTitle="";
+    pickWallpaperButton.Enabled=false;
+    clearWallpaperButton.Enabled=false;
+    wallpaperStatus.Text="极致性能模式已开启：同屏壁纸已停用（关闭极致性能模式后可用）";
+   }
+   else
+   {
+    pickWallpaperButton.Enabled=!applyingWallpaper;
+    clearWallpaperButton.Enabled=!applyingWallpaper&&wallpaperPlayer!=null;
+    wallpaperStatus.Text="当前：各账号使用各自壁纸（同屏壁纸仅本页生效）";
+   }
+   StylePage(pageTheme);
+   UpdatePollInterval();
+  }
+
   void StylePage(int theme)
   {
    pageTheme=theme;
-   UiPalette palette=UiTheme.PaletteFor(theme);
+   int effectiveTheme=extremePerformanceMode?UiTheme.ThemeNativeLight:theme;
+   UiPalette palette=UiTheme.PaletteFor(effectiveTheme);
    BackColor=palette.BgColor;
    ForeColor=palette.TextColor;
    bar.ForeColor=ForeColor;
    foreach(Control control in bar.Controls)control.ForeColor=ForeColor;
    task.BackColor=minutes.BackColor=themePicker.BackColor=palette.InputBackColor;
-   bool glassOrShared=wallpaperPlayer!=null||theme==UiTheme.ThemeLiquidGlass;
+   bool glassOrShared=!extremePerformanceMode&&(wallpaperPlayer!=null||effectiveTheme==UiTheme.ThemeLiquidGlass);
    foreach(var tile in tiles){
-    tile.Card.BackColor=glassOrShared?Color.FromArgb(theme==UiTheme.ThemeLiquidGlass?96:156,palette.CardColor):palette.CardColor;
+    tile.Card.BackColor=glassOrShared?Color.FromArgb(effectiveTheme==UiTheme.ThemeLiquidGlass?96:156,palette.CardColor):palette.CardColor;
     tile.Card.ForeColor=ForeColor;
     tile.Selected.ForeColor=ForeColor;
     tile.Status.ForeColor=palette.MutedColor;
@@ -137,8 +165,9 @@ namespace AandmAuto {
     StylePage(theme);
     string[] failures=results.Where(result=>result!=null).ToArray();
     int saved=tiles.Count-failures.Length;
-    themeStatus.Text=failures.Length==0?"已为 "+saved+" 个账号保存「"+UiTheme.ThemeName(theme)+"」":
-     "已保存 "+saved+"/"+tiles.Count+" 个账号 · "+string.Join(" · ",failures);
+    themeStatus.Text=failures.Length==0
+     ?(extremePerformanceMode?"已为 "+saved+" 个账号保存「"+UiTheme.ThemeName(theme)+"」（关闭极致性能模式后生效）":"已为 "+saved+" 个账号保存「"+UiTheme.ThemeName(theme)+"」")
+     :"已保存 "+saved+"/"+tiles.Count+" 个账号 · "+string.Join(" · ",failures);
     return saved;
    }finally{themePicker.Enabled=true;applyingTheme=false;}
   }
@@ -153,7 +182,8 @@ namespace AandmAuto {
      var response=await AccountCommand.Send(profiles.Root("main"),tile.Id,new TaskCommand{
       Id=Guid.NewGuid().ToString("N"),Action="setTheme",Theme=theme,Host=Handle.ToInt64()});
      if(!Convert.ToBoolean(response["ok"]))throw new InvalidOperationException(Convert.ToString(response["message"]));
-     if(Convert.ToInt32(response["theme"])!=theme)throw new InvalidOperationException("账号未确认主题。");
+     bool tileExtreme=extremePerformanceMode||(response.ContainsKey("extremePerformance")&&Convert.ToBoolean(response["extremePerformance"]));
+     if(!tileExtreme&&Convert.ToInt32(response["theme"])!=theme)throw new InvalidOperationException("账号未确认主题。");
     }
     return null;
    }catch(Exception error){return tile.Selected.Text+" "+error.Message;}
@@ -171,7 +201,7 @@ namespace AandmAuto {
 
   async Task PickSharedWallpaperAsync()
   {
-   if(applyingWallpaper||closing)return;
+   if(extremePerformanceMode||applyingWallpaper||closing)return;
    using(var picker=new WallpaperEnginePickerForm(wallpaperEngineDir,false))
    {
     if(picker.ShowDialog(this)!=DialogResult.OK||picker.SelectedWallpaper==null)return;
@@ -182,11 +212,12 @@ namespace AandmAuto {
 
   async Task<bool> ApplySharedWallpaperItemAsync(WallpaperEngineItem item)
   {
-   if(item==null||applyingWallpaper||closing)return false;
+   if(extremePerformanceMode||item==null||applyingWallpaper||closing)return false;
    applyingWallpaper=true;
    pickWallpaperButton.Enabled=false;
    clearWallpaperButton.Enabled=false;
    wallpaperStatus.Text="正在载入同屏壁纸："+(item.Title??"已选作品")+"…";
+   string playbackError=null;
    try
    {
     SharedWallpaperPlayer player=EnsureWallpaperPlayer();
@@ -225,20 +256,20 @@ namespace AandmAuto {
    }
    catch(Exception error)
    {
-    ReleaseWallpaperPlayer();
-    StylePage(pageTheme);
-    wallpaperStatus.Text="同屏壁纸未生效："+error.Message;
-    return false;
+    playbackError=error.Message;
    }
    finally
    {
     applyingWallpaper=false;
     if(!IsDisposed&&!closing)
     {
-     pickWallpaperButton.Enabled=true;
-     clearWallpaperButton.Enabled=wallpaperPlayer!=null;
+     pickWallpaperButton.Enabled=!extremePerformanceMode;
+     clearWallpaperButton.Enabled=!extremePerformanceMode&&wallpaperPlayer!=null;
     }
    }
+   await ClearSharedWallpaperAsync();
+   wallpaperStatus.Text="同屏壁纸未生效："+playbackError;
+   return false;
   }
 
   async Task<bool> ClearSharedWallpaperAsync()
@@ -256,7 +287,7 @@ namespace AandmAuto {
     string[] failures=results.Where(result=>result!=null).ToArray();
     StylePage(pageTheme);
     wallpaperStatus.Text=failures.Length==0
-     ?"当前：各账号使用各自壁纸（同屏壁纸仅本页生效）"
+     ?(extremePerformanceMode?"极致性能模式已开启：同屏壁纸已停用（关闭极致性能模式后可用）":"当前：各账号使用各自壁纸（同屏壁纸仅本页生效）")
      :"部分账号未恢复："+string.Join(" · ",failures);
     return failures.Length==0;
    }
@@ -265,8 +296,8 @@ namespace AandmAuto {
     applyingWallpaper=false;
     if(!IsDisposed&&!closing)
     {
-     pickWallpaperButton.Enabled=true;
-     clearWallpaperButton.Enabled=wallpaperPlayer!=null;
+     pickWallpaperButton.Enabled=!extremePerformanceMode;
+     clearWallpaperButton.Enabled=!extremePerformanceMode&&wallpaperPlayer!=null;
     }
    }
   }
@@ -288,8 +319,9 @@ namespace AandmAuto {
   void ReleaseWallpaperPlayer()
   {
    if(wallpaperPlayer==null)return;
-   wallpaperPlayer.Dispose();
+   SharedWallpaperPlayer old=wallpaperPlayer;
    wallpaperPlayer=null;
+   old.Dispose();
   }
 
   async Task ConnectTile(Tile tile){
@@ -299,14 +331,16 @@ namespace AandmAuto {
     for(int i=0;i<16&&!closing;i++){try{response=await AccountCommand.Send(profiles.Root("main"),tile.Id,new TaskCommand{Action="dock",Host=Handle.ToInt64()});if(!Convert.ToBoolean(response["ok"]))throw new InvalidOperationException(Convert.ToString(response["message"]));break;}catch(Exception e){last=e;}await Task.Delay(500);}
     if(closing)return;if(response==null||!Convert.ToBoolean(response["ok"]))throw last??new InvalidOperationException("无法连接账号");
     tile.Window=new IntPtr(Convert.ToInt64(response["window"]));tile.LastSlotSize=Size.Empty;DockWindow.SetChild(tile.Window,true);DockWindow.SetParent(tile.Window,tile.Slot.Handle);ResizeTile(tile);tile.Status.Text="已连接，游戏载入后即可同步任务。";
-    if(wallpaperPlayer!=null&&wallpaperPlayer.Frames.Sequence>0)await ApplyTileSharedWallpaper(tile,wallpaperPlayer.Frames.Name);
+    if(!extremePerformanceMode&&wallpaperPlayer!=null&&wallpaperPlayer.Frames.Sequence>0)await ApplyTileSharedWallpaper(tile,wallpaperPlayer.Frames.Name);
    }catch(Exception e){tile.Status.Text="连接失败："+e.Message+"；请用当前版本重新打开该账号。";}finally{tile.Connecting=false;}
   }
   void UpdatePollInterval()
   {
    if(IsDisposed||closing)return;
    bool anyBusy=tiles.Any(t=>t.Busy);
-   int nextInterval=anyBusy?1500:(WindowState==FormWindowState.Minimized?5000:3500);
+   int nextInterval=extremePerformanceMode
+    ?(anyBusy?3000:(WindowState==FormWindowState.Minimized?10000:6000))
+    :(anyBusy?1500:(WindowState==FormWindowState.Minimized?5000:3500));
    if(timer.Interval!=nextInterval)timer.Interval=nextInterval;
   }
   void ResizeTile(Tile tile)
@@ -318,9 +352,13 @@ namespace AandmAuto {
    DockWindow.MoveWindow(tile.Window,0,0,slotSize.Width,slotSize.Height,true);
   }
   async Task RefreshTile(Tile tile){if(tile.Connecting||closing||tile.Window==IntPtr.Zero)return;await SendTile(tile,"status");ResizeTile(tile);}
-  async Task SendTile(Tile tile,string action){try{var response=await AccountCommand.Send(profiles.Root("main"),tile.Id,new TaskCommand{Id=action=="status"?null:Guid.NewGuid().ToString("N"),Action=action,Task=ScheduleBook.Catalog[task.SelectedIndex,0],Minutes=(int)minutes.Value});bool busy=response.ContainsKey("busy")&&Convert.ToBoolean(response["busy"]);int queued=response.ContainsKey("queued")?Convert.ToInt32(response["queued"]):0;tile.Busy=busy||queued>0;if(!IsDisposed)tile.Status.Text=Convert.ToString(response["message"])+(response.ContainsKey("queued")?" · 排队 "+queued:"");}catch(Exception e){if(!IsDisposed)tile.Status.Text="未送达："+e.Message;}}
+  async Task SendTile(Tile tile,string action){try{var response=await AccountCommand.Send(profiles.Root("main"),tile.Id,new TaskCommand{Id=action=="status"?null:Guid.NewGuid().ToString("N"),Action=action,Task=ScheduleBook.Catalog[task.SelectedIndex,0],Minutes=(int)minutes.Value});bool busy=response.ContainsKey("busy")&&Convert.ToBoolean(response["busy"]);int queued=response.ContainsKey("queued")?Convert.ToInt32(response["queued"]):0;tile.Busy=busy||queued>0;if(action=="status"&&response.ContainsKey("extremePerformance")){bool remoteExtreme=Convert.ToBoolean(response["extremePerformance"]);if(remoteExtreme!=extremePerformanceMode)OnExtremePerformanceChanged(remoteExtreme);}if(!IsDisposed)tile.Status.Text=Convert.ToString(response["message"])+(response.ContainsKey("queued")?" · 排队 "+queued:"");}catch(Exception e){if(!IsDisposed)tile.Status.Text="未送达："+e.Message;}}
   async Task Broadcast(string action){var picked=tiles.Where(t=>t.Selected.Checked).ToArray();await Task.WhenAll(picked.Select(t=>SendTile(t,action)));}
   internal void DetachAllImmediate(){foreach(var t in tiles)if(t.Window!=IntPtr.Zero&&DockWindow.IsWindow(t.Window)){DockWindow.SetParent(t.Window,IntPtr.Zero);DockWindow.SetChild(t.Window,false);}}
+  internal string SmokeWallpaperStatus { get { return wallpaperStatus.Text; } }
+  internal string SmokeWallpaperWindow { get { return wallpaperPlayer == null ? "" : wallpaperPlayer.WindowTitle; } }
+  internal long SmokeWallpaperSequence { get { return wallpaperPlayer == null ? 0 : wallpaperPlayer.Frames.Sequence; } }
+  internal int SmokeWallpaperSample() { return wallpaperPlayer == null ? 0 : wallpaperPlayer.Frames.SampleHash(); }
   internal bool SmokeReady {get{return tiles.All(t=>t.Window!=IntPtr.Zero&&!t.Connecting&&DockWindow.GetParent(t.Window)==t.Slot.Handle);}}
   internal IEnumerable<string> SmokeIds {get{return tiles.Select(t=>t.Id);}}
   internal IEnumerable<string> SmokeStatuses {get{return tiles.Select(t=>t.Status.Text);}}

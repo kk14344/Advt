@@ -52,13 +52,23 @@ namespace AandmAuto
 					await Task.Delay(350);
 					for (int i = 0; i < switches; i++)
 					{
+						long priorFrame = UiTheme.WallpaperFrameSequence;
 						wallpaperEngineProject = projects[i % projects.Length];
+                        forceWallpaperRetry = true;
 						SwitchUiAppearance(UiLayoutGrid + i % 3, UiTheme.ThemeLiquidGlass, "", 65, UiTheme.BgModeEngine, 12, UiTheme.BgFitCover);
 						await ApplyStageWallpaperAsync();
 						var start = Stopwatch.StartNew();
-						while (UiTheme.EngineFrame == null && !playbackFailed && start.ElapsedMilliseconds < 12000)
-							await Task.Delay(100);
-						if (UiTheme.EngineFrame == null) throw new InvalidOperationException(playbackStatus);
+                        while ((lastDeliveredSequence == 0 || UiTheme.WallpaperFrameSequence <= priorFrame)
+                            && !playbackFailed && start.ElapsedMilliseconds < 32000)
+                            await Task.Delay(100);
+                        samples.Add(new
+                        {
+                            project = Path.GetFileName(Path.GetDirectoryName(wallpaperEngineProject)),
+                            firstFrameMs = start.ElapsedMilliseconds,
+                            status = playbackStatus
+                        });
+                        if (lastDeliveredSequence == 0 || UiTheme.WallpaperFrameSequence <= priorFrame)
+                            throw new InvalidOperationException(playbackStatus);
 						completedSwitches++;
 						report("switching");
 					}
@@ -70,7 +80,8 @@ namespace AandmAuto
 						long previous = UiTheme.WallpaperFrameSequence;
 						await Task.Delay(delay);
 						if (playbackFailed || UiTheme.WallpaperFrameSequence <= previous && delay >= 1000
-							&& WindowState != FormWindowState.Minimized)
+							&& WindowState != FormWindowState.Minimized &&
+                            (wallpaperPlayback == null || !wallpaperPlayback.HasRecentCapture(10)))
 							throw new InvalidOperationException("壁纸未继续出帧。" + playbackStatus);
 						report("running");
 					}

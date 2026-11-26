@@ -48,6 +48,44 @@ test('golems take priority over adjacent chests and downward excavation at every
   A:step();assert(A.fight and A.fight.golem and ROUTE_HITS[1].x==4 and #ROUTE_HITS==1)
  end
 `);
+run(`
+ function auto_boss_fixture()
+  route_fixture(120)
+  A.cfg.autoCaveBoss=true;A.next_cave_boss=nil;A.last_action_at=95
+  MINE.cave_boss_lv=1;MINE.cave_boss_bp=50;MINE.cave_boss_end_time=9000
+  MINE.block_list[121]={[5]=1}
+  constants.RESOURCE_TYPE.demon_medal=9;constants.CAVE_BOSS_CHALLANGE_SUB=2
+  package.loaded['logic.bag'].GetSpaceCount=function()return 50 end
+  RTNET.event_listener.challenge_cave_boss_ret=function()end
+  RTNET.event_listener.query_mining_info_ret=function()end
+ end
+`);
+test('auto cave boss resumes excavation on the first tick after acceptance or rejection',`
+ for _,result in ipairs({'success','not_enough_resource'}) do
+  auto_boss_fixture();local prior=A.stats.caveBoss
+  A:step()
+  assert(#RTSENT==1 and RTSENT[1].challenge_cave_boss and #ROUTE_HITS==0)
+  assert(A._task_pending._sent and A.status:find('回执'))
+  rt_reply('challenge_cave_boss_ret',{result=result})
+  route_tick(.25)
+  assert(#ROUTE_HITS==1 and ROUTE_HITS[1].y==121,'same response cycle must resume digging')
+  assert(A.stats.caveBoss==prior+(result=='success' and 1 or 0) and A._task_pending==nil)
+ end
+`);
+test('an unavailable cave boss channel does not enter the challenge wait',`
+ auto_boss_fixture()
+ local channel=A.request_channel_available
+ A.request_channel_available=function()return false end
+ A:step();assert(#ROUTE_HITS==1 and #RTSENT==0 and not A._task_pending)
+ A.request_channel_available=channel
+`);
+test('a missing cave boss reply attempts one read, then resumes without a duplicate challenge',`
+ auto_boss_fixture();local prior=A.stats.caveBoss
+ A:step()
+ route_tick(3.1);assert(#RTSENT==2 and RTSENT[2].query_mining_info and #ROUTE_HITS==0)
+ route_tick(1.6)
+ assert(#RTSENT==2 and #ROUTE_HITS==1 and not A._task_pending and A.stats.caveBoss==prior)
+`);
 test('after the golem the chest is handled before resuming shallow descent',`
  route_fixture(120);MINE.block_list[120][4]=3;MINE.block_list[120][6]=40;MINE.block_list[121]={[5]=1}
  A:step();assert(A.fight.golem);MINE.block_list[120][4]=0;A.fight=nil;route_tick(1)
@@ -65,8 +103,130 @@ test('chests precede a normal mining boss while ordinary golems remain first',`
 `);
 test('disabled target categories are still respected during automatic descent',`
  route_fixture(120);A.cfg.autoGolem=false;A.cfg.autoChest=false
- MINE.block_list[120][4]=3;MINE.block_list[120][6]=40;MINE.block_list[121]={[5]=1}
+ MINE.block_list[120][4]=3;MINE.block_list[120][6]=41;MINE.block_list[121]={[5]=1}
  A:step();assert(not A.fight and ROUTE_HITS[1].y==121)
+`);
+test('adjacent free boxes can open a frontier when automatic chest looting is off',`
+ route_fixture(120);A.cfg.autoChest=false
+ MINE.block_list[120][6]=40;MINE.block_list[121]={[5]=1}
+ A:step();assert(A.fight and A.fight.free_passage and A.fight.x==6)
+`);
+test('the global TNT switch blocks explosive-only routes and stops spending picks with a visible golem',`
+ route_ring();A.cfg.autoMiningTnt=false;MINE.golem_num=1
+ A:step();assert(#ROUTE_HITS==0 and #RTSENT==0 and A.detail:find('雷管已关闭'))
+ A.cfg.autoMiningTnt=true;MINE.golem_num=0
+`);
+test('TNT prices compare actual pick cost including the active golem surcharge',`
+ route_ring()
+ MINE.block_list[120]={[5]=0,[6]=60,[7]=3}
+ MINE.block_list[119]={[5]=1,[6]=1,[7]=1}
+ MINE.block_list[121]={[7]=2};MINE.block_list[120][8]=2
+ A.cfg.miningTntMinSaving=2;MINE.golem_num=0
+ local plan=A:plan_mining_target(A:scan_targets());assert(plan.route_tnt==0 and plan.route_cost==3)
+ MINE.golem_num=1
+ plan=A:plan_mining_target(A:scan_targets());assert(plan.route_tnt==2 and plan.route_cost==0)
+ MINE.golem_num=0
+`);
+test('the planner waits instead of spending on normal excavation when monster coordinates are missing',`
+ route_fixture(120);MINE.golem_num=1;MINE.block_list[121]={[5]=1}
+ A:step();assert(#ROUTE_HITS==0 and A.detail:find('额外扣镐'))
+ MINE.golem_num=0;A._golem_region_at=nil
+`);
+test('the workshop strategy uses the matching project requirement, then returns to a connected shallow frontier',`
+ route_fixture(119);A.cfg.workshopShallowMining=true;A.cfg.workshopDepth=150;A.cfg.workshopMinutes=120
+ local tables=config_manager.mining_quarry_config
+ config_manager.mining_quarry_config={
+  {ID=5,need_layer=35,need_time=120},{ID=8,need_layer=120,need_time=120},
+  {ID=99,need_layer=150,need_time=240}}
+ MINE.dig_depth=119
+ MINE.block_list[120]={[5]=1};MINE.block_list[119][6]=1
+ MINE.block_list[30]={[9]=0,[10]=1}
+ A:step();assert(ROUTE_HITS[1].y==120,A.status)
+ MINE.dig_depth=120
+ route_tick(1);assert(ROUTE_HITS[2].y==30 and ROUTE_HITS[2].x==10,A.status)
+ assert(A:workshop_mining_depth()==120)
+ config_manager.mining_quarry_config=tables;A.cfg.workshopShallowMining=false;MINE.dig_depth=nil
+`);
+test('after a reset the assistant restores workshop depth even if the previous mine was eligible',`
+ route_fixture(24);A.cfg.workshopShallowMining=true;A.cfg.workshopDepth=150;A.cfg.workshopMinutes=120
+ local tables=config_manager.mining_quarry_config
+ config_manager.mining_quarry_config={{ID=8,need_layer=120,need_time=120}}
+ MINE.dig_depth=120;MINE.block_list[24][6]=1;MINE.block_list[25]={[5]=1}
+ A:step();assert(ROUTE_HITS[1].x==6 and ROUTE_HITS[1].y==24,A.status)
+ MINE.cur_position={x=5,y=6};MINE.dig_depth=6;MINE.block_list={[6]={[5]=0},[7]={[5]=1},[24]={[6]=2}}
+ route_tick(1);assert(ROUTE_HITS[2].y==7,A.status)
+ config_manager.mining_quarry_config=tables;A.cfg.workshopShallowMining=false;MINE.dig_depth=nil
+`);
+test('the shallow planner can choose a vertical frontier and prefers useful reveal over distance',`
+ route_fixture(43);A.cfg.workshopShallowMining=true
+ MINE.dig_depth=150;MINE.block_list={
+  [42]={[5]=2,[6]=2},[43]={[5]=0,[6]=1,[7]=2,[12]=0},
+  [44]={[5]=2,[6]=2,[12]=1},
+ }
+ A:step();assert(ROUTE_HITS[1].x==12 and ROUTE_HITS[1].y==44,A.status)
+ A.cfg.workshopShallowMining=false;MINE.dig_depth=nil
+`);
+test('two equally revealing cuts prefer the one with more unseen cells on the following cut',`
+ route_fixture(30);A.exploration_vision={radius=0,samples=8};A.exploration_tip=nil
+ MINE.block_list={[30]={[5]=0,[6]=1,[8]=2,[15]=0,[16]=1},
+                  [29]={[6]=2,[7]=2,[16]=2},[31]={[6]=2,[7]=2,[16]=2}}
+ local original=A.dig;local chosen
+ A.dig=function(_,x,y) chosen=x;return false end
+ A:mine_exploration(nil,20,60)
+ assert(chosen==16,'the first cut near x=6 has no unseen continuation')
+ MINE.block_list[30][8]=nil;MINE.block_list[30][18]=2
+ for _,y in ipairs({29,31}) do MINE.block_list[y][7]=nil;MINE.block_list[y][17]=2 end
+ A:mine_exploration(nil,20,60);assert(chosen==6,'in-place changes must invalidate the lookahead')
+ A.dig=original;A.exploration_vision=nil
+`);
+test('incremental edges and target locations match a fresh scan after stream edits, eviction and reset',`
+ route_fixture(26)
+ local function check(grid)
+  local cache=A:index_mining_grid(grid)
+  for y=20,32 do for x=-6,6 do
+   local row=grid[y];local kind=row and row[x]
+   local target=cache.targets[y] and cache.targets[y][x]
+   if kind==3 or kind==40 then assert(target==kind) else assert(target==nil) end
+   local edge=cache.edges[y] and cache.edges[y][x]
+   local connected=kind~=nil and kind~=0 and (row[x-1]==0 or row[x+1]==0
+    or (grid[y-1] and grid[y-1][x]==0) or (grid[y+1] and grid[y+1][x]==0))
+   assert((edge~=nil)==(connected==true),'wrong edge at '..x..','..y)
+   if edge then assert(edge.block_type==kind) end
+  end end
+ end
+ local grid={};local kinds={0,1,2,3,40}
+ for step=1,60 do
+  local y=20+step%13;local x=step%13-6
+  grid[y]=grid[y] or {};grid[y][x]=kinds[step%5+1];grid[y][math.max(-6,x-1)]=0;check(grid)
+  if step%3==0 then grid[y][x]=nil;grid[y][-x]=3;check(grid) end
+  if step%5==0 then grid[y]={[0]=0,[1]=40};check(grid) end
+  if step%7==0 then grid[y]=nil;check(grid) end
+ end
+ check({[25]={[0]=0,[1]=1}})
+`);
+test('a seasonal box can open a zero-pick route and a nonzero event cost forces replanning',`
+ route_fixture(30);A.cfg.autoChest=false
+ MINE.block_list={[30]={[5]=0,[6]=48,[7]=3,[8]=1,[9]=0}}
+ local target={x=7,y=30,golem=true,manhattan=2,label='魔像'}
+ local plan=A:plan_mining_target({target})
+ assert(plan.route_cost==0 and plan.path[1].x==6 and plan.path[1].free_chest)
+ A:blacklist(6,30,30,'宝箱费用未确认为零')
+ plan=A:plan_mining_target({target})
+ assert(plan.route_cost==1 and plan.path[1].x==8 and not plan.path[1].free_chest)
+`);
+test('a directly reachable standard golem comes first when both monster types cost zero picks',`
+ route_fixture(30)
+ MINE.block_list={[30]={[4]=0,[5]=0,[6]=28,[19]=0,[20]=27}}
+ local nightmare={x=6,y=30,golem=true,block_type=28,manhattan=1}
+ local golem={x=20,y=30,golem=true,block_type=27,manhattan=15}
+ assert(A:plan_mining_target({nightmare,golem})==golem)
+`);
+test('a free chest with an unseen diagonal is useful after observing square vision',`
+ route_fixture(30);A.cfg.autoChest=false;A.exploration_vision={radius=1,samples=8}
+ MINE.block_list={[30]={[5]=0,[6]=40,[7]=2},[29]={[6]=2},[31]={[6]=2}}
+ local targets,box=A:scan_targets()
+ assert(#targets==0 and box and box.x==6 and box.free_passage)
+ A.exploration_vision=nil
 `);
 test('an enclosed golem gets one necessary TNT opening even with timed-ore TNT disabled',`
  route_ring();A:step();assert(ROUTE_HITS[1].x==6 and #RTSENT==0)

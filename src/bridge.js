@@ -1,11 +1,11 @@
 (function () {
   'use strict';
 
-  if (window.__MWA_APP && window.__MWA_APP_VERSION === '1.0.0') {
+  if (window.__MWA_APP && window.__MWA_APP_VERSION === '1.1.0') {
     return;
   }
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var CORE_TICK_MIN_MS = 40;
   var CORE_TICK_INTERVAL_MS = 45;
   var BATTLE_SKIP_INTERVAL_MS = 20;
@@ -28,14 +28,21 @@
     waitNightmareCooldown: false,
     autoCaveBoss: false,
     useTntOnLong: false,
+    autoMiningTnt: true,
+    miningTntMinSaving: 2,
     allowLongOre: false,
     autoSkipBattle: true,
+    battleReplaySpeed: 100,
     skipOneDemonKeyChest: true,
     autoUseMiningBag: true,
     autoTreasureEvent: true,
     autoMute: true,
     horizontalMining: true,
+    workshopShallowMining: true,
     horizontalStartDepth: 150,
+    autoMysticStoneReset: false,
+    mysticStoneThreshold: 150,
+    mysticStoneResetTier: 1,
     horizontalBandMinY: 120,
     horizontalBandMaxY: 150,
     arenaAllowBloodRefresh: false,
@@ -59,6 +66,9 @@
     dailyUndergroundLevel: 0,
     dailyVoidChallenge: true,
     dailyMarketExchange: true,
+    dailyMysteryShop: false,
+    mysteryBuyBudget: 0,
+    mysteryRefreshBudget: 0,
     cartUpgradeMax: true,
     cartBuyEscort: true,
     cartPaidTargetRefresh: true,
@@ -89,12 +99,17 @@
 
   var probeVM=null,nextCoreAttempt=0,taskActive=false,lastCoreTick=-1000,lastCapturePoll=-1000,captureOutstanding=false;
   var coreTimer = 0;
+  function idleTickIntervalMs() {
+    var bg = window.__MWA_BACKGROUND;
+    var mode = bg && typeof bg.getMode === 'function' ? bg.getMode() : null;
+    return mode && mode.extremePerf ? 500 : 250;
+  }
   function scheduleCoreTick() {
     clearTimeout(coreTimer);
     coreTimer = setTimeout(function () {
       tickOnce();
       scheduleCoreTick();
-    }, cfg.enabled || taskActive || captureOutstanding ? CORE_TICK_INTERVAL_MS : 250);
+    }, cfg.enabled || taskActive || captureOutstanding ? CORE_TICK_INTERVAL_MS : idleTickIntervalMs());
   }
   function applyOptions(vm,values) {
     var entries=Object.keys(values).map(function(key){return '['+JSON.stringify(key)+']='+JSON.stringify(values[key]);});
@@ -111,7 +126,11 @@
         if(loaded!==true)return false;
         vm.execute(LUA_CORE);
       }
-      applyOptions(vm,cfg);coreVm=vm;lastError='';
+      applyOptions(vm,cfg);
+      mysteryGeneration=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+      mysteryMessage=null;
+      if(mysteryProducts.length) applyMysteryProducts(vm);
+      coreVm=vm;lastError='';
       if (logVm !== vm) { logVm = vm; logEpoch++; }
       return true;
     }catch(e){coreVm=null;nextCoreAttempt=now+2000;lastError=String(e&&e.message?e.message:e);return false;}
@@ -121,6 +140,26 @@
     if (!ensureCore()) throw new Error('游戏客户端尚未加载');
     return coreVm.execute(code);
   }
+
+  var mysteryProducts=[], mysteryMessage=null, mysteryGeneration='';
+  function applyMysteryProducts(vm) {
+    vm.execute('__MWA:set_mystery_products({' + mysteryProducts.map(function(key){return JSON.stringify(key);}).join(',') + '})');
+  }
+  function requestMysteryBudget(result) {
+    var request=result&&result.mysteryBudget;
+    if (!request || !window.chrome || !window.chrome.webview) return;
+    var stamp=performance.now();
+    if (mysteryMessage&&mysteryMessage.vm===coreVm&&mysteryMessage.token===request.token&&
+        mysteryMessage.operation===request.operation&&stamp-mysteryMessage.at<300) return;
+    mysteryMessage={vm:coreVm,token:request.token,operation:request.operation,at:stamp};
+    window.chrome.webview.postMessage(Object.assign({type:'mysteryBudget',generation:mysteryGeneration},request));
+  }
+  window.__MWA_MYSTERY_ACK=function(generation,token,operation,status,remaining) {
+    if (generation!==mysteryGeneration||!coreVm||!mysteryMessage||mysteryMessage.vm!==coreVm||
+        mysteryMessage.token!==token||mysteryMessage.operation!==operation) return false;
+    var args=[Number(token),JSON.stringify(operation),JSON.stringify(status),Number(remaining)];
+    return coreVm.execute('return __MWA:mystery_budget_ack('+args.join(',')+')');
+  };
 
   var captureSent={}, captureGeneration=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
   function pumpCaptures() {
@@ -156,7 +195,7 @@
       }
       var stamp=performance.now();
       if(stamp-lastCoreTick<CORE_TICK_MIN_MS)return;
-      if(!cfg.enabled&&!taskActive&&!inBattle&&stamp-lastCoreTick<250)return;
+      if(!cfg.enabled&&!taskActive&&!captureOutstanding&&!inBattle&&stamp-lastCoreTick<idleTickIntervalMs())return;
       lastCoreTick=stamp;
       var now = performance.now() / 1000;
       coreVm.execute('__MWA:tick(' + now.toFixed(3) + ',' + (inBattle ? 'true' : 'false') + ',true)');
@@ -260,7 +299,11 @@
       if(typeof DEFAULTS[key]==='number'){
         value=Number(value);
         if(!isFinite(value))value=DEFAULTS[key];
+        if(key==='battleReplaySpeed'&&[100,125,150,200].indexOf(value)<0)value=100;
         if(key==='horizontalStartDepth')value=Math.floor(Math.max(1,Math.min(9999,value)));
+        if(key==='mysticStoneThreshold')value=Math.floor(Math.max(2,Math.min(9999,value)));
+        if(key==='mysticStoneResetTier'&&[1,100,200,300,350].indexOf(value)<0)value=1;
+        if(key==='miningTntMinSaving')value=Math.floor(Math.max(1,Math.min(90,value)));
       }else value=value===true;
       if(cfg[key]!==value){cfg[key]=value;changed[key]=value;}
     });
@@ -292,6 +335,10 @@
     setOption: setOption,
     setOptions: setOptions,
     getConfig: getConfig,
+    setMysteryProducts: function(keys) {
+      mysteryProducts=(keys||[]).filter(function(key){return typeof key==='string'&&/^\d+:\d+$/.test(key);});
+      if(coreVm) applyMysteryProducts(coreVm);
+    },
     cancelTask: function () {
       taskActive=false;if (ensureCore()) return coreVm.execute('return __MWA:cancel_task()');
       return false;
@@ -302,6 +349,7 @@
       var inBattle = !!(engine && typeof engine.hasVisibleBattle === 'function' && engine.hasVisibleBattle());
       coreVm.execute('__MWA.now=' + (performance.now()/1000).toFixed(3) + '; __MWA.inBattle=' + (inBattle ? 'true' : 'false'));
       var result=coreVm.execute(code);
+      requestMysteryBudget(result);
       if(code.indexOf(':start_')>=0) {
         taskActive=result!==false;
         if (taskActive) scheduleCoreTick();

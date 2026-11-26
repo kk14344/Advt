@@ -21,9 +21,45 @@ namespace AandmAuto
         private static int pixels;
         private const int MaxPixels=2500000;
 
+        internal static void ClearCache()
+        {
+            lock(gate) {
+                foreach(Entry entry in cache.Values) {
+                    if(entry!=null&&entry.Image!=null)entry.Image.Dispose();
+                }
+                cache.Clear();
+                recent.Clear();
+                pixels=0;
+            }
+        }
+
         internal static void Draw(Graphics g,string text,Font font,Rectangle bounds,Color color,TextFormatFlags flags)
         {
-            if(string.IsNullOrEmpty(text)||bounds.Width<=0||bounds.Height<=0)return;
+            if(g==null||font==null||string.IsNullOrEmpty(text)||bounds.Width<=0||bounds.Height<=0)return;
+            if(UiTheme.ExtremePerformanceMode) {
+                TextFormatFlags drawFlags=flags;
+                if((drawFlags&TextFormatFlags.SingleLine)==0) {
+                    bool multiLineText=text.IndexOf('\n')>=0||text.IndexOf('\r')>=0;
+                    if(!multiLineText&&(drawFlags&TextFormatFlags.EndEllipsis)!=0) {
+                        drawFlags|=TextFormatFlags.SingleLine;
+                    } else if(!multiLineText&&(drawFlags&(TextFormatFlags.VerticalCenter|TextFormatFlags.Bottom))!=0) {
+                        if(bounds.Height<font.Height*2) {
+                            drawFlags|=TextFormatFlags.SingleLine;
+                        } else {
+                            TextFormatFlags measureFlags=(drawFlags&~(TextFormatFlags.PreserveGraphicsClipping|TextFormatFlags.PreserveGraphicsTranslateTransform))|TextFormatFlags.SingleLine;
+                            Size oneLine=TextRenderer.MeasureText(text,font,new Size(int.MaxValue,int.MaxValue),measureFlags);
+                            drawFlags|=(oneLine.Width<=bounds.Width)?TextFormatFlags.SingleLine:TextFormatFlags.WordBreak;
+                        }
+                    } else {
+                        drawFlags|=TextFormatFlags.WordBreak;
+                    }
+                }
+                if((drawFlags&TextFormatFlags.SingleLine)!=0&&(drawFlags&TextFormatFlags.NoPadding)==0) {
+                    drawFlags|=TextFormatFlags.NoPadding;
+                }
+                TextRenderer.DrawText(g,text,font,bounds,color,drawFlags);
+                return;
+            }
             string key=text+"\u001f"+font.Name+"|"+font.SizeInPoints.ToString("R",CultureInfo.InvariantCulture)+"|"+
                 (int)font.Style+"|"+bounds.Width+"|"+bounds.Height+"|"+color.ToArgb()+"|"+(int)flags+"|"+
                 g.DpiX.ToString("R",CultureInfo.InvariantCulture)+"|"+g.DpiY.ToString("R",CultureInfo.InvariantCulture);

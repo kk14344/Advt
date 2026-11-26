@@ -23,12 +23,13 @@ namespace AandmAuto {
    await ExecuteScriptAsync("window.multiProbe.cookie="+json.Serialize(cookies[0].Value));dailyTaskTimer.Start();
   }
  }
- internal static class MultiAccountChecks {
+ internal static partial class MultiAccountChecks {
   internal static void Run(string output){
    Directory.CreateDirectory(output);Environment.SetEnvironmentVariable("AANDM_MULTI_SMOKE","1");
    var store=new AccountProfiles(AppPaths.BaseRoot);var ids=new List<string>{"main"};
    while(ids.Count<MultiAccountForm.MaxAccounts)
     ids.Add(store.Save(null,"offline-test-"+(ids.Count+1),"test-only",false,null).Id);
+   PrepareDynamicProfiles(store,ids);
    var screen=new MultiAccountForm(store,ids);screen.Shown+=async delegate{
     var j=new JavaScriptSerializer();var checks=new List<string>();string error="";var children=new List<int>();
     try{
@@ -127,7 +128,8 @@ namespace AandmAuto {
      if(starts0.Length!=4||Convert.ToInt32(duplicate["queued"])!=0)
       throw new Exception("重复命令启动次数或队列异常："+j.Serialize(duplicate));
      checks.Add("command-idempotency");await screen.SmokeStop();
-     await screen.SmokeDetachAsync();var released=await ReadAll(store,ids);if(released.Any(x=>DockWindow.GetParent(new IntPtr(Convert.ToInt64(x["window"])))!=IntPtr.Zero))throw new Exception("账号未恢复顶层窗口");
+     if(CheckDynamic)await VerifyDynamicWallpapers(screen,store,ids,output,checks);
+     if(!CheckDynamic)await screen.SmokeDetachAsync();var released=await ReadAll(store,ids);if(released.Any(x=>DockWindow.GetParent(new IntPtr(Convert.ToInt64(x["window"])))!=IntPtr.Zero))throw new Exception("账号未恢复顶层窗口");
      for(int i=0;i<ids.Count;i++){
       if(!string.IsNullOrEmpty(Convert.ToString(released[i]["sharedWallpaper"])))
        throw new Exception("退出同屏后未清空共享壁纸。");

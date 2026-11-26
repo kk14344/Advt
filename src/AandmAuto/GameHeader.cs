@@ -57,10 +57,31 @@ namespace AandmAuto
 
 		private void PaintContent(Graphics graphics)
 		{
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				Rectangle full = new Rectangle(0, 0, base.Width, base.Height);
+				if (full.Width <= 2 || full.Height <= 2) return;
+				using (var b = new SolidBrush(Color.FromArgb(247, 246, 242)))
+					graphics.FillRectangle(b, full);
+				using (var p = new Pen(Color.FromArgb(224, 221, 213), 1f))
+					graphics.DrawLine(p, 0, full.Height - 1, full.Width - 1, full.Height - 1);
+				Rectangle textArea = new Rectangle(0, 0, full.Width, Math.Max(1, full.Height - 1));
+				DrawTitleAndHint(graphics, textArea, Color.FromArgb(31, 31, 31), Color.FromArgb(102, 98, 90), Color.Empty);
+				return;
+			}
 			UiSurface.PaintBackdrop(this, graphics);
 			graphics.SmoothingMode = SmoothingMode.AntiAlias;
 			Rectangle rectangle = new Rectangle(0, 0, base.Width, Math.Max(1, base.Height - 2));
 			if (rectangle.Width <= 2 || rectangle.Height <= 2) return;
+
+            if (UiTheme.UsesEngineCanvas(this))
+            {
+                using (var mask = new SolidBrush(Color.FromArgb(145, UiTheme.Palette.SideOuterColor)))
+                    graphics.FillRectangle(mask, rectangle);
+                DrawTitleAndHint(graphics, rectangle, UiTheme.Palette.TextColor, UiTheme.Palette.MutedColor, Color.Empty);
+                return;
+            }
 
 			if (UiTheme.CurrentTheme == UiTheme.ThemeParchment)
 			{
@@ -131,10 +152,10 @@ namespace AandmAuto
 		{
 			bool showHint = !string.IsNullOrEmpty(Hint) && rectangle.Width >= 280;
 			int hintWidth = showHint ? TextRenderer.MeasureText(Hint, hintFont).Width + 12 : 0;
-			int textX = UiTheme.CurrentTheme == UiTheme.ThemeClassic ? 28 : 12;
+			int textX = (!UiTheme.ExtremePerformanceMode && UiTheme.CurrentTheme == UiTheme.ThemeClassic) ? 28 : 12;
 			Rectangle textBounds = new Rectangle(textX, 0, Math.Max(1, rectangle.Width - textX - 10 - hintWidth), rectangle.Height);
 			TextFormatFlags flags = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
-			if (shadowColor.A > 0)
+			if (shadowColor.A > 0 && !UiTheme.ExtremePerformanceMode)
 				GameText.Draw(graphics, Title, titleFont, new Rectangle(textBounds.X + 1, textBounds.Y + 1, textBounds.Width, textBounds.Height), shadowColor, flags);
 			GameText.Draw(graphics, Title, titleFont, textBounds, titleColor, flags);
 			if (showHint)

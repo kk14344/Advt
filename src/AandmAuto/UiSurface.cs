@@ -29,6 +29,30 @@ namespace AandmAuto
         internal static void PaintWhole(Control control,PaintEventArgs e,Action<Graphics> paint)
         {
             if(control.Width<1 || control.Height<1)return;
+            if (UiTheme.ExtremePerformanceMode)
+            {
+                // Avoid Graphics.Save() around TextRenderer.DrawText with PreserveGraphicsClipping
+                // on translated Graphics (GDI+ state containers break Region.GetHrgn clipping).
+                SmoothingMode prevSmoothing = e.Graphics.SmoothingMode;
+                InterpolationMode prevInterpolation = e.Graphics.InterpolationMode;
+                PixelOffsetMode prevPixelOffset = e.Graphics.PixelOffsetMode;
+                CompositingQuality prevCompositing = e.Graphics.CompositingQuality;
+                using (Matrix prevTransform = e.Graphics.Transform)
+                using (Region prevClip = e.Graphics.Clip)
+                {
+                    try { paint(e.Graphics); }
+                    finally
+                    {
+                        e.Graphics.Transform = prevTransform;
+                        e.Graphics.Clip = prevClip;
+                        e.Graphics.SmoothingMode = prevSmoothing;
+                        e.Graphics.InterpolationMode = prevInterpolation;
+                        e.Graphics.PixelOffsetMode = prevPixelOffset;
+                        e.Graphics.CompositingQuality = prevCompositing;
+                    }
+                }
+                return;
+            }
             if (UiTheme.EngineFrame != null && e.ClipRectangle.Contains(control.ClientRectangle))
             {
                 GraphicsState state = e.Graphics.Save();
@@ -50,6 +74,7 @@ namespace AandmAuto
             internal Bitmap Image;
             internal long Frame = -1;
             internal Rectangle Area;
+            internal Size Canvas;
 
             internal void Release()
             {
@@ -64,7 +89,7 @@ namespace AandmAuto
 
         internal static void PaintFrameBackdrop(Control owner, IBackdropOwner backdrop, Graphics graphics)
         {
-            if (UiTheme.EngineFrame == null || owner.Width <= 0 || owner.Height <= 0)
+            if (UiTheme.ExtremePerformanceMode || UiTheme.EngineFrame == null || owner.Width <= 0 || owner.Height <= 0)
             {
                 FrameBackdrop existing;
                 if (frameBackdrops.TryGetValue(owner, out existing)) existing.Release();
@@ -81,7 +106,8 @@ namespace AandmAuto
                 control.Disposed += delegate { value.Release(); };
                 return value;
             });
-            if (cache.Frame != UiTheme.WallpaperFrameSequence || cache.Area != area)
+            var canvas = new Size(canvasWidth, canvasHeight);
+            if (cache.Frame != UiTheme.WallpaperFrameSequence || cache.Area != area || cache.Canvas != canvas)
             {
                 if (cache.Image == null || cache.Image.Size != area.Size)
                 {
@@ -96,6 +122,7 @@ namespace AandmAuto
                 }
                 cache.Frame = UiTheme.WallpaperFrameSequence;
                 cache.Area = area;
+                cache.Canvas = canvas;
             }
 
             Rectangle clip = Rectangle.Intersect(owner.ClientRectangle, Rectangle.Ceiling(graphics.VisibleClipBounds));
@@ -123,7 +150,8 @@ namespace AandmAuto
                 }
                 owner=owner.Parent;
             }
-            using(var brush=new SolidBrush(Color.FromArgb(63,51,32)))graphics.FillRectangle(brush,control.ClientRectangle);
+            Color fallback=UiTheme.ExtremePerformanceMode?UiTheme.Palette.BgColor:Color.FromArgb(63,51,32);
+            using(var brush=new SolidBrush(fallback))graphics.FillRectangle(brush,control.ClientRectangle);
         }
     }
 }

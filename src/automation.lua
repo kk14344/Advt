@@ -2,7 +2,7 @@
 -- 冒险与挖矿 · 矿区自动助手 (Lua core)
 -- 只调用游戏客户端已有的正常操作接口，不修改服务器数据。
 -- ============================================================
-if __MWA and __MWA.VERSION == "1.0.0" then
+if __MWA and __MWA.VERSION == "1.1.0" then
     return __MWA
 end
 
@@ -38,7 +38,7 @@ local function now_text()
 end
 
 local A = {
-	VERSION = "1.0.0",
+	VERSION = "1.1.0",
     cfg = {
         enabled = false,
         autoMine = true,
@@ -57,6 +57,8 @@ local A = {
         refuseEvents = true,
         allowLongOre = false,
         useTntOnLong = false,
+        autoMiningTnt = true,
+        miningTntMinSaving = 2,
         maxDigTime = 8,
         maxTargetPath = 90,
         lossCooldown = 300,
@@ -66,13 +68,21 @@ local A = {
         refillInterval = 0,
         autoSkipBattle = true,
         battleSkipDelay = 0,
+        battleReplaySpeed = 100,
         skipOneDemonKeyChest = true,
         autoUseMiningBag = true,
         autoTreasureEvent = true,
+        autoMysticStoneReset = false,
+        mysticStoneThreshold = 150,
+        mysticStoneResetTier = 1,
+        dailyMysteryShop = false,
+        mysteryBuyBudget = 0,
+        mysteryRefreshBudget = 0,
         layerMinDepth = 20,
         layerMaxDepth = 60,
         layerStep = 10,
         horizontalMining = true,
+        workshopShallowMining = true,
         horizontalStartDepth = 150,
         rushAvoidGems = true,
         autoMute = true,
@@ -108,6 +118,7 @@ local A = {
         errors = 0,
     },
     logs = {},
+    log_seq = 0,
     failed = {},
     -- 结构化审计与消费策略状态（C# 按 audit_seq 增量拉取/持久化基数）
     audit_seq = 0,
@@ -126,6 +137,7 @@ __MWA = A
 
 function A:log(message)
     local line = now_text() .. "  " .. tostring(message)
+    self.log_seq = self.log_seq + 1
     table.insert(self.logs, 1, line)
     while #self.logs > 60 do
         table.remove(self.logs)
@@ -141,12 +153,19 @@ function A:set(key, value)
     elseif type(self.cfg[key]) == "number" then
         value = tonumber(value) or self.cfg[key]
     end
-    if key=="horizontalStartDepth" then
+    if key=="miningTntMinSaving" then
+        value=math.floor(math.max(1,math.min(90,value==value and value or 2)))
+    elseif key=="battleReplaySpeed" then
+        value=self:normalize_replay_speed(value)
+    elseif key=="workshopShallowMining" and value~=self.cfg[key] then
+        self.exploration_tip=nil;self.exploration_depth=nil
+    elseif key=="horizontalStartDepth" then
         if value~=value then value=150 end
         value=math.floor(math.max(1,math.min(9999,value)))
         if value~=self.cfg[key] then
             self.horizontal_started=nil;self.horizontal_transition_logged=nil
             self.last_descent_log=nil;self.layer_target=nil;self.last_tunnel_y=nil
+            self.exploration_tip=nil;self.exploration_depth=nil
         end
     end
     self.cfg[key] = value
@@ -181,7 +200,7 @@ function A:resetStats()
     self:log("统计已重置")
 end
 
-function A:snapshot()
+function A:snapshot(log_since)
     local stats = {}
     for key, value in pairs(self.stats) do
         stats[key] = value
@@ -191,7 +210,10 @@ function A:snapshot()
         cfg[key] = value
     end
     local logs = {}
-    for index = 1, math.min(#self.logs, 8) do
+    local incremental = type(log_since) == "number"
+    if incremental and (log_since < 0 or log_since > self.log_seq) then log_since = 0 end
+    local log_limit = incremental and self.log_seq - log_since or 8
+    for index = 1, math.min(#self.logs, log_limit) do
         logs[index] = self.logs[index]
     end
     local mining_state = nil
@@ -214,6 +236,7 @@ function A:snapshot()
         stats = stats,
         cfg = cfg,
         logs = logs,
+        logSeq = incremental and self.log_seq or nil,
         mining = mining_state,
         miningRoute = self.cfg.enabled and self.cfg.showMiningRoute and self.mining_route_preview or nil,
         miningWait = self.cfg.enabled and self:mining_wait_view() or nil,
@@ -292,7 +315,9 @@ local function is_target(block_type)
 end
 
 local function is_free_chest(block_type)
-    return block_type==(BT.chest1 or 40)
+    -- The seasonal box may be a different event on the live server. Validate
+    -- the returned event costs before settling either type as free passage.
+    return block_type==(BT.chest1 or 40) or block_type==(BT.chest7 or 48)
 end
 
 local CHEST_OPTION_KEYS = {
@@ -441,125 +466,62 @@ local function route_work()
 end
 local function find_path(grid, pickaxe, target_x, target_y, max_blocks, max_time, allow_long, avoid_gems, explore, node_limit)
     max_blocks = tonumber(max_blocks) or 90
-    local best_starts = {}
-    local immediate = false
-    local function passable(kind)
-        return (explore and kind==nil) or can_dig(kind,pickaxe,max_time,allow_long) or is_free_chest(kind)
-    end
-
-    for index = 1, #DIRS do
-        local dir = DIRS[index]
-        local x, y = target_x + dir.x, target_y + dir.y
-        local block_type = block_at(grid, x, y)
-        if is_empty(block_type) then
-            immediate = true
-            break
-        end
-        if passable(block_type)
-            and not (avoid_gems and is_gem_block(block_type)) then
-            table.insert(best_starts, { x = x, y = y })
-        end
-    end
-
-    if immediate then
-        return {}, true
-    end
-    if #best_starts == 0 then
-        return nil, false
-    end
-
-    local dist = {}
-    local parent = {}
-    local queue = {}
-    local head, tail = 1, 0
-    local visited = {}
+    local costs, rows = {}, {}
+    local queue, head, tail = {}, 0, -1
     local limit = node_limit or math.max(2000, max_blocks * 160)
     local processed = 0
 
-    local function key(x, y)
-        return tostring(x) .. ":" .. tostring(y)
-    end
-
-    local function push_back(x, y, distance)
-        tail = tail + 1
-        queue[tail] = { x = x, y = y, d = distance }
-    end
-
-    local function push_front(x, y, distance)
-        head = head - 1
-        queue[head] = { x = x, y = y, d = distance }
-    end
-
-    for index = 1, #best_starts do
-        local start = best_starts[index]
-        local k = key(start.x, start.y)
-        if dist[k] == nil or dist[k] > 1 then
-            dist[k] = 1
-            parent[k] = nil
-            push_back(start.x, start.y, 1)
+    local function offer(x, y, kind, parent)
+        if x==target_x and y==target_y then return end
+        local cost = kind==nil and (explore and 1 or false) or costs[kind]
+        if kind~=nil and cost==nil then
+            if is_free_chest(kind) then cost=0
+            elseif can_dig(kind,pickaxe,max_time,allow_long)
+                and not (avoid_gems and is_gem_block(kind)) then cost=1
+            else cost=false end
+            costs[kind]=cost
         end
+        if not cost or (cost==0 and next(A.failed) and A:is_failed(x,y)) then return end
+        local distance = (parent and parent.distance or 0)+cost
+        if distance>max_blocks then return end
+        local row = rows[y]
+        if not row then row={};rows[y]=row end
+        local previous = row[x]
+        if previous and previous.distance<=distance then return end
+        local node = {x=x,y=y,kind=kind,distance=distance,parent=parent}
+        row[x]=node
+        if cost==0 then head=head-1;queue[head]=node
+        else tail=tail+1;queue[tail]=node end
     end
 
-    while head <= tail and processed < limit do
+    for _,dir in ipairs(DIRS) do
+        local x,y=target_x+dir.x,target_y+dir.y
+        local kind=block_at(grid,x,y)
+        if is_empty(kind) then return {},true end
+        offer(x,y,kind,nil)
+    end
+
+    while head<=tail and processed<limit do
         route_work()
-        local node = queue[head]
-        queue[head] = nil
-        head = head + 1
-        local k = key(node.x, node.y)
-        local known = dist[k]
-        if known == node.d and not visited[k] then
-            visited[k] = true
-            processed = processed + 1
-            local block_type = block_at(grid, node.x, node.y)
-
-            if is_empty(block_type) then
-                local digs = {}
-                local cx, cy = node.x, node.y
-                local guard = 0
-                while true do
-                    local pk = key(cx, cy)
-                    local p = parent[pk]
-                    if not p or guard > max_blocks + 2 then
-                        break
-                    end
-                    cx, cy = p.x, p.y
-                    if not is_empty(block_at(grid, cx, cy)) then
-                        digs[#digs + 1] = { x = cx, y = cy, free_chest=is_free_chest(block_at(grid,cx,cy)),unknown=block_at(grid,cx,cy)==nil }
-                    end
-                    guard = guard + 1
+        local node=queue[head];queue[head]=nil;head=head+1
+        if rows[node.y][node.x]==node then
+            processed=processed+1
+            for _,dir in ipairs(DIRS) do
+                local x,y=node.x+dir.x,node.y+dir.y
+                local kind=block_at(grid,x,y)
+                if is_empty(kind) then
+                    local path={}
+                    repeat
+                        path[#path+1]={x=node.x,y=node.y,free_chest=is_free_chest(node.kind),unknown=node.kind==nil}
+                        node=node.parent
+                    until not node
+                    return path,false
                 end
-                if #digs <= max_blocks then
-                    return digs, false
-                end
-                return nil, false
-            end
-
-            for index = 1, #DIRS do
-                local dir = DIRS[index]
-                local nx, ny = node.x + dir.x, node.y + dir.y
-                local next_type = block_at(grid, nx, ny)
-                local nk = key(nx, ny)
-                if is_empty(next_type) then
-                    local nd = node.d
-                    if nd <= max_blocks and (dist[nk] == nil or nd < dist[nk]) then
-                        dist[nk] = nd
-                        parent[nk] = { x = node.x, y = node.y }
-                        push_front(nx, ny, nd)
-                    end
-                elseif passable(next_type)
-                    and not (avoid_gems and is_gem_block(next_type)) then
-                    local nd = node.d + 1
-                    if nd <= max_blocks and (dist[nk] == nil or nd < dist[nk]) then
-                        dist[nk] = nd
-                        parent[nk] = { x = node.x, y = node.y }
-                        push_back(nx, ny, nd)
-                    end
-                end
+                offer(x,y,kind,node)
             end
         end
     end
-
-    return nil, false
+    return nil,false
 end
 
 -- ------------------------------------------------------------
@@ -605,51 +567,141 @@ function A:prune_failed()
     end
 end
 
+-- The client can replace rows, mutate them in place or drop streamed cells.
+-- Reconcile the visible grid on each scan so nearby planning data can be reused.
+function A:index_mining_grid(grid)
+    local index=self.mining_index
+    local fresh=not index or index.grid~=grid
+    if fresh then
+        index={grid=grid,rows={},targets={},edges={}}
+        self.mining_index=index
+    end
+
+    local kinds={}
+    local function update_edge(x,y)
+        local kind=block_at(grid,x,y)
+        local edges=index.edges[y]
+        if kind~=nil and kind~=EMPTY and adjacent_empty(grid,x,y) then
+            if not edges then edges={};index.edges[y]=edges end
+            edges[x]={x=x,y=y,block_type=kind}
+        elseif edges then edges[x]=nil end
+    end
+    local function change(x,y,kind,old)
+        if kind~=nil then
+            if kinds[kind]==nil then kinds[kind]=is_target(kind) end
+            if kinds[kind] then
+                if not index.targets[y] then index.targets[y]={} end
+                index.targets[y][x]=kind
+            elseif index.targets[y] then index.targets[y][x]=nil end
+        elseif index.targets[y] then index.targets[y][x]=nil end
+        update_edge(x,y)
+        if fresh then return end
+        if old==EMPTY or kind==EMPTY then
+            for _,d in ipairs(DIRS) do update_edge(x+d.x,y+d.y) end
+        end
+
+        -- Both the current reveal and the one-step lookahead fit in this square.
+        for ey=y-3,y+3 do
+            local edges=index.edges[ey]
+            if edges then
+                for ex=x-3,x+3 do
+                    local tile=edges[ex]
+                    if tile then tile.profile=nil end
+                end
+            end
+        end
+    end
+    for y,live in pairs(grid) do
+        local row=index.rows[y]
+        if not row then row={cells={},size=0};index.rows[y]=row end
+        local cells=row.cells
+        local count,added=0,0
+        for x,kind in pairs(live) do
+            count=count+1
+            local old=cells[x]
+            if old~=kind then
+                if old==nil then added=added+1 end
+                cells[x]=kind
+                change(x,y,kind,old)
+            end
+        end
+        if row.size+added>count then
+            for x,old in pairs(cells) do
+                if live[x]==nil then cells[x]=nil;change(x,y,nil,old) end
+            end
+        end
+        row.size=count
+    end
+    for y,row in pairs(index.rows) do
+        if not grid[y] then
+            for x,old in pairs(row.cells) do change(x,y,nil,old) end
+            index.rows[y]=nil;index.targets[y]=nil;index.edges[y]=nil
+        end
+    end
+    return index
+end
+
 function A:scan_targets()
     local grid = mining.block_list
-    local targets = {}
+    local targets, free_box = {}, nil
     if type(grid) ~= "table" then
         return targets
     end
     local boss_time = tonumber(mining.boss_time) or 0
     local game_now = time_logic:Now()
-    for y, row in pairs(grid) do
+    local index=self:index_mining_grid(grid)
+    local any_failed=next(self.failed)~=nil
+    for y, row in pairs(index.targets) do
         for x, block_type in pairs(row) do
-            if is_target(block_type) then
-                local cfg = block_cfg(block_type)
-                local boss = is_boss(block_type)
-                local chest = (cfg.collect_type or 0) == CT.chest
-                local allowed = false
-                if boss then
-                    allowed = self.cfg.autoBoss
-                    if allowed and boss_time > 0 and boss_time <= game_now then
-                        allowed = false
-                    end
-                elseif chest then
-                    allowed = self.cfg.autoChest
-                    local option_key = CHEST_OPTION_KEYS[block_type]
-                    if allowed and option_key and self.cfg[option_key] == false then
-                        allowed = false
-                    end
-                else
-                    allowed = self.cfg.autoGolem
+            local boss,chest=is_boss(block_type),is_chest(block_type)
+            local allowed = false
+            if boss then
+                allowed = self.cfg.autoBoss
+                if allowed and boss_time > 0 and boss_time <= game_now then
+                    allowed = false
                 end
-                local deferred=self:is_failed(x,y)
-                if allowed and (not deferred or (not boss and not chest)) then
-                    local manhattan = math.abs(x - (mining.cur_position.x or 0))
-                        + math.abs(y - (mining.cur_position.y or 0))
-                    targets[#targets + 1] = {
-                        x = x,
-                        y = y,
-                        block_type = block_type,
-                        boss = boss,
-                        chest = chest,
-                        golem = not boss and not chest,
-                        manhattan = manhattan,
-                        label = boss and "矿区BOSS" or (chest and "宝箱" or "魔像"),
-                        defer_until=deferred and self.failed[tostring(x)..":"..tostring(y)] or nil,
-                    }
+            elseif chest then
+                allowed = self.cfg.autoChest
+                local option_key = CHEST_OPTION_KEYS[block_type]
+                if allowed and option_key and self.cfg[option_key] == false then
+                    allowed = false
                 end
+            else
+                allowed = self.cfg.autoGolem
+            end
+            local deferred=any_failed and self:is_failed(x,y)
+            if chest and self.cfg.autoMine and is_free_chest(block_type)
+                and not deferred and adjacent_empty(grid,x,y) then
+                local gain=self:estimated_reveal(grid,x,y)
+                if gain==0 then
+                    for _,dir in ipairs(DIRS) do
+                        local nx,ny=x+dir.x,y+dir.y
+                        local neighbor=block_at(grid,nx,ny)
+                        if not adjacent_empty(grid,nx,ny) and
+                            (is_target(neighbor) or can_dig(neighbor,current_pickaxe(),self.cfg.maxDigTime,false)) then
+                            gain=1;break
+                        end
+                    end
+                end
+                if gain>0 and (not free_box or gain>free_box.gain) then
+                    free_box={x=x,y=y,block_type=block_type,chest=true,label="免费宝箱",
+                        free_passage=true,free_exploration=true,gain=gain}
+                end
+            end
+            if allowed and (not deferred or (not boss and not chest)) then
+                local manhattan = math.abs(x - (mining.cur_position.x or 0))
+                    + math.abs(y - (mining.cur_position.y or 0))
+                targets[#targets + 1] = {
+                    x = x,
+                    y = y,
+                    block_type = block_type,
+                    boss = boss,
+                    chest = chest,
+                    golem = not boss and not chest,
+                    manhattan = manhattan,
+                    label = boss and "矿区BOSS" or (chest and "宝箱" or "魔像"),
+                    defer_until=deferred and self.failed[tostring(x)..":"..tostring(y)] or nil,
+                }
             end
         end
     end
@@ -689,7 +741,7 @@ function A:scan_targets()
             end
         end
     end
-    return targets
+    return targets,free_box,index
 end
 
 function A:frontier(include_free_chests)
@@ -699,17 +751,26 @@ function A:frontier(include_free_chests)
     if type(grid) ~= "table" then
         return result
     end
+    local times = {}
     for y, row in pairs(grid) do
+        local above,below=grid[y-1],grid[y+1]
         for x, block_type in pairs(row) do
-            local free_chest = include_free_chests and is_free_chest(block_type)
-            if (free_chest or can_dig(block_type, pickaxe, self.cfg.maxDigTime, self.cfg.allowLongOre))
-                and adjacent_empty(grid, x, y) then
+            local seconds = times[block_type]
+            if seconds == nil then
+                if include_free_chests and is_free_chest(block_type) then seconds = 0
+                elseif can_dig(block_type, pickaxe, self.cfg.maxDigTime, self.cfg.allowLongOre) then
+                    seconds = dig_time(block_type, pickaxe)
+                else seconds = false end
+                times[block_type] = seconds
+            end
+            if seconds and (row[x-1]==EMPTY or row[x+1]==EMPTY or
+                (above and above[x]==EMPTY) or (below and below[x]==EMPTY)) then
                 result[#result + 1] = {
                     x = x,
                     y = y,
                     block_type = block_type,
-                    time = free_chest and 0 or dig_time(block_type, pickaxe),
-                    free_chest = free_chest,
+                    time = seconds,
+                    free_chest = include_free_chests and is_free_chest(block_type),
                 }
             end
         end
@@ -734,7 +795,7 @@ function A:note_golems(targets)
     local first_x, first_y = nil, nil
     for index = 1, #targets do
         local target = targets[index]
-        if not target.boss and not target.chest then
+        if target.golem then
             local key = tostring(target.x) .. ":" .. tostring(target.y)
             current[key] = true
             if not (self.seen_golems or {})[key] then
@@ -751,13 +812,13 @@ function A:note_golems(targets)
     end
 end
 
-function A:seek_virtual_target()
+function A:seek_virtual_target(only_golems)
     local position = mining.cur_position
     if not position then
         return nil
     end
     local best = nil
-    local function consider(x, y, label)
+    local function consider(x, y, label, golem)
         if not x or not y or (x == 0 and y == 0) then
             return
         end
@@ -769,7 +830,7 @@ function A:seek_virtual_target()
             return
         end
         if not best or distance < best.manhattan then
-            best = { x = x, y = y, label = label, manhattan = distance, virtual = true }
+            best = { x = x, y = y, label = label, golem = golem, manhattan = distance, virtual = true }
         end
     end
 
@@ -778,11 +839,11 @@ function A:seek_virtual_target()
         for index = 1, #golems do
             local point = golems[index]
             if point and point.x and point.y then
-                consider(point.x, point.y, "魔像")
+                consider(point.x, point.y, "魔像", true)
             end
         end
     end
-    if self.cfg.autoBoss then
+    if self.cfg.autoBoss and not only_golems then
         local boss = mining.boss_pos
         local boss_time = tonumber(mining.boss_time) or 0
         if boss and boss_time > time_logic:Now() then
@@ -1272,6 +1333,7 @@ function A:dig(x, y, hint)
         return false
     end
     local before_type = mining:GetBlockType(x, y)
+    if before_type==PURPLE and self.cfg.autoMiningTnt==false then return false end
     self:set_mining_route(self.mining_route_target,{x=x,y=y,blast=self._mine_blast~=nil or nil},hint)
     local pending={x=x,y=y,at=self.now,game_at=time_logic:Now(),block_type=before_type}
     self.pending_dig=pending
@@ -1353,6 +1415,7 @@ function A:start_target(target)
         chest = target.chest,
         golem = target.golem,
         free_passage = target.free_passage,
+        free_exploration = target.free_exploration,
         phase = "query",
         at = self.now,
         wait_started = self.now,
@@ -1402,9 +1465,11 @@ function A:update_fight()
             if fight.free_passage then
                 local conf=(config_manager.event_config or {})[event_id]
                 local costly=not conf or (tonumber(conf.need_item_id) or 0)>0
-                for value in string.gmatch(conf and conf.need_num or "","%d+")do if tonumber(value)>0 then costly=true end end
+                for value in string.gmatch(tostring(conf and conf.need_num or ""),"[%d.]+") do
+                    if (tonumber(value) or 0)>0 then costly=true end
+                end
                 if costly then
-                    self:blacklist(fight.x,fight.y,2,"开口箱回包包含费用，暂缓通路清理")
+                    self:blacklist(fight.x,fight.y,fight.free_exploration and 300 or 2,"宝箱费用未确认为零，暂缓免费开箱")
                     self.fight=nil;self.status="免费通路费用未确认，暂缓开箱";return true
                 end
             end
@@ -1565,84 +1630,6 @@ function A:try_collect()
     return true
 end
 
-function A:try_cave_boss()
-    if not self.cfg.autoCaveBoss then
-        return false
-    end
-    if self.inBattle or self.fight then
-        return false
-    end
-    if self.now < (self.next_cave_boss or 0) then
-        return false
-    end
-    if mining.cave_boss_lv == nil then
-        if self.now >= (self.next_cave_query or 0) then
-            self.next_cave_query = self.now + 30
-            pcall(function()
-                mining:RefreshRandomEvents()
-            end)
-        end
-        return false
-    end
-    local level = tonumber(mining.cave_boss_lv) or 0
-    local bp = tonumber(mining.cave_boss_bp) or 0
-    local game_now = time_logic:Now()
-    local end_time = tonumber(mining.cave_boss_end_time) or 0
-    if level <= 0 or bp <= 0 then
-        return false
-    end
-    if end_time > 0 and end_time <= game_now then
-        return false
-    end
-    local medal_type = constants.RESOURCE_TYPE and constants.RESOURCE_TYPE.demon_medal
-    local medal_cost = constants.CAVE_BOSS_CHALLANGE_SUB or 2
-    if medal_type then
-        local ok, medal_count = pcall(function()
-            return resource_logic:GetResourceNum(medal_type)
-        end)
-        if not ok or type(medal_count) ~= "number" then
-            return false
-        end
-        if medal_count < medal_cost then
-            self.next_cave_boss = self.now + 60
-            self.status = "恶魔勋章不足"
-            self.detail = "挑战副本BOSS需要 " .. tostring(medal_cost) .. " 枚"
-            return false
-        end
-    end
-    local ok_bag, bag_space = pcall(function()
-        return bag_logic:GetSpaceCount()
-    end)
-    if not ok_bag or type(bag_space) ~= "number" then
-        return false
-    end
-    if bag_space < (constants.EVENT_MAX_BAG_SPACE_COUNT or 1) then
-        self.next_cave_boss = self.now + 60
-        self.status = "背包空间不足"
-        self.detail = "请先清理背包再挑战副本BOSS"
-        return false
-    end
-    if not self:can_act(2) then
-        return false
-    end
-    self.next_cave_boss = self.now + (tonumber(self.cfg.caveBossInterval) or 120)
-    local ok, err = pcall(function()
-        mining:ChallengeCaveBoss()
-    end)
-    if ok then
-        self:mark_action()
-        self.stats.caveBoss = self.stats.caveBoss + 1
-        self.status = "挑战矿区副本BOSS"
-        self.detail = "等级 " .. tostring(level)
-        self:log("挑战矿区副本BOSS，等级 " .. tostring(level))
-        self.close_reward_until = self.now + 8
-        self.pause_until = self.now + 6
-        return true
-    end
-    self:log("副本BOSS挑战失败：" .. tostring(err))
-    return false
-end
-
 function A:try_refuse_event()
     local event = mining.pending_random_event
     if not mining:IsPendingRandomEvent(event) then
@@ -1748,11 +1735,20 @@ function A:check_account()
         self.pending_dig = nil
         self._mine_sync=nil;self.mine_refill=nil;self._mine_event=nil;self._mine_event_done=nil
         if account_changed then self._mine_blast=nil end
-        self.pause_until = nil
         self.expand_origin = nil
         -- A transient nil uid during a battle or map refresh must not erase
         -- the tunnel spacing state, otherwise the next tunnel can be too close.
         if account_changed then
+            local pending=self._task_pending
+            if pending and (pending.kind=="mine_cave_boss" or pending.kind=="mine_cave_boss_check"
+                or self._mystic_reset and pending==self._mystic_reset.pending) then
+                self._task_pending=nil
+            end
+            self._mystic_reset=nil;self._mystic_reset_next=nil;self._mystic_reset_blocked=nil
+            self.next_cave_boss=nil
+            self.next_cave_query=nil
+            self.exploration_tip=nil;self.exploration_depth=nil
+            self.exploration_observation=nil;self.exploration_vision=nil
             self.layer_target = nil
             self.layer_dir = 1
             self.last_tunnel_y = nil
@@ -1773,7 +1769,6 @@ function A:check_account()
         self.fight = nil
         self.pending_dig = nil
         self._mine_sync=nil
-        self.pause_until = nil
         self.expand_origin = nil
         -- Keep layer_target/last_tunnel_y across stream snapshots. Resetting
         -- them here used to open a new tunnel too close to the previous one.
@@ -1789,6 +1784,7 @@ function A:step()
     end
     self.context = context.sub_name or ""
     self:check_account()
+    if self:advance_mystic_stone_reset() then return end
 
     if not self:mining_ready() then
         if context.sub_name == "main_sub_scene" then
@@ -1828,6 +1824,7 @@ function A:step()
     self.battle_seen_at = nil
     self.battle_skip_attempts = 0
 
+    if self:advance_auto_cave_boss() then return end
     if self:mine_blast_step() then return end
 
     if not self:pending_dig_resolved() then
@@ -1846,20 +1843,9 @@ function A:step()
         return
     end
 
-    if self.pause_until and self.now < self.pause_until then
-        self.status = "等待战斗开始"
-        self.detail = "副本BOSS挑战请求已发送"
-        return
-    end
-
-    if not self:pending_dig_resolved() then
-        self.status="等待挖掘响应"
-        return
-    end
-
     local remain, total = mining:GetDigTime()
     if remain and remain > 0.05 then
-        if self.cfg.useTntOnLong and total and total > 60
+        if self.cfg.autoMiningTnt and self.cfg.useTntOnLong and total and total > 60
             and (mining:GetDigTime() > 30) then
             local cfg = block_cfg(mining.cur_block_type)
             if cfg and (cfg.tnt_count or 0) > 0 and self:can_act(3) then
@@ -1891,8 +1877,11 @@ function A:step()
     if self:try_collect() then
         return
     end
+    if self:try_mystic_stone_reset() then return end
 
-    local targets = self:scan_targets()
+    if self.exploration_observation then self:observe_mining_vision() end
+
+    local targets,free_box,index = self:scan_targets()
     self:note_golems(targets)
     local best,planning = self:plan_mining_target_budgeted(targets)
     if planning then self.status="规划目标通路";self.detail="核对目标附近的可通行地块";return end
@@ -1900,6 +1889,11 @@ function A:step()
     self.mining_route_target=best
     if best then self:set_mining_route(best,best.path and best.path[1],best.label)
     else self:set_mining_route(nil,nil) end
+
+    if self.cfg.autoGolem and (tonumber(mining.golem_num) or 0)>0 and (not best or not best.golem) then
+        self:wait_for_golem_route()
+        return
+    end
 
     if best then
         if best.needs_snapshot then
@@ -1944,18 +1938,27 @@ function A:step()
         -- No real path exists in the loaded map. Expanding around this target
         -- cannot bypass an enclosed TNT barrier and used to waste many picks.
         self:load_target_route(best,nil)
+        if best.golem and self.cfg.autoMiningTnt==false then
+            self.detail="雷管已关闭，未找到可用绕路；暂停开挖"
+        end
         return
     end
 
+    if free_box and self:start_target(free_box) then return end
+
     if self:try_cave_boss() then return end
 
+    local daily=self.daily_state
+    if self.cfg.workshopShallowMining and self.cfg.autoMine and not (daily and daily.running and not daily.encounter_clear) then
+        self:mine_for_workshop_then_explore(index)
+        return
+    end
+
     -- Descending is the last choice, including the automatic shallow start.
-    if self.cfg.enabled and self.cfg.autoMine and not (self.daily_state and self.daily_state.running)
-        and not self:automatic_mining_depth_ready() then
-        local down=self:choose_descent_frontier(self:frontier())
+    if self.cfg.enabled and self.cfg.autoMine and not (self.daily_state and self.daily_state.running and not self.daily_state.encounter_clear)
+        and not self:exploration_depth_ready() then
         local selected=self:automatic_mining_start_depth()
-        if down then self:dig(down.x,down.y,"自动下潜至第"..selected.."层")
-        else
+        if not self:mine_exploration(selected) then
             self.status="自动下潜：等待可挖掘的通路"
             self.detail="当前深度 "..tostring(mining.cur_position.y).."；达到第"..selected.."层后继续自动挖掘"
         end
@@ -1988,12 +1991,16 @@ function A:step()
     end
 
     local virtual_target = self:seek_virtual_target()
+    if virtual_target and virtual_target.golem then
+        self:load_target_route(virtual_target,nil)
+        return
+    end
     if virtual_target and self:mine_frontier(virtual_target) then
         return
     end
 
     if self.cfg.autoMine then
-        if self:mine_frontier(nil) then
+        if self:mine_exploration() then
             return
         end
     end

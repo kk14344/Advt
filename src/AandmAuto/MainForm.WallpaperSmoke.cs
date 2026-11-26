@@ -20,6 +20,11 @@ namespace AandmAuto
 
 		private async Task RunIndependentWallpaperSmokeAsync(string projectPath)
 		{
+            if (Environment.GetEnvironmentVariable("AANDM_STAGE3_DIRECT_PROBE") == "1")
+            {
+                await RunBrowserVideoProbeAsync(projectPath);
+                return;
+            }
 			var result = new Dictionary<string, object>();
 			try
 			{
@@ -32,7 +37,8 @@ namespace AandmAuto
 				if (!int.TryParse(Environment.GetEnvironmentVariable("AANDM_WALLPAPER_HEIGHT"), out testHeight)) testHeight = 810;
 				ClientSize = new Size(testWidth, testHeight);
 				result["clientSize"] = new { ClientSize.Width, ClientSize.Height };
-				TopMost = true;
+                bool quiet = Environment.GetEnvironmentVariable("AANDM_STAGE3_MEASURE") == "1";
+				TopMost = !quiet;
 				CenterToScreen();
 				webView.CoreWebView2.NavigateToString(@"<!doctype html><meta charset='utf-8'>
 					<style>html,body{width:100%;height:100%;margin:0;background:#111}
@@ -51,15 +57,40 @@ namespace AandmAuto
 				int layout;
 				if (!int.TryParse(Environment.GetEnvironmentVariable("AANDM_WALLPAPER_LAYOUT"), out layout)) layout = UiLayoutGrid;
 				var repaintTimes = new List<double>();
+                var changedPaintTimes = new List<double>();
+                uint previousHash = 0;
+                bool hasPreviousHash = false;
 				long paintedFrame = -1;
 				viewportPanel.Paint += delegate
 				{
 					long frame = UiTheme.WallpaperFrameSequence;
 					if (UiTheme.EngineFrame == null || paintedFrame == frame) return;
 					paintedFrame = frame;
-					repaintTimes.Add(wallpaperSmokeClock.Elapsed.TotalMilliseconds);
+					double stamp = wallpaperSmokeClock.Elapsed.TotalMilliseconds;
+                    repaintTimes.Add(stamp);
+                    if (quiet)
+                    {
+                        uint hash = SampleVisibleWallpaper();
+                        if (!hasPreviousHash || hash != previousHash) changedPaintTimes.Add(stamp);
+                        previousHash = hash;
+                        hasPreviousHash = true;
+                    }
 				};
 				SwitchUiAppearance(layout, UiTheme.ThemeLiquidGlass, "", 65, UiTheme.BgModeEngine, 12, UiTheme.BgFitCover);
+                if (layout == UiLayoutGrid) SwitchBottomTab("log");
+                AddLog("动态壁纸验收 · 日志文字保持可见", GreenColor);
+                var sideFrames = new HashSet<long>();
+                var headerFrames = new HashSet<long>();
+                var logFrames = new HashSet<long>();
+                activeSidePanel.Paint += delegate { if (UiTheme.EngineFrame != null) sideFrames.Add(UiTheme.WallpaperFrameSequence); };
+                viewportBar.Paint += delegate
+                {
+                    if (UiTheme.EngineFrame == null) return;
+                    headerFrames.Add(UiTheme.WallpaperFrameSequence);
+                    var log = txtLog as GlassRichTextBox;
+                    if (log != null && log.Visible && log.LastWallpaperPaint == UiTheme.WallpaperFrameSequence)
+                        logFrames.Add(log.LastWallpaperPaint);
+                };
 				result["layout"] = layout;
 				using (var g = CreateGraphics()) result["dpi"] = g.DpiX;
 				await ApplyStageWallpaperAsync();
@@ -71,10 +102,13 @@ namespace AandmAuto
 
 				int seconds;
 				if (!int.TryParse(Environment.GetEnvironmentVariable("AANDM_WALLPAPER_SECONDS"), out seconds)) seconds = 6;
+                if (quiet) await Task.Delay(10000);
 				int first = wallpaperSmokeTimes.Count;
 				int firstPaint = repaintTimes.Count;
+                int firstChanged = changedPaintTimes.Count;
 				int totalSeconds = Math.Max(2, Math.Min(60, seconds));
 				var metricsClock = Stopwatch.StartNew();
+                if (quiet) File.WriteAllText(Path.Combine(DataRoot(), "wallpaper-metrics-start"), "");
 				using (Process current = Process.GetCurrentProcess())
 				{
 					TimeSpan cpuStart = current.TotalProcessorTime;
@@ -90,6 +124,15 @@ namespace AandmAuto
 						(current.TotalProcessorTime - cpuStart).TotalSeconds / metricsClock.Elapsed.TotalSeconds * 100.0;
 					result["assistantPrivatePeakMiB"] = privatePeak / (1024.0 * 1024.0);
 				}
+                if (quiet) File.WriteAllText(Path.Combine(DataRoot(), "wallpaper-metrics-end"), "");
+                double[] changed = changedPaintTimes.Skip(firstChanged).ToArray();
+                double[] changedIntervals = changed.Skip(1).Select((t, i) => t - changed[i]).OrderBy(t => t).ToArray();
+                if (quiet)
+                {
+                    result["distinctViewportPaintFps"] = changed.Length > 1 ? (changed.Length - 1) * 1000 / (changed.Last() - changed[0]) : 0;
+                    result["distinctViewportP95Ms"] = changedIntervals.Length == 0 ? 0 :
+                        changedIntervals[(int)Math.Ceiling(changedIntervals.Length * 0.95) - 1];
+                }
 				double[] times = wallpaperSmokeTimes.Skip(first).ToArray();
 				double[] intervals = times.Skip(1).Select((t, i) => t - times[i]).OrderBy(t => t).ToArray();
 				result["frames"] = times.Length;
@@ -105,10 +148,39 @@ namespace AandmAuto
 				result["p95FrameIntervalMs"] = intervals.Length > 0 ? intervals[(int)Math.Ceiling(intervals.Length * 0.95) - 1] : 0;
 				result["frameSize"] = new { UiTheme.EngineFrame.Width, UiTheme.EngineFrame.Height };
 				result["renderStatus"] = playbackStatus;
+                result["assistantPanelFrames"] = sideFrames.Count;
+                result["headerFrames"] = headerFrames.Count;
+                result["commonPanelHeaderFrames"] = sideFrames.Intersect(headerFrames).Count();
+                result["logFrames"] = logFrames.Count;
+                var logControl = txtLog as GlassRichTextBox;
+                result["logVisible"] = logControl != null && logControl.Visible;
+                result["logForegroundPrinted"] = logControl != null && logControl.HasPrintedText();
+                result["taskbarPlaybackWindowHidden"] = wallpaperPlayback != null && wallpaperPlayback.TaskbarWindowHidden;
+                result["trayHideSettingEnabled"] = WallpaperEngineLocator.TrayIconHidden();
+                result["droppedFullBlackFrames"] = wallpaperPlayback == null ? 0 : wallpaperPlayback.DroppedBlackFrames;
+
+                if (layout == UiLayoutGrid)
+                {
+                    Rectangle originalBounds = Bounds;
+                    long beforeMove = UiTheme.WallpaperFrameSequence;
+                    SetBounds(Left + 24, Top + 16, Width - 48, Height - 24);
+                    await Task.Delay(350);
+                    SwitchTab("settings");
+                    await Task.Delay(200);
+                    SwitchTab("tasks");
+                    SwitchBottomTab("log");
+                    Bounds = originalBounds;
+                    await Task.Delay(350);
+                    result["moveResizeAndPanelSwitch"] = UiTheme.WallpaperFrameSequence > beforeMove &&
+                        !playbackFailed && wallpaperPlayback != null && wallpaperPlayback.TaskbarWindowHidden;
+                    if (!(bool)result["moveResizeAndPanelSwitch"])
+                        throw new InvalidOperationException("移动、缩放或切换面板后播放未恢复。");
+                }
 
 				bgRuntimeTimer.Stop();
 				if (wallpaperPlayback != null) wallpaperPlayback.PausePipeline();
 				await Task.Delay(230);
+                if (!quiet)
 				using (var screen = new Bitmap(ClientSize.Width, ClientSize.Height))
 				using (var expected = new Bitmap(viewportPanel.Width, viewportPanel.Height))
 				{
@@ -148,8 +220,12 @@ namespace AandmAuto
 				result["resumed"] = wallpaperSmokeTimes.Count > beforeRestore;
 				result["resumeMs"] = timeout.ElapsedMilliseconds;
 				result["resumeStatus"] = playbackStatus;
-				result["result"] = (double)result["webViewBackdropMeanRgbDifference"] < 9.0
-					&& (bool)result["resumed"] && (bool)result["pausedWhenMinimized"] ? "passed" : "failed";
+				result["result"] = (quiet || (double)result["webViewBackdropMeanRgbDifference"] < 9.0)
+					&& (bool)result["resumed"] && (bool)result["pausedWhenMinimized"]
+                    && (bool)result["taskbarPlaybackWindowHidden"]
+                    && (int)result["commonPanelHeaderFrames"] >= 2
+                    && (!(bool)result["logVisible"] || (int)result["logFrames"] >= 2 && (bool)result["logForegroundPrinted"])
+                    ? "passed" : "failed";
 			}
 			catch (Exception ex)
 			{
@@ -162,6 +238,16 @@ namespace AandmAuto
 				Close();
 			}
 		}
+
+        private static uint SampleVisibleWallpaper()
+        {
+            var frame = UiTheme.EngineFrame;
+            uint hash = 2166136261U;
+            for (int y = 1; y < 9; y++)
+                for (int x = 1; x < 13; x++)
+                    hash = unchecked((hash ^ (uint)frame.GetPixel(frame.Width*x/13,frame.Height*y/9).ToArgb()) * 16777619U);
+            return hash;
+        }
 
 	}
 }

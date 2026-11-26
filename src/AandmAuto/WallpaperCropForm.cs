@@ -152,7 +152,7 @@ namespace AandmAuto
 				}
 
 				using (var tagBg = new SolidBrush(Color.FromArgb(150, 0, 0, 0)))
-				using (var tagFont = UiTheme.CleanFont(8f, FontStyle.Bold))
+				using (var tagFont = UiTheme.GameFont(8f, FontStyle.Bold))
 				{
 					if (splitX - sel.X > 66)
 					{
@@ -355,7 +355,7 @@ namespace AandmAuto
 			ShowInTaskbar = false;
 			BackColor = Color.FromArgb(18, 22, 30);
 			ForeColor = Color.White;
-			Font = UiTheme.CleanFont(9f);
+			Font = UiTheme.GameFont(9f);
 
 			if (sample != null) loadedImage = new Bitmap(sample);
 			else if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
@@ -388,7 +388,7 @@ namespace AandmAuto
 				AutoSize = true,
 				Location = new Point(14, 17),
 				ForeColor = Color.FromArgb(235, 240, 248),
-				Font = UiTheme.CleanFont(9f)
+				Font = UiTheme.GameFont(9f)
 			};
 			chkLock.CheckedChanged += delegate
 			{
@@ -432,7 +432,7 @@ namespace AandmAuto
 				Size = new Size(290, 50),
 				TextAlign = ContentAlignment.MiddleLeft,
 				ForeColor = Color.FromArgb(196, 208, 226),
-				Font = UiTheme.CleanFont(8.5f)
+				Font = UiTheme.GameFont(8.5f)
 			};
 
 			var btnOk = new Button

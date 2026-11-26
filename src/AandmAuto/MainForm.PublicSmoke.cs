@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 
 namespace AandmAuto
@@ -27,6 +28,12 @@ namespace AandmAuto
                     if(ready && coreSeconds==0)coreSeconds=watch.Elapsed.TotalSeconds;
                     object scene;sceneReady=state.TryGetValue("scene",out scene) && scene!=null && !string.IsNullOrEmpty(Convert.ToString(scene));
                     if(ready && sceneReady)break;
+                }
+                if(ready && sceneReady && Environment.GetEnvironmentVariable("AANDM_LOGIN_IDLE_SMOKE") == "1")
+                {
+                    await TestIdleLoginPresentationAsync();
+                    Close();
+                    return;
                 }
                 if(ready)
                 {
@@ -57,5 +64,29 @@ namespace AandmAuto
             }),Encoding.UTF8);
             Close();
         }
+        private async Task TestIdleLoginPresentationAsync()
+        {
+            gameSnapshotReady = true;
+            var core = webView.CoreWebView2;
+            var watch = Stopwatch.StartNew();
+            WindowState = FormWindowState.Minimized;
+            while (!core.IsSuspended && watch.ElapsedMilliseconds < 42000)
+                await Task.Delay(250);
+            bool slept = core.IsSuspended;
+            long sleepAfterMs = watch.ElapsedMilliseconds;
+            WindowState = FormWindowState.Normal;
+            KeepPageRunning();
+            watch.Restart();
+            while (core.IsSuspended && watch.ElapsedMilliseconds < 3000)
+                await Task.Delay(50);
+            bool restored = !core.IsSuspended && ControllerIsVisible();
+            string scene = await ExecuteLuaAsync("return require('scene.scene_manager'):GetCurrentSceneName()");
+            File.WriteAllText(Path.Combine(DataRoot(), "public-login-idle-check.json"), json.Serialize(new
+            {
+                result = slept && restored && scene == "\"login\"" ? "passed" : "failed",
+                slept, restored, scene, sleepAfterMs, restoreMs = watch.ElapsedMilliseconds
+            }), Encoding.UTF8);
+        }
+
     }
 }

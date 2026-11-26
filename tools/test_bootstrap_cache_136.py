@@ -4,6 +4,7 @@ from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from secrets import token_hex
+import gzip
 import json
 import os
 import subprocess
@@ -11,7 +12,7 @@ from threading import Thread
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / 'build' / ('asset-cache-fixture-' + token_hex(4))
+DATA = ROOT / 'dist' / ('asset-cache-fixture-' + token_hex(4))
 EXE = ROOT / 'dist' / '冒险与挖矿自动助手-优化版.exe'
 PUBLIC = bytes(range(256)) * 2048
 PRIVATE = b'private fixture'
@@ -49,7 +50,12 @@ class Fixture(BaseHTTPRequestHandler):
             body = PRIVATE
         else:
             body = b'fresh response'
+        compressed = self.path == PUBLIC_PATH and cache_control != 'no-store'
+        if compressed:
+            body = gzip.compress(body)
         self.send_response(200)
+        if compressed:
+            self.send_header('Content-Encoding', 'gzip')
         self.send_header('Content-Type', content_type)
         self.send_header('Cache-Control', cache_control)
         self.send_header('Content-Length', str(len(body)))
@@ -90,7 +96,7 @@ if __name__ == '__main__':
         finally:
             server.shutdown()
     report = {
-        'result': 'passed', 'cold': cold['cache'], 'warmDifferentProfile': warm['cache'],
+        'result': 'passed', 'publicEncoding': 'gzip', 'cold': cold['cache'], 'warmDifferentProfile': warm['cache'],
         'corruptionRepair': repaired['cache'], 'realBrowserProfiles': 3,
         'networkRequests': {'publicPart': HITS[PUBLIC_PATH], 'dynamic': HITS['/api/fixture'],
                             'noStore': HITS[PRIVATE_PATH], 'authorized': HITS[PUBLIC_PATH + '-authorized']},

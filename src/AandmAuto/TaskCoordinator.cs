@@ -126,7 +126,12 @@ namespace AandmAuto
 					badge = "兑换中";
 					break;
 				case AssistantTaskKind.Daily:
-					if (!dailyMinePhase)
+					if (dailyEncounterPhase)
+					{
+						taskStatus = "奇遇清空";
+						badge = "挖矿中";
+					}
+					else if (!dailyMinePhase)
 					{
 						taskStatus = "日常委托";
 					}

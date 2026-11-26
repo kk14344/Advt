@@ -54,7 +54,7 @@ end
 
 -- Resolve the configured tier before reading runtime depth or materials.
 -- The same preflight is used by manual production and one-key daily.
-function A:workshop_production_project(empty_slots)
+function A:configured_workshop_project()
     local configured=tonumber(self.cfg.workshopDepth) or 150
     local minutes=tonumber(self.cfg.workshopMinutes) or 120
     local project,layer
@@ -66,9 +66,16 @@ function A:workshop_production_project(empty_slots)
             end
         end
     end
-    if not project then
-        return nil,"config",string.format("找不到 %d 层内的 %d 分钟工坊档位",configured,minutes)
-    end
+    return project,layer,configured,minutes
+end
+
+function A:workshop_mining_depth()
+    return ws_mining_depth()
+end
+
+function A:workshop_production_project(empty_slots)
+    local project,layer,configured,minutes=self:configured_workshop_project()
+    if not project then return nil,"config",string.format("找不到 %d 层内的 %d 分钟工坊档位",configured,minutes) end
     local title=tostring(project.name or "设定档位")
     local actual=ws_mining_depth()
     if actual<layer then

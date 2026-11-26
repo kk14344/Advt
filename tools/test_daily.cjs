@@ -76,7 +76,7 @@ function reset_daily_fixture()
  A.cfg.dailyVoidChallenge=false;A.cfg.dailyMarketExchange=false
  A.cfg.dailyRefine=false;A.cfg.earthUseAll=false;constants.RESOURCE_TYPE.ultimate_tool=7
  A:cancel_task();A._cancelled_task_pending=nil;A.now=0;clock=1000;weekday=7;A.inBattle=false;sent={};checked_in=false
- for id=1,15 do A.cfg['dailyTask'..id]=true end
+ for id=1,15 do A.cfg['dailyTask'..id]=id~=11 end
  A.cfg.dailyIncludeMine=false;A.cfg.dailyRewards=true;A.cfg.dailyFreePrayer=true;A.cfg.dailyFreeAlchemy=true
  A.cfg.dailyAlchemyTier=1;A.cfg.dailyTrollLevel=0;A.cfg.dailyUndergroundLevel=0;A._guild_boss_done_day={}
  A.cfg.dailyGuildBoss=false;A.cfg.dailyEvents=false
@@ -315,7 +315,7 @@ function count_event(key)
  return n
 end
 `);
-test('daily executes all 15 task categories and verifies server progress',`
+test('daily executes the 14 regular task categories and verifies server progress',`
 reset_daily_fixture();A.cfg.arenaAllowBloodRefresh=true;A:start_daily()
 local result
 for tick=1,500 do
@@ -324,7 +324,7 @@ for tick=1,500 do
  if result.done then break end
 end
 assert(result and result.done and not result.partial,tostring(result and result.message))
-for id,conf in pairs(daily_conf_for_test)do assert(server_counts[id]>=conf.condition_count,'missing real action '..id)end
+for id,conf in pairs(daily_conf_for_test)do if id~=11 then assert(server_counts[id]>=conf.condition_count,'missing real action '..id) end end
 assert(server_counts[5]==9 and server_counts[6]==3)
 for _,message in ipairs(sent)do assert(not message.refresh_arena_rival)end
 assert(A.cfg.arenaAllowBloodRefresh==true,'daily must preserve standalone arena preference')

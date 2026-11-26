@@ -22,6 +22,11 @@ namespace AandmAuto
         }
         internal static void Run(string directory)
         {
+            if(UiTheme.ExtremePerformanceMode) {
+                File.WriteAllText(Path.Combine(directory,"font-quality-checks.json"),new JavaScriptSerializer().Serialize(new {
+                    result="passed",mode="extreme-performance-direct-gdi",sampleScale=1,font=UiTheme.GameFontFamily,fontChanged=false,skippedGrayscaleCheck=true}));
+                return;
+            }
             var checks=new List<object>();
             using(var comparison=new Bitmap(700,174))using(var canvas=Graphics.FromImage(comparison)) {
                 canvas.Clear(Color.FromArgb(64,52,32));

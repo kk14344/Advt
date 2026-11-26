@@ -170,6 +170,21 @@ namespace AandmAuto
 			return "";
 		}
 
+        private const string TrayRegistryKey = @"Software\WallpaperEngine";
+        private const string TrayRegistryValue = "hideTrayIcon";
+
+        internal static bool TrayIconHidden()
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(TrayRegistryKey))
+                return key != null && Equals(key.GetValue(TrayRegistryValue), 1);
+        }
+
+        internal static void SetTrayIconHidden(bool hidden)
+        {
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(TrayRegistryKey))
+                key.SetValue(TrayRegistryValue, hidden ? 1 : 0, RegistryValueKind.DWord);
+        }
+
 		internal static string FindPlaybackExecutable(string customDir)
 		{
 			string install = FindInstallDir(customDir);
@@ -196,8 +211,15 @@ namespace AandmAuto
 			return "";
 		}
 
-		internal static Size ReadVideoSize(string path)
+        internal static Size ReadVideoSize(string path)
+        {
+            double fps;
+            return ReadVideoInfo(path, out fps);
+        }
+
+        internal static Size ReadVideoInfo(string path, out double fps)
 		{
+            fps = 0;
 			Type shellType = System.Type.GetTypeFromProgID("Shell.Application");
 			if (shellType == null) return Size.Empty;
 			object shell = null, folder = null, file = null;
@@ -212,6 +234,7 @@ namespace AandmAuto
 				if (file == null) return Size.Empty;
 				int width = ReadVideoDimension(file, "System.Video.FrameWidth");
 				int height = ReadVideoDimension(file, "System.Video.FrameHeight");
+                fps = ReadVideoDimension(file, "System.Video.FrameRate") / 1000.0;
 				return width > 0 && height > 0 ? new Size(width, height) : Size.Empty;
 			}
 			catch (COMException) { return Size.Empty; }

@@ -7,7 +7,9 @@ namespace AandmAuto {
  internal sealed partial class MainForm {
   private ScheduleBook scheduleBook=new ScheduleBook();
   private Timer scheduleTimer; private bool scheduleBusy,scheduleActive;
-  private ScheduleRun activeSchedule; private int scheduleStepIndex;
+  private ScheduleRun activeSchedule;
+  private bool restoreScheduleCheckpoint;
+  private int scheduledStepPage;
   private DateTime scheduledStepUntil=DateTime.MinValue;
   private DateTime nextScheduleProbeUtc=DateTime.MinValue;
   private DateTime harvestRegistrationRetryUtc=DateTime.MaxValue;
@@ -37,6 +39,13 @@ namespace AandmAuto {
     bool stale=scheduleBook.Harvest.RemoveAll(r=>r==null||string.IsNullOrEmpty(r.Account)||r.Account=="0"||r.DueUtc==DateTime.MinValue)>0;
     if(scheduleBook.RemoveDisabledHarvests()||stale)harvestSettingsChanged=true;
     foreach(var p in scheduleBook.Plans)p.Validate();
+    var checkpoint=scheduleBook.Checkpoint;
+    if(checkpoint!=null){
+     if(!checkpoint.IsValid()){
+      AddLog("定时任务断点无效，无法续跑该轮。",YellowColor);
+      scheduleBook.Checkpoint=null;harvestSettingsChanged=true;
+     }else restoreScheduleCheckpoint=true;
+    }
     if(harvestSettingsChanged)SaveSchedule();
    }catch(Exception e){
     scheduleBook=new ScheduleBook();AddLog("读取定时设置失败，已暂停计划："+e.Message,YellowColor);
@@ -122,20 +131,55 @@ namespace AandmAuto {
      if(scheduledStepUntil!=DateTime.MinValue&&now>=scheduledStepUntil){scheduledStepUntil=DateTime.MinValue;await StopCurrentTasksAsync();return;}
      if(AnyTaskRunning())return;
      scheduledStepUntil=DateTime.MinValue;
-     if(scheduleStepIndex>=activeSchedule.Steps.Count){AddLog(activeSchedule.Name+"队列执行完成。",GreenColor);scheduleActive=false;activeSchedule=null;return;}
-     var step=activeSchedule.Steps[scheduleStepIndex++];AddLog(activeSchedule.Name+"："+step,BlueColor);
+     var checkpoint=scheduleBook.Checkpoint;
+     if(checkpoint.StepInFlight){
+      bool pageChanged=scheduledStepPage!=pageGeneration;
+      checkpoint.StepInFlight=false;
+      if(pageChanged)checkpoint.NeedsReview++;
+      try{SaveSchedule();}catch{checkpoint.StepInFlight=true;if(pageChanged)checkpoint.NeedsReview--;throw;}
+      if(pageChanged)AddLog(activeSchedule.Name+" · "+activeSchedule.Steps[checkpoint.NextStep-1]+"页面已重载，结算待核对。",YellowColor);
+     }
+     if(checkpoint.NextStep>=activeSchedule.Steps.Count){
+      scheduleBook.Checkpoint=null;
+      try{SaveSchedule();}catch{scheduleBook.Checkpoint=checkpoint;throw;}
+      int review=checkpoint.NeedsReview;
+      AddLog(activeSchedule.Name+(review==0?"队列执行完成。":"剩余步骤结束，"+review+" 项中断步骤待核对。"),review==0?GreenColor:YellowColor);
+      scheduleActive=false;activeSchedule=null;return;
+     }
+     if(!coreReady||utcNow<nextScheduleProbeUtc)return;
+     nextScheduleProbeUtc=utcNow.AddSeconds(1);
+     int stepGeneration=taskGeneration, stepPage=pageGeneration;
+     string stepAccount=await ReadScheduleAccountAsync();
+     if(stepGeneration!=taskGeneration||stepPage!=pageGeneration||AnyTaskRunning()||scheduleBook.Checkpoint!=checkpoint)return;
+     if(stepAccount!=checkpoint.Account)return;
+     var step=activeSchedule.Steps[checkpoint.NextStep];
+     checkpoint.NextStep++;checkpoint.StepInFlight=true;scheduledStepPage=pageGeneration;
+     try{SaveSchedule();}catch{checkpoint.NextStep--;checkpoint.StepInFlight=false;throw;}
+     AddLog(activeSchedule.Name+"："+step,BlueColor);
      if(step.Minutes>0)scheduledStepUntil=now.AddMinutes(step.Minutes);
      await StartAssistantTaskAsync(step.Task);return;
     }
     if(!coreReady||AnyTaskRunning()||utcNow<nextScheduleProbeUtc)return;
-    if(scheduleBook.Pending.Count==0&&scheduleBook.DueHarvest(utcNow)==null&&!scheduleBook.CheckinDue(utcNow)){
+    if(!restoreScheduleCheckpoint&&scheduleBook.Pending.Count==0&&scheduleBook.DueHarvest(utcNow)==null&&!scheduleBook.CheckinDue(utcNow)){
      CloseFinishedSchedule();return;
     }
     nextScheduleProbeUtc=utcNow.AddSeconds(3);
-    int generation=taskGeneration;
-    string world=json.Deserialize<string>(await ExecuteLuaAsync("return require('scene.scene_manager'):GetCurrentSceneName()=='world' and 'world:'..__MWA:harvest_account() or ''"))??"";
-    if(generation!=taskGeneration||AnyTaskRunning()||!world.StartsWith("world:",StringComparison.Ordinal))return;
-    string account=world.Substring(6);
+    if(webView.CoreWebView2.IsSuspended) KeepPageRunning();
+    int generation=taskGeneration, page=pageGeneration;
+    string account=await ReadScheduleAccountAsync();
+    if(generation!=taskGeneration||page!=pageGeneration||AnyTaskRunning()||string.IsNullOrEmpty(account)||account=="0")return;
+    if(restoreScheduleCheckpoint){
+     var checkpoint=scheduleBook.Checkpoint;
+     if(checkpoint.Account!=account)return;
+     if(checkpoint.StepInFlight){
+      checkpoint.StepInFlight=false;checkpoint.NeedsReview++;
+      try{SaveSchedule();}catch{checkpoint.StepInFlight=true;checkpoint.NeedsReview--;throw;}
+      AddLog(checkpoint.Run.Name+" · "+checkpoint.Run.Steps[checkpoint.NextStep-1]+"中途断开，结算待核对。",YellowColor);
+     }
+     restoreScheduleCheckpoint=false;activeSchedule=checkpoint.Run;scheduleActive=true;
+     AddLog(activeSchedule.Name+"已恢复定时断点。",BlueColor);
+     return;
+    }
     if(!string.IsNullOrEmpty(account)&&account!="0"&&scheduleBook.CheckinDue(utcNow)){
      long previous=scheduleBook.LastCheckinSlot;
      scheduleBook.LastCheckinSlot=ScheduleBook.CheckinSlotUtc(utcNow).Ticks;
@@ -158,10 +202,24 @@ namespace AandmAuto {
      return;
     }
     if(scheduleBook.Pending.Count==0){CloseFinishedSchedule();return;}
-    activeSchedule=scheduleBook.Pending[0];scheduleBook.Pending.RemoveAt(0);SaveSchedule();
-    scheduleActive=true;scheduleStepIndex=0;
+    var pending = scheduleBook.Pending[0];
+    scheduleBook.Pending.RemoveAt(0);
+    scheduleBook.Checkpoint=new ScheduleCheckpoint{Run=pending,Account=account};
+    try { SaveSchedule(); }
+    catch
+    {
+     scheduleBook.Checkpoint=null;
+     scheduleBook.Pending.Insert(0, pending);
+     throw;
+    }
+    activeSchedule = pending;
+    scheduleActive = true;
    }catch(Exception ex){AddLog("任务队列："+ex.Message,YellowColor);}
    finally{scheduleBusy=false;}
+  }
+  private async Task<string> ReadScheduleAccountAsync(){
+   string world=json.Deserialize<string>(await ExecuteLuaAsync("return require('scene.scene_manager'):GetCurrentSceneName()=='world' and 'world:'..__MWA:harvest_account() or ''"))??"";
+   return world.StartsWith("world:",StringComparison.Ordinal)?world.Substring(6):"";
   }
   private async Task StartAssistantTaskAsync(string id){
    switch(id){case "daily":BtnDaily_Click(this,EventArgs.Empty);break;case "arena":BtnArena_Click(this,EventArgs.Empty);break;case "void":BtnVoid_Click(this,EventArgs.Empty);break;case "mine":BtnMine_Click(this,EventArgs.Empty);break;
@@ -183,7 +241,7 @@ namespace AandmAuto {
    }
    if(lastRunning||startRequested)await StopAutomationAsync();
   }
-  private void CancelScheduledQueue(){scheduleActive=false;activeSchedule=null;scheduleStepIndex=0;scheduledStepUntil=DateTime.MinValue;scheduleBook.Pending.Clear();if(!previewMode)SaveSchedule();}
+  private void CancelScheduledQueue(){scheduleActive=false;activeSchedule=null;restoreScheduleCheckpoint=false;scheduledStepUntil=DateTime.MinValue;scheduleBook.Checkpoint=null;scheduleBook.Pending.Clear();if(!previewMode)SaveSchedule();}
   private async void BtnScheduleOptions_Click(object sender,EventArgs e){
    await OpenUnifiedSettingsAsync("schedule");
   }

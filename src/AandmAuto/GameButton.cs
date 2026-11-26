@@ -26,6 +26,7 @@ namespace AandmAuto
 		private Size cachedLabelBox;
 		private int cachedLabelTheme = -1;
 		private string cachedLabelStyle;
+		private bool cachedLabelExtreme;
 
 		public GameButtonSkin Skin
 		{
@@ -74,6 +75,8 @@ namespace AandmAuto
 		{
 			get
 			{
+				if (UiTheme.ExtremePerformanceMode)
+					return new Rectangle(4, 2, Math.Max(1, Width - 8), Math.Max(1, Height - 4));
 				if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 					return new Rectangle(6, 2, Math.Max(1, Width - 12), Math.Max(1, Height - 4));
 				return new Rectangle(7, 4, Math.Max(1, Width - 14), Math.Max(1, Height - 9));
@@ -245,11 +248,56 @@ namespace AandmAuto
 			DrawLabelColored(graphics, ink, Color.FromArgb(165, 0, 0, 0));
 		}
 
+		private void PaintExtremePerf(Graphics graphics, Rectangle target)
+		{
+			Color fill, border, ink;
+			if (!Enabled)
+			{
+				fill = Color.FromArgb(240, 239, 234);
+				border = Color.FromArgb(214, 211, 202);
+				ink = Color.FromArgb(153, 149, 140);
+			}
+			else if (skin == GameButtonSkin.Green || (selected && skin == GameButtonSkin.Gold))
+			{
+				fill = pressed ? Color.FromArgb(34, 88, 58) : (hovered ? Color.FromArgb(53, 129, 87) : Color.FromArgb(44, 110, 73));
+				border = Color.FromArgb(34, 88, 58);
+				ink = Color.White;
+			}
+			else if (skin == GameButtonSkin.Gold)
+			{
+				fill = pressed ? Color.FromArgb(245, 232, 198) : (hovered ? Color.FromArgb(255, 249, 230) : Color.FromArgb(253, 246, 227));
+				border = Color.FromArgb(199, 163, 82);
+				ink = Color.FromArgb(31, 31, 31);
+			}
+			else if (skin == GameButtonSkin.Orange)
+			{
+				fill = pressed ? Color.FromArgb(247, 236, 224) : (hovered ? Color.FromArgb(255, 248, 240) : Color.FromArgb(255, 255, 255));
+				border = Color.FromArgb(212, 180, 149);
+				ink = Color.FromArgb(34, 34, 34);
+			}
+			else
+			{
+				fill = pressed ? Color.FromArgb(232, 229, 222) : (hovered ? Color.FromArgb(239, 236, 230) : Color.FromArgb(248, 247, 244));
+				border = selected ? Color.FromArgb(44, 110, 73) : Color.FromArgb(201, 197, 188);
+				ink = Color.FromArgb(34, 34, 34);
+			}
+			int rw = Math.Max(2, target.Width - 1);
+			int rh = Math.Max(2, target.Height);
+			using (var b = new SolidBrush(fill))
+				graphics.FillRectangle(b, target.X, target.Y, rw, rh);
+			using (var p = new Pen(border, 1f))
+				graphics.DrawRectangle(p, target.X, target.Y, rw - 1, rh - 1);
+			if (selected && Enabled && skin != GameButtonSkin.Green && skin != GameButtonSkin.Gold)
+			{
+				using (var acc = new SolidBrush(Color.FromArgb(44, 110, 73)))
+					graphics.FillRectangle(acc, target.X + 1, target.Y + rh - 3, Math.Max(1, rw - 2), 2);
+			}
+			DrawLabelColored(graphics, ink, Color.Empty);
+		}
+
 		private void PaintContent(Graphics graphics)
 		{
 			UiSurface.PaintBackdrop(this, graphics);
-			graphics.SmoothingMode = SmoothingMode.AntiAlias;
-			graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
 			Rectangle rectangle = new Rectangle(0, 0, base.Width, base.Height);
 			if (rectangle.Width <= 2 || rectangle.Height <= 2) return;
 			Rectangle target = new Rectangle(1, 1, Math.Max(1, rectangle.Width - 2), Math.Max(1, rectangle.Height - 3));
@@ -258,6 +306,16 @@ namespace AandmAuto
 				target.Y += 1;
 				target.Height = Math.Max(1, target.Height - 1);
 			}
+
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				PaintExtremePerf(graphics, target);
+				return;
+			}
+
+			graphics.SmoothingMode = SmoothingMode.AntiAlias;
+			graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
 
 			if (UiTheme.CurrentTheme == UiTheme.ThemeNativeLight)
 			{
@@ -375,8 +433,9 @@ namespace AandmAuto
 			string text = Text ?? "";
 			string style = UiTheme.ButtonLabelStyle ?? "";
 			int theme = UiTheme.CurrentTheme;
+			bool extreme = UiTheme.ExtremePerformanceMode;
 			if (cachedLabelFont != null && cachedLabelText == text && cachedLabelBox == box
-				&& cachedLabelTheme == theme && cachedLabelStyle == style)
+				&& cachedLabelTheme == theme && cachedLabelStyle == style && cachedLabelExtreme == extreme)
 				return cachedLabelFont;
 			if (cachedLabelFont != null) cachedLabelFont.Dispose();
 			cachedLabelFont = LabelFont();
@@ -384,6 +443,7 @@ namespace AandmAuto
 			cachedLabelBox = box;
 			cachedLabelTheme = theme;
 			cachedLabelStyle = style;
+			cachedLabelExtreme = extreme;
 			return cachedLabelFont;
 		}
 
@@ -404,7 +464,7 @@ namespace AandmAuto
 				TextFormatFlags.NoPadding | TextFormatFlags.HorizontalCenter;
 			if (pressed) bounds.Y += 1;
 			Font font = GetCachedLabelFont();
-			if (shadowInk.A > 0)
+			if (shadowInk.A > 0 && !UiTheme.ExtremePerformanceMode)
 				GameText.Draw(graphics, Text, font, new Rectangle(bounds.X + 1, bounds.Y + 1, bounds.Width, bounds.Height), shadowInk, flags);
 			GameText.Draw(graphics, Text, font, bounds, ink, flags);
 		}

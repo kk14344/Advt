@@ -58,6 +58,19 @@ namespace AandmAuto
             options["uiTheme"]=theme;
             Write(path,options);
         }
+        private void CopyOptionsForNewAccount(string templateRoot, string id)
+        {
+            string source = Path.Combine(templateRoot, "options.json");
+            if (!File.Exists(source)) return;
+            string target = Path.Combine(Root(id), "options.json");
+            Dictionary<string, object> options = null;
+            try { options = json.Deserialize<Dictionary<string, object>>(File.ReadAllText(source, Encoding.UTF8)); }
+            catch (ArgumentException) { }
+            catch (InvalidOperationException) { }
+            if (options != null && options.Remove("battleReplaySpeed")) Write(target, options);
+            else File.Copy(source, target, false);
+        }
+
         public AccountProfile Save(string id,string username,string password,bool autoLogin,string templateRoot) {
             username=(username??"").Trim();if(username.Length==0||string.IsNullOrEmpty(password))throw new InvalidOperationException("请填写账号和密码");
             using(var guard=new Mutex(false,AppPaths.SignalName("Catalog",root,"main"))) {
@@ -71,7 +84,7 @@ namespace AandmAuto
                         Directory.CreateDirectory(Root(id));File.WriteAllText(Path.Combine(Root(id),"browser-reset-required"),"account changed");
                     }
                     Write(Path.Combine(Root(id),"account.dat"),new Dictionary<string,object>{{"username",username},{"password",Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(password),null,DataProtectionScope.CurrentUser))},{"autoLogin",autoLogin}});
-                    if(adding&&!string.IsNullOrEmpty(templateRoot)){string options=Path.Combine(templateRoot,"options.json");if(File.Exists(options))File.Copy(options,Path.Combine(Root(id),"options.json"),false);}
+                    if (adding && !string.IsNullOrEmpty(templateRoot)) CopyOptionsForNewAccount(templateRoot, id);
                     Write(Catalog,entries);return selected;
                 }finally{if(held)guard.ReleaseMutex();}
             }

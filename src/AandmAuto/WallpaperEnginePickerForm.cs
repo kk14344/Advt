@@ -83,7 +83,7 @@ namespace AandmAuto
 				{
 					Rectangle tagRect = new Rectangle(imgRect.Right - 34, imgRect.Y + 4, 30, 16);
 					using (var tb = new SolidBrush(Color.FromArgb(200, 44, 110, 73))) g.FillRectangle(tb, tagRect);
-					using (var tf = UiTheme.CleanFont(7f, FontStyle.Bold))
+					using (var tf = UiTheme.GameFont(7f, FontStyle.Bold))
 						GameText.Draw(g, "GIF", tf, tagRect, Color.White, UiSurface.TextFlags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 				}
 

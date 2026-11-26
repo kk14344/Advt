@@ -325,6 +325,8 @@ A._guide[7][2]=old
 const mineBefore=passed;
 require('./test_research_mine.cjs')({run,test});
 const mineScenarios=passed-mineBefore;
+// Existing daily fixtures model non-mining tasks. The encounter tests opt in explicitly.
+run("A.cfg.dailyTask11=false");
 const dailyBefore=passed;
 require('./test_daily.cjs')({run,test,toLua});
 if(process.env.AANDM_ONLY_CART){
@@ -336,6 +338,8 @@ if(process.env.AANDM_ONLY_CART){
 require('./test_daily_119.cjs')({run,test,toLua});
 const daily128Before=passed;
 require('./test_daily_128.cjs')({run,test,toLua});
+require('./test_mystery_shop.cjs')({run,test});
+require('./test_battle_replay.cjs')({run,test});
 const daily128Scenarios=passed-daily128Before;
 require('./test_caves_127.cjs')({run,test,toLua});
 const daily129Before=passed;
@@ -367,6 +371,7 @@ require('./test_refine_142.cjs')({run,test,toLua});
 const refine142Scenarios=passed-refine142Before;
 const daily142Before=passed;
 require('./test_daily_142.cjs')({run,test,toLua});
+require('./test_daily_encounters.cjs')({run,test});
 const daily142Scenarios=passed-daily142Before;
 const retry130Before=passed;
 runningRetry130=true;require('./test_retry_130.cjs')({run,test,toLua});
@@ -384,6 +389,32 @@ const escort134Scenarios=passed-escort134Before;
 const release144Before=passed;
 require('./test_144.cjs')({run,test,toLua});
 const release144Scenarios=passed-release144Before;
+if(!process.env.AANDM_ONLY_RETRY){
+ run(`
+   package.loaded['util.constants'].BLOCK_TYPE={empty=0,rock_purple_gold=3}
+   package.loaded['scene.scene_manager']=scene_manager
+   package.loaded['logic.config_manager']=config_manager
+   package.loaded['logic.time']=time_logic
+   for _,name in ipairs({"logic.mining","logic.graphic","logic.user","logic.resource","logic.bag"}) do
+     package.loaded[name]=package.loaded[name] or {}
+   end
+   __MWA=nil
+ `);
+ run(fullLua);
+ run(`
+ local cursor = __MWA.log_seq
+ assert(#__MWA:snapshot(cursor).logs == 0)
+ __MWA:log("fixture duplicate")
+ __MWA:log("fixture duplicate")
+ local delta = __MWA:snapshot(cursor)
+ assert(delta.logSeq == cursor + 2 and #delta.logs == 2)
+ assert(delta.logs[1]:match("fixture duplicate$") and delta.logs[2]:match("fixture duplicate$"))
+ assert(#__MWA:snapshot(delta.logSeq).logs == 0)
+ assert(#__MWA:snapshot(delta.logSeq + 1).logs >= 2)
+ `);
+ passed++;
+ console.log('PASS adventure log cursor omits unchanged entries and preserves repeats and reconnect history');
+}
 const report={workflowTests:passed,release144Scenarios,refine142Scenarios,daily142Scenarios,daily129Scenarios,retry130Scenarios,guideAlternatives:planCount,mineScenarios,dailyScenarios:workshopBefore-dailyBefore,daily128Scenarios,
  ore131Scenarios,
  push132Scenarios,

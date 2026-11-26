@@ -43,8 +43,14 @@ jobs:
           python tools/test_updater.py --channel all
           python tools/sync_game_data.py
 
-      - name: Run Lua task & background regression suites
+      - name: Run Lua task & 1.44.13 regression suites
         shell: pwsh
         run: |
           node tools/test_tasks.cjs
           node tools/test_background_133.cjs
+          node tools/test_mining_route_125.cjs
+          node tools/test_mining_reset.cjs
+          node tools/test_mystery_shop.cjs
+          node tools/test_daily_encounters.cjs
+          node tools/test_battle_replay.cjs
+          node tools/test_mining_band.cjs

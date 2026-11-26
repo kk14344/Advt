@@ -30,7 +30,7 @@ namespace AandmAuto
 		private readonly List<Label> dropGridLabels = new List<Label>();
 		private string lastDropKey;
 		private Label lblMiningStatsSpend;
-		private RichTextBox rtbReport;
+		private GlassRichTextBox rtbReport;
 		private Label lblReportPage;
 		private GameButton btnReportPrev;
 		private GameButton btnReportNext;
@@ -229,14 +229,13 @@ namespace AandmAuto
 			rtbReport.ReadOnly = true;
 			rtbReport.BorderStyle = BorderStyle.None;
 			rtbReport.ForeColor = bodyInk;
-			rtbReport.Font = UiTheme.GameFont(7.5f, FontStyle.Regular);
 			rtbReport.WordWrap = true;
 			rtbReport.DetectUrls = false;
 			rtbReport.HideSelection = false;
 			rtbReport.ScrollBars = RichTextBoxScrollBars.Vertical;
 			rtbReport.ShortcutsEnabled = true;
 			rtbReport.Margin = new Padding(0, 2, 0, 2);
-			rtbReport.Text = "开始自动挖矿后，这里显示每场战斗与掉落。";
+			rtbReport.SetBodyText("开始自动挖矿后，这里显示每场战斗与掉落。");
 			layout.Controls.Add(GlassRichTextBox.WithBackdrop(rtbReport), 0, 4);
 
 			// 翻页行（居中保持 3:1 比例）
@@ -670,7 +669,7 @@ namespace AandmAuto
 				}
 			}
 			string next = builder.ToString();
-			if (rtbReport.Text != next) rtbReport.Text = next;
+			rtbReport.SetBodyText(next);
 		}
 
 		// 自检（AANDM_STATS_TEST=1）：用三段合成快照跑一遍增量合并、归零与持久化，

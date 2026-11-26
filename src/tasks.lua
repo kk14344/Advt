@@ -20,9 +20,12 @@ local function reply(self, message, fields)
     return fields
 end
 
+-- @BATTLE_REPLAY@
+
 -- Wrap the game's one-to-one handlers, preserving their original callbacks.
 -- RegisterEvent alone would replace the game's handlers and break its state.
 function A:install_fast_graphics()
+    self:install_battle_replay_speed()
     local ok,g=pcall(require,"logic.graphic")
     if not ok or type(g)~="table" or type(g.DispatchEvent)~="function" then return false end
     if g.DispatchEvent==g._mwa_fast_dispatch then return true end
@@ -111,7 +114,7 @@ function A:install_task_hooks()
         "get_vanity_mercenary_ret", "vanity_sync_troop_ret", "vanity_challenge_ret", "vanity_buy_recruit_ret",
         "query_mine_info_ret", "mine_start_ret", "mine_receive_reward_ret",
         "query_cultivation_info_ret",
-        "dig_block_ret","finish_random_event_ret","solve_adventure_event_ret","accept_random_event_ret",
+        "dig_block_ret","finish_random_event_ret","solve_adventure_event_ret","accept_random_event_ret","refresh_mining_area_ret",
         "use_tnt_ret","collect_mine_ret",
         "query_golem_info_ret","query_mining_block_info_ret",
         "challenge_friend_ret","challenge_server_pvp_ret","challenge_battlefront_boss_ret","challenge_glory_ret",
@@ -963,6 +966,7 @@ A._skill_tags = skill_tags
 -- @REFILL@
 
 -- @MINING_RUNTIME@
+-- @MINING_RESET@
 -- @MINING_ROUTE@
 
 -- @MINING_CAMERA@
@@ -975,6 +979,7 @@ A._skill_tags = skill_tags
 
 -- @DAILY_TAIL@
 -- @DAILY_COMPLETION@
+-- @MYSTERY_SHOP@
 
 -- @RUNE_RECOVERY@
 

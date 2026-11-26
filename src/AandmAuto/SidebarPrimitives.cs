@@ -28,6 +28,15 @@ namespace AandmAuto
 		{
 			Rectangle bounds = new Rectangle(0, 0, Width, Height);
 			if (bounds.Width < 4 || bounds.Height < 4) return;
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var brush = new SolidBrush(Color.White))
+					graphics.FillRectangle(brush, bounds);
+				using (var pen = new Pen(Color.FromArgb(214, 211, 202), 1f))
+					graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+				return;
+			}
 			UiSurface.PaintBackdrop(this, graphics);
 
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
@@ -120,6 +129,15 @@ namespace AandmAuto
 		{
 			Rectangle bounds = new Rectangle(0, 0, Width, Height);
 			if (bounds.Width < 4 || bounds.Height < 4) return;
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var brush = new SolidBrush(Color.White))
+					graphics.FillRectangle(brush, bounds);
+				using (var pen = new Pen(Color.FromArgb(214, 211, 202), 1f))
+					graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+				return;
+			}
 			UiSurface.PaintBackdrop(this, graphics);
 
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
@@ -147,6 +165,13 @@ namespace AandmAuto
 					graphics.DrawRectangle(pen, 1, 1, Math.Max(1, Width - 3), Math.Max(1, Height - 3));
 				return;
 			}
+            if (UiTheme.UsesEngineCanvas(this))
+            {
+                using (var veil = new SolidBrush(Color.FromArgb(145, 245, 232, 169))) graphics.FillRectangle(veil, bounds);
+                using (var pen = new Pen(Color.FromArgb(90, 62, 24), 1.5f))
+                    graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+                return;
+            }
 			Image paper = GameArt.Get("game-paper_bg1.png");
 			if (paper != null)
 			{
@@ -185,6 +210,20 @@ namespace AandmAuto
 		{
 			Rectangle bounds = new Rectangle(0, 0, Width, Height);
 			if (bounds.Width < 3 || bounds.Height < 3) return;
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var fill = new SolidBrush(Color.FromArgb(250, 249, 246)))
+					graphics.FillRectangle(fill, bounds);
+				using (var border = new Pen(Color.FromArgb(224, 221, 213), 1f))
+					graphics.DrawRectangle(border, 0, 0, Width - 1, Height - 1);
+				if (LeftStripeColor.A > 0)
+				{
+					using (var stripe = new SolidBrush(LeftStripeColor))
+						graphics.FillRectangle(stripe, 1, 1, 4, Math.Max(1, Height - 2));
+				}
+				return;
+			}
 			UiSurface.PaintBackdrop(this, graphics);
 
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
@@ -216,6 +255,7 @@ namespace AandmAuto
 				hiC = Color.FromArgb(223, 192, 132);
 			}
 
+            if (UiTheme.UsesEngineCanvas(this)) fillC = Color.FromArgb(178, fillC);
 			Rectangle face = new Rectangle(0, 0, Width, Height - 1);
 			using (var fill = new SolidBrush(fillC))
 				graphics.FillRectangle(fill, face);
@@ -259,7 +299,7 @@ namespace AandmAuto
 		{
 			get
 			{
-				if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
+				if (UiTheme.ExtremePerformanceMode || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 					return new Rectangle(6, 2, Math.Max(1, Width - 12), Math.Max(1, Height - 4));
 				return new Rectangle(6, 3, Math.Max(1, Width - 20), Math.Max(1, Height - 5));
 			}
@@ -274,6 +314,25 @@ namespace AandmAuto
 
 		private void PaintContent(Graphics g)
 		{
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				if (Width < 8 || Height < 8) return;
+				g.SmoothingMode = SmoothingMode.None;
+				Color bg = !Enabled ? Color.FromArgb(240, 239, 234) : (selected ? Color.White : (hovered ? Color.FromArgb(248, 247, 244) : Color.FromArgb(234, 232, 225)));
+				using (var b = new SolidBrush(bg))
+					g.FillRectangle(b, 0, 0, Width, Height);
+				using (var p = new Pen(Color.FromArgb(213, 209, 199), 1f))
+					g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
+				if (selected)
+				{
+					using (var accent = new SolidBrush(Color.FromArgb(44, 110, 73)))
+						g.FillRectangle(accent, 0, Height - 3, Width, 3);
+				}
+				Color tc = !Enabled ? Color.FromArgb(153, 149, 140) : (selected ? Color.FromArgb(31, 31, 31) : Color.FromArgb(99, 95, 87));
+				TextFormatFlags f = UiSurface.TextFlags | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding;
+				GameText.Draw(g, Text, Font, TextBounds, tc, f);
+				return;
+			}
 			UiSurface.PaintBackdrop(this, g);
 			if (Width < 8 || Height < 8) return;
 
@@ -458,6 +517,23 @@ namespace AandmAuto
 			if (Width < 4 || Height < 4) return;
 			Rectangle r = new Rectangle(0, (Height - 10) / 2, Width - 1, Math.Min(10, Height - 1));
 
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				g.SmoothingMode = SmoothingMode.None;
+				using (var bg = new SolidBrush(Color.FromArgb(230, 227, 219)))
+					g.FillRectangle(bg, r);
+				int fillWExtreme = (int)Math.Round((r.Width - 2) * fraction);
+				if (fillWExtreme > 0 && r.Height > 2)
+				{
+					Color accent = FillBottom.A > 0 ? FillBottom : Color.FromArgb(44, 110, 73);
+					using (var brush = new SolidBrush(accent))
+						g.FillRectangle(brush, r.X + 1, r.Y + 1, fillWExtreme, r.Height - 1);
+				}
+				using (var border = new Pen(Color.FromArgb(204, 200, 190), 1f))
+					g.DrawRectangle(border, r);
+				return;
+			}
+
 			if (UiTheme.CurrentTheme == UiTheme.ThemeWarmWood)
 			{
 				using (var trough = new SolidBrush(Color.FromArgb(74, 39, 14))) g.FillRectangle(trough, r);
@@ -539,6 +615,13 @@ namespace AandmAuto
 		{
 			Rectangle r = ClientRectangle;
 			if (r.Width <= 0 || r.Height <= 0) return;
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var b = new SolidBrush(Color.FromArgb(244, 243, 239)))
+					graphics.FillRectangle(b, r);
+				return;
+			}
 			Color baseBg = UiTheme.Palette.BgColor;
 			using (var b = new SolidBrush(baseBg)) graphics.FillRectangle(b, r);
 			if (UiTheme.CustomBackground != null || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
@@ -555,12 +638,14 @@ namespace AandmAuto
 		{
 			this.showWallpaper = showWallpaper;
 			DoubleBuffered = true;
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ResizeRedraw = true;
 		}
 
 		protected override void OnPaintBackground(PaintEventArgs e)
 		{
 			base.OnPaintBackground(e);
+			if (UiTheme.ExtremePerformanceMode) return;
 			if (SharedWallpaperPainter != null && SharedWallpaperPainter(e.Graphics)) return;
 			if (showWallpaper()) UiTheme.DrawCustomBackground(e.Graphics, this, ClientRectangle, UiTheme.BackgroundVeilColor);
 		}
@@ -582,14 +667,23 @@ namespace AandmAuto
 
 		public void PaintBackdrop(Graphics graphics)
 		{
+			Rectangle r = ClientRectangle;
+			if (r.Width <= 0 || r.Height <= 0) return;
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var b = new SolidBrush(Color.White))
+					graphics.FillRectangle(b, r);
+				using (var pen = new Pen(Color.FromArgb(214, 211, 202), 1f))
+					graphics.DrawLine(pen, 0, r.Height - 1, r.Width - 1, r.Height - 1);
+				return;
+			}
 			if (SharedWallpaperPainter != null && SharedWallpaperPainter(graphics))
 			{
 				using (var tint = new SolidBrush(Color.FromArgb(112, UiTheme.BackgroundVeilColor)))
 					graphics.FillRectangle(tint, ClientRectangle);
 				return;
 			}
-			Rectangle r = ClientRectangle;
-			if (r.Width <= 0 || r.Height <= 0) return;
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass || UiTheme.CustomBackground != null)
 			{
 				Color baseColor = UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass
@@ -693,7 +787,8 @@ namespace AandmAuto
 				outer = Color.FromArgb(41, 32, 20); page = Color.FromArgb(87, 73, 42);
 				btn1 = Color.FromArgb(139, 184, 48); btn2 = Color.FromArgb(228, 191, 48); ink = Color.FromArgb(238, 209, 143);
 			}
-			if (ThemeMode == UiTheme.ThemeLiquidGlass)
+			if (UiTheme.ExtremePerformanceMode) g.SmoothingMode = SmoothingMode.None;
+			if (ThemeMode == UiTheme.ThemeLiquidGlass && !UiTheme.ExtremePerformanceMode)
 			{
 				using (var bg = new LinearGradientBrush(new Rectangle(1, 1, w, h), Color.FromArgb(32, 74, 134), Color.FromArgb(92, 54, 138), 35f))
 					g.FillRectangle(bg, 1, 1, w, h);
@@ -746,7 +841,7 @@ namespace AandmAuto
 		private void PaintContent(Graphics g)
 		{
 			UiSurface.PaintBackdrop(this, g);
-			g.SmoothingMode = SmoothingMode.AntiAlias;
+			g.SmoothingMode = UiTheme.ExtremePerformanceMode ? SmoothingMode.None : SmoothingMode.AntiAlias;
 			int w = Width - 2, h = Height - 2;
 			if (w < 20 || h < 20) return;
 

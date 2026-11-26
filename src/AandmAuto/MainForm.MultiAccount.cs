@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Web.Script.Serialization;
 namespace AandmAuto {
- internal sealed class TaskCommand {public string Id {get;set;}public string Action {get;set;}public string Task {get;set;}public int Minutes {get;set;}public long Host {get;set;}public int? Theme {get;set;}public string SharedWallpaper {get;set;}}
+ internal sealed class TaskCommand {public string Id {get;set;}public string Action {get;set;}public string Task {get;set;}public int Minutes {get;set;}public long Host {get;set;}public int? Theme {get;set;}public string SharedWallpaper {get;set;}public bool? ExtremePerformance {get;set;}}
  internal static class AccountCommand {
   internal static string Pipe(string root,string id){return "AandmAutoTasks-"+AppPaths.ContextKey(root,id);}
   internal static async Task<Dictionary<string,object>> Send(string root,string id,TaskCommand command){
@@ -69,12 +69,32 @@ namespace AandmAuto {
     if(c.Host==0||dockHost!=c.Host||!DockWindow.IsWindow(new IntPtr(c.Host)))throw new InvalidOperationException("此账号未接入当前同屏窗口。");
     await SetSharedWallpaperAsync(c.SharedWallpaper);
    }
+   else if(c.Action=="setExtremePerf"){
+    if(!c.ExtremePerformance.HasValue)throw new ArgumentException("缺少极致性能模式参数。");
+    await ApplyExtremePerformanceModeAsync(c.ExtremePerformance.Value,false);
+   }
+   else if(c.Action=="smokeWallpaperInput"&&Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE")=="1"
+       &&c.Host!=0&&c.Host==dockHost&&sharedWallpaper!=null){
+    return new Dictionary<string,object>{{"ok",true},{"canvasClick",await VerifyWallpaperCanvasInputAsync()}};
+   }
    else if(c.Action=="panel")ShowDockSidebar();
    else if(c.Action!="status")throw new ArgumentException("不支持的命令");
-   receipt=new Dictionary<string,object>{{"ok",true},{"profile",AppPaths.ProfileId},{"window",Handle.ToInt64()},{"busy",AnyTaskRunning()},{"message",c.Action=="start"?"已排队："+ScheduleBook.Label(c.Task):lblStatus.Text},{"queued",scheduleBook.Pending.Count},{"ready",coreReady},{"theme",UiTheme.CurrentTheme}};
+   int reportedTheme=(c.Action=="setTheme"&&extremePerformanceMode)?GetNumberOption("uiTheme",UiTheme.CurrentTheme):UiTheme.CurrentTheme;
+   receipt=new Dictionary<string,object>{{"ok",true},{"profile",AppPaths.ProfileId},{"window",Handle.ToInt64()},{"busy",AnyTaskRunning()},{"message",c.Action=="start"?"已排队："+ScheduleBook.Label(c.Task):lblStatus.Text},{"queued",scheduleBook.Pending.Count},{"ready",coreReady},{"theme",reportedTheme},{"extremePerformance",extremePerformanceMode}};
+   if(Program.QuietResourceTest && c.Action=="status"){
+    receipt["mainFormMinimized"]=WindowState==FormWindowState.Minimized;
+    receipt["gameSnapshotReady"]=gameSnapshotReady;
+    receipt["presentationHidden"]=quietGamePresentation;
+    receipt["rendererSuspended"]=coreReady&&webView.CoreWebView2.IsSuspended;
+    receipt["loginSleepEligible"]=CanSleepLogin(DateTime.UtcNow);
+    receipt["loginSleepResult"]=loginSleepResult;
+    receipt["backgroundPulseCount"]=runtimePulseCount;
+   }
    if(c.Action=="sharedWallpaper"||Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE")=="1"){
     receipt["sharedWallpaper"]=sharedWallpaper==null?"":sharedWallpaper.Name;
     receipt["wallpaperSequence"]=sharedWallpaper==null?0:sharedWallpaper.Sequence;
+    receipt["sharedPaintSequence"]=sharedPaintSequence;
+    receipt["sharedPaintX"]=sharedPaintX;
     receipt["ownWallpaperPlaying"]=wallpaperPlayback!=null;
     receipt["wallpaperProject"]=wallpaperEngineProject??"";
     receipt["customBgPath"]=customBgPath??"";
@@ -87,11 +107,38 @@ namespace AandmAuto {
   {
    new AccountProfiles(AppPaths.BaseRoot).SaveTheme(AppPaths.ProfileId,theme);
    numberOptions["uiTheme"]=theme;
+   if(extremePerformanceMode)return;
    if(UiTheme.CurrentTheme==theme)return;
    SwitchUiAppearance(activeUiLayout,theme,customBgPath,UiTheme.CustomBackgroundOpacity,
     UiTheme.CustomBackgroundMode,UiTheme.GlassBlur,UiTheme.CustomBackgroundFit);
    if(detachedSidebar!=null&&!detachedSidebar.IsDisposed)detachedSidebar.BackColor=SideColor;
    await ApplyStageWallpaperAsync();
+  }
+  private void NotifyOtherProfilesExtremePerf(bool enabled)
+  {
+   if(previewMode)return;
+   string root=AppPaths.BaseRoot;
+   string selfId=AppPaths.ValidateProfileId(AppPaths.ProfileId??"main");
+   Task.Run(async delegate{
+    try{
+     var profiles=new AccountProfiles(root);
+     var list=profiles.Read();
+     foreach(var p in list){
+      if(p==null||string.IsNullOrEmpty(p.Id))continue;
+      string id;
+      try{id=AppPaths.ValidateProfileId(p.Id);}catch{continue;}
+      if(id==selfId)continue;
+      if(!profiles.IsRunning(id))continue;
+      try{
+       await AccountCommand.Send(root,id,new TaskCommand{
+        Id=Guid.NewGuid().ToString("N"),
+        Action="setExtremePerf",
+        ExtremePerformance=enabled
+       });
+      }catch{}
+     }
+    }catch{}
+   });
   }
   private void SetDockLayout(bool value){var root=sidebarScroll.Parent as TableLayoutPanel;if(root!=null)root.ColumnStyles[0].Width=value?0:SidebarWidth;sidebarScroll.Visible=!value;PerformLayout();}
   private void ShowDockSidebar(){

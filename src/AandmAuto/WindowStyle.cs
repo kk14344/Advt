@@ -49,6 +49,14 @@ namespace AandmAuto
         {
             if(handle!=IntPtr.Zero) RedrawWindow(handle,IntPtr.Zero,IntPtr.Zero,0x0001|0x0004|0x0080|0x0100);
         }
+        internal static void PaintWallpaperFrame(System.Windows.Forms.Control control, bool children)
+        {
+            if (control == null || !control.IsHandleCreated || !control.Visible) return;
+            const uint invalidate = 0x0001, noErase = 0x0020, noChildren = 0x0040, allChildren = 0x0080, updateNow = 0x0100;
+            RedrawWindow(control.Handle, IntPtr.Zero, IntPtr.Zero,
+                invalidate | noErase | updateNow | (children ? allChildren : noChildren));
+        }
+
         [DllImport("user32.dll")]private static extern IntPtr SendMessage(IntPtr h,uint message,IntPtr w,IntPtr l);
         internal static void SetRedraw(IntPtr handle,bool enabled){SendMessage(handle,0x000B,enabled?new IntPtr(1):IntPtr.Zero,IntPtr.Zero);}
 
@@ -67,6 +75,41 @@ namespace AandmAuto
 			SendRichEditMessage(handle, 0x04DE, IntPtr.Zero, ref position);
 		}
 
+
+	    [ComImport, Guid("56FDF344-FD6D-11d0-958A-006097C9A090")]
+    private class TaskbarList { }
+
+    [ComImport, Guid("56FDF342-FD6D-11d0-958A-006097C9A090"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ITaskbarList
+    {
+        void HrInit();
+        void AddTab(IntPtr window);
+        void DeleteTab(IntPtr window);
+        void ActivateTab(IntPtr window);
+        void SetActiveAlt(IntPtr window);
+    }
+
+    internal static void HidePlaybackTaskbarWindow(IntPtr window)
+    {
+        // The renderer remains visible and keeps drawing off screen.
+        SetTaskbarVisible(window, false);
+        ITaskbarList taskbar = null;
+        try
+        {
+            taskbar = (ITaskbarList)new TaskbarList();
+            taskbar.HrInit();
+            taskbar.DeleteTab(window);
+        }
+        catch (COMException) { }
+        finally { if (taskbar != null) Marshal.ReleaseComObject(taskbar); }
+    }
+
+    internal static bool IsPlaybackToolWindow(IntPtr window)
+    {
+        if (window == IntPtr.Zero) return false;
+        long style = GetWindowLongPtr(window, GWL_EXSTYLE).ToInt64();
+        return (style & WS_EX_TOOLWINDOW) != 0 && (style & WS_EX_APPWINDOW) == 0;
+    }
 
 		public static void SetTaskbarVisible(IntPtr handle, bool visible)
 		{

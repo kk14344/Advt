@@ -48,6 +48,16 @@ namespace AandmAuto
 			Rectangle bounds = new Rectangle(0, 0, base.Width, base.Height);
 			if (bounds.Width < 4 || bounds.Height < 4) return;
 
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var brush = new SolidBrush(Color.White))
+					graphics.FillRectangle(brush, bounds);
+				using (var pen = new Pen(Color.FromArgb(214, 211, 202), 1f))
+					graphics.DrawRectangle(pen, 0, 0, bounds.Width - 1, bounds.Height - 1);
+				return;
+			}
+
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
 				UiSurface.PaintBackdrop(this, graphics);

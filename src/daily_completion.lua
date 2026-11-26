@@ -93,7 +93,7 @@ function A:daily_market_step(st)
             local signature=table.concat(ids,"|")..":"..tostring(response.reset_time or 0)
             if m.signature and m.signature~=signature then return {done=true,partial=true,message="集市已换批，本轮不重复旧订单"} end
             m.signature=signature;m.uncertain=nil
-            response.order_list=orders;m.snapshot=response;m.must_query=false
+            response.order_list=orders;m.snapshot=response;m.snapshot_at=self.now;m.must_query=false
             for _,o in ipairs(orders)do
                 local key=trade_key(o)
                 if o.is_done==true and m.requested[key] and not m.confirmed[key] then
@@ -183,7 +183,7 @@ end
 local base_daily_step=A.daily_step
 
 local daily_extra_rows={
-    {"adventure_claim","冒险探险结果"},{"market_exchange","集市兑换"},{"mail_enabled","邮件"},{"rewards","活跃度奖励"},
+    {"adventure_claim","冒险探险结果"},{"market_exchange","集市兑换"},{"mystery_shop_enabled","神秘商店"},{"mail_enabled","邮件"},{"rewards","活跃度奖励"},
     {"activity_rewards","活动奖励"},{"gold_enabled","金币召唤"},{"refine_enabled","炼化"},
     {"gift_all","好友点数"},{"checkin_all","全时段签到"},{"vip_reward","月卡奖励"},
     {"prayer","免费祈祷"},{"alchemy","每日炼金"},{"guild_boss","工会首领"},
@@ -192,6 +192,175 @@ local daily_extra_rows={
 }
 local function daily_report_day()
     return math.floor((time_logic:Now()+(tonumber(time_logic.time_zone_offset) or 28800))/86400)
+end
+
+function A:game_day_start()
+    local now=tonumber(time_logic:Now())
+    if not now or now<=0 then return end
+    local offset=tonumber(time_logic.time_zone_offset) or 28800
+    local day=math.floor((now+offset)/86400)*86400-offset
+    if type(time_logic.GetNowDayTime)=="function" then
+        local ok,legacy_day=pcall(time_logic.GetNowDayTime,time_logic)
+        if ok and tonumber(legacy_day) and tonumber(legacy_day)>0 then day=tonumber(legacy_day) end
+    end
+    return day
+end
+
+function A:encounter_identity()
+    local user=self:harvest_account()
+    local login=package.loaded["logic.login"]
+    local server=login and tonumber(login.server_id)
+    if not server or server<=0 or user=="" or user=="0" then return end
+    local day=self:game_day_start()
+    if day then return tostring(server)..":"..user,day end
+end
+
+function A:set_encounter_clear_days(days)
+    self.encounter_clear_days=days
+    return true
+end
+
+function A:start_daily_encounter_resume(role)
+    self:cancel_task()
+    self.daily_state={running=true,selected={[11]=true},skipped={},claims=0,
+        completion_phase="close",completion_result={done=true,message="日常执行结束"},
+        encounter_clear={role=role}}
+    self:install_daily_spend_guard()
+    return true
+end
+
+local function treasure_active()
+    local function active(event)
+        return type(event)=="table" and event.event_type==RANDOM_TYPE.treasure_hunt
+            and (event.end_time==nil or (tonumber(event.end_time) or 0)>time_logic:Now())
+    end
+    if active(mining.pending_random_event) or active(mining.show_random_event) then return true end
+    for _,event in pairs(mining.random_event_list or {}) do
+        if active(event) then return true end
+    end
+    return false
+end
+
+local function encounter_wait(self,message,delay)
+    local clear=self.daily_state.encounter_clear
+    return reply(self,message,{wait=true,phase="encounter",encounterRole=clear.role,delaySeconds=delay})
+end
+
+function A:daily_encounter_step(st)
+    if not st.selected or not st.selected[11] or self.cfg.mobileNoMining or st.encounter_done then return end
+    local clear=st.encounter_clear
+    if not clear then
+        if self.cfg.enabled then self:set("enabled",false) end
+        clear={}
+        st.encounter_clear=clear
+    end
+    local context=self:read_context()
+    if not context then
+        if not self.inBattle then
+            clear.entered=nil;clear.confirmed=nil;clear.zero_confirmed=nil
+            local pending=(self.mine_refill and self.mine_refill.uncertain) or self._task_pending
+            if pending and not pending.response and not pending.event:match("^query_") then
+                self._cancelled_task_pending=pending
+            end
+            self._task_pending=nil;self._mine_event=nil;self.mine_refill=nil
+        end
+        return encounter_wait(self,"奇遇清空 · 等待游戏连接或战斗结束",0.5)
+    end
+    local role,day=self:encounter_identity()
+    if not role then return encounter_wait(self,"奇遇清空 · 等待区服、角色与游戏日同步",0.5) end
+    if clear.role and clear.role~=role then
+        st.skipped[11]="角色已切换，奇遇清空未完成"
+        st.encounter_done=true
+        return
+    end
+    clear.role=role
+    if day~=clear.day then
+        clear.day=day;clear.confirmed=nil;clear.zero_confirmed=nil
+        if self._task_pending and self._task_pending.kind=="clear_encounter_read" then self._task_pending=nil end
+    end
+    if (self.encounter_clear_days or {})[role]==day then
+        st.encounter_done=true
+        st.encounter_success=true
+        st.encounter_message="今日已完成，直接跳过"
+        return
+    end
+    if self.inBattle or self.fight then
+        if self.fight and not self.inBattle then self:update_fight() end
+        return encounter_wait(self,"奇遇清空 · 等待战斗结算")
+    end
+    if context.sub_name~="mining_district_sub_scene" then
+        clear.entered=nil;clear.confirmed=nil;clear.zero_confirmed=nil
+        if task_now(self)>=(clear.enter_at or 0) then
+            clear.enter_at=task_now(self)+2
+            mining:QueryBlockInfo()
+        end
+        return encounter_wait(self,"奇遇清空 · 正在进入矿区",0.15)
+    end
+    if not clear.entered then clear.entered=true;clear.confirmed=nil;clear.zero_confirmed=nil end
+
+    local pending=self._task_pending
+    if pending and pending.kind=="clear_encounter_read" then
+        if not pending.response and task_now(self)-pending.sent_at<5 then
+            return encounter_wait(self,"奇遇清空 · 等待矿区状态确认",0.1)
+        end
+        self._task_pending=nil
+        local message=pending.response
+        if not message or message.result and message.result~="success" or tonumber(message.event_count)==nil then
+            return encounter_wait(self,"奇遇清空 · 重新读取矿区状态",0.5)
+        end
+        clear.confirmed=true
+        clear.zero_confirmed=tonumber(message.event_count)==0
+    end
+
+    local remaining=tonumber(mining.event_count)
+    local has_treasure=treasure_active()
+    local settled=not self._task_pending and not self._mine_event and not self._mine_blast and not self.mine_refill
+        and not self.pending_dig
+    if settled and (not clear.confirmed or remaining==nil
+        or remaining==0 and not has_treasure and not clear.zero_confirmed) then
+        local barrier=self:task_barrier()
+        if barrier then return encounter_wait(self,barrier.message,0.1) end
+        self:task_request("query_mining_info_ret","clear_encounter_read",function()
+            return network:Send({query_mining_info={}})
+        end)
+        return encounter_wait(self,"奇遇清空 · 正在刷新矿区状态",0.1)
+    end
+    if clear.confirmed and clear.zero_confirmed and remaining==0 and not has_treasure
+        and type(mining.random_event_list)=="table" and settled then
+        st.encounter_done=true
+        st.encounter_success=true
+        st.encounter_message="今日奇遇剩余 0 次，藏宝图已结束"
+        self.encounter_clear_days=self.encounter_clear_days or {}
+        self.encounter_clear_days[role]=day
+        st.completion_result.encounterClearDone={role=role,day=day}
+        return
+    end
+    if not clear.confirmed then
+        return encounter_wait(self,"奇遇清空 · 等待上一次矿区操作结算",0.1)
+    end
+    if remaining==0 and not has_treasure then
+        if self.pending_dig then self:pending_dig_resolved() end
+        if self._mine_blast then self:mine_blast_step() end
+        if self.mine_refill then self:mine_bag_step() end
+        if self._mine_event and self._mine_event.error then
+            st.skipped[11]=self._mine_event.error;st.encounter_done=true
+            return
+        end
+        if settled then clear.zero_confirmed=nil end
+        return encounter_wait(self,"奇遇清空 · 等待当前矿区操作和藏宝图状态同步",0.15)
+    end
+    if remaining~=0 or has_treasure then clear.zero_confirmed=nil end
+    local enabled,auto_mine=self.cfg.enabled,self.cfg.autoMine
+    self.cfg.enabled=true;self.cfg.autoMine=true
+    local ok,err=pcall(function()self:step()end)
+    self.cfg.enabled=enabled;self.cfg.autoMine=auto_mine
+    if not ok or (self.mine_refill and self.mine_refill.unavailable) or (self._mine_event and self._mine_event.error) then
+        st.skipped[11]=not ok and tostring(err) or self.mine_refill and self.mine_refill.error or self._mine_event.error
+        st.encounter_done=true
+        return
+    end
+    pcall(function()self:follow_mining_camera()end)
+    return encounter_wait(self,"奇遇清空 · 剩余 "..tostring(remaining or "待确认").." 次 · "..tostring(self.status or "自动挖掘"))
 end
 
 function A:start_daily_unfinished(account,day,scope)
@@ -222,6 +391,10 @@ function A:daily_report(stopped)
             local done=item and daily:CheckActivityComplet(id,item.completion_count or 0)
             local detail=st.skipped[id]
             local retry=id~=7 and id~=14 and id~=13
+            if id==11 then
+                name="奇遇清空";done=st.encounter_success;detail=st.encounter_message or detail or "尚未确认清空"
+                retry=not self.cfg.mobileNoMining
+            end
             if id==2 then
                 name="工坊收取与生产"
                 done=st.workshop_done and not detail
@@ -271,6 +444,10 @@ function A:daily_report(stopped)
                 status=retry and "待补办" or "已处理"
                 detail=(list and ("兑换 "..done.."/"..#list.." · Bonus "..(m.bonus and "已领取" or "未达成")) or "订单待同步")
                     ..(detail and " · "..detail or "")
+            elseif key=="mystery_shop_enabled" then
+                local result=st.mystery_shop and st.mystery_shop.result
+                detail=result and result.message or (st.completion_notes or {}).mystery_shop
+                status=result and result.partial and "部分完成" or (detail and "已核对" or "待核对")
             elseif key=="mail_enabled" then
                 retry=not tail.mail_checked or tail.mail_retry==true
                 detail="领取 "..st.mail_claimed.." 封"
@@ -379,6 +556,7 @@ function A:daily_retry_children(st)
     return r
 end
 function A:daily_step()
+    local DAILY_COMPLETION_MAX_RETRIES=8
     local st=self.daily_state
     if not st or not st.running then return base_daily_step(self) end
     local refine_gate=self:daily_refine_gate(st)
@@ -397,7 +575,9 @@ function A:daily_step()
     end
     if self.inBattle then return reply(self,"等待战斗结算后继续日常收尾",{wait=true}) end
     if st.round_at and task_now(self)<st.round_at then return reply(self,"队列已执行一轮，等待补办未确认请求",{wait=true,delaySeconds=math.min(1,st.round_at-task_now(self))}) end
-    for _,phase in ipairs({"adventure","caves","market","rewards","retry_items","retry_children"})do
+    local phases={"adventure","caves","market","mystery_shop","rewards","retry_items","retry_children","close"}
+    for index=1,#phases-1 do
+        local phase=phases[index]
         if st.completion_phase==phase then
             local ok,result=pcall(function()
                 if phase=="adventure" then
@@ -409,14 +589,30 @@ function A:daily_step()
                 elseif phase=="market" then
                     if not st.market_exchange then return {done=true,message=""} end
                     return self:daily_market_step(st)
+                elseif phase=="mystery_shop" then
+                    if not st.mystery_shop_enabled then return {done=true,message=""} end
+                    return self:daily_mystery_step(st)
                 elseif phase=="rewards" then return self:daily_tail_rewards(st)
                 elseif phase=="retry_items" then return self:daily_retry_items(st)
                 else return self:daily_retry_children(st) end
             end)
-            if not ok then self._task_pending=nil;result={done=true,retry=true,partial=true,message="收尾阶段暂不可用，将自动补办："..tostring(result)} end
+            if not ok then
+                self._task_pending=nil
+                if phase=="mystery_shop" then
+                    result={done=true,partial=true,message="神秘商店已暂停，未确认的额度仍保留："..tostring(result)}
+                    st.mystery_shop_enabled=false
+                else
+                    result={done=true,retry=true,partial=true,message="收尾阶段暂不可用，将自动补办："..tostring(result)}
+                end
+            end
             if not result.done then return reply(self,result.message,result) end
-            if phase=="market" and st.market_exchange then self:close_daily_market() end
-            if result.retry then st.completion_retry=true end
+            if phase=="market" and st.market_exchange and not st.mystery_shop_enabled then self:close_daily_market() end
+            if phase=="mystery_shop" and (st.mystery_shop_enabled or st.mystery_shop) then self:close_daily_market() end
+            if result.retry then
+                st.completion_retry=true
+                st.completion_retry_notes=st.completion_retry_notes or {}
+                st.completion_retry_notes[phase]=result.message~="" and result.message or "状态未确认"
+            end
             st.completion_notes=st.completion_notes or {}
             if result.message and result.message~="" and not result.retry and st.completion_notes[phase]~=result.message then
                 st.completion_notes[phase]=result.message
@@ -424,22 +620,48 @@ function A:daily_step()
             end
             st.completion_result.partial=st.completion_result.partial or result.partial or result.error
             if self._task_pending and not self._task_pending.response then
+                local pending=self._task_pending
+                if not pending.event:match("^query_") then self._cancelled_task_pending=pending end
                 st.completion_retry=true;self._task_pending=nil
             end
-            st.completion_phase=phase=="adventure" and "caves" or phase=="caves" and "market" or phase=="market" and "rewards" or phase=="rewards" and "retry_items" or phase=="retry_items" and "retry_children" or "close"
+            st.completion_phase=phases[index+1]
         end
     end
-    if st.completion_retry then
+    if st.completion_retry and (st.retry_round or 0)<DAILY_COMPLETION_MAX_RETRIES then
+        st.completion_retry_notes=nil
         st.retry_round=(st.retry_round or 0)+1;st.round_at=task_now(self)+math.min(10,st.retry_round)
         st.completion_retry=false;st.completion_phase="adventure";st.cave_tail=nil;st.reward_tail=nil;st.retry_children_run=nil
         st.adventure=nil
         if st.market then st.market.snapshot=nil;st.market.tried={};st.market.bonus_attempted=nil end
         return reply(self,"本轮已结束，自动补办未确认请求（第"..st.retry_round.."轮，可手动停止）",{wait=true})
     end
-    if self.inBattle then return reply(self,"等待战斗结算后关闭日常窗口",{wait=true}) end
-    local refine_schedule=self:daily_refine_schedule(st)
-    if refine_schedule then return refine_schedule end
-    self:close_daily_windows()
+    if st.completion_retry then
+        st.completion_retry=false
+        st.completion_result.partial=true
+        local notes={}
+        for _,phase in ipairs(phases) do
+            local note=(st.completion_retry_notes or {})[phase]
+            if note then notes[#notes+1]=note end
+        end
+        local detail=#notes>0 and "（"..table.concat(notes,"；").."）" or ""
+        st.completion_result.message=(st.completion_result.message or "日常结束").."；部分收尾仍待核对，已继续后续任务"..detail
+    end
+    if not st.encounter_clear then
+        if self.inBattle then return reply(self,"等待战斗结算后关闭日常窗口",{wait=true}) end
+        local refine_schedule=self:daily_refine_schedule(st)
+        if refine_schedule then return refine_schedule end
+        self:close_daily_windows()
+    end
+    local ok_clear,clear_result=pcall(function()return self:daily_encounter_step(st)end)
+    if ok_clear and clear_result then return clear_result end
+    if not ok_clear then st.skipped[11]="矿区状态读取失败："..tostring(clear_result) end
+    if st.skipped[11] then
+        st.completion_result.partial=true
+        st.completion_result.message=(st.completion_result.message or "日常结束").."；奇遇清空未完成："..st.skipped[11]
+    elseif st.encounter_success then
+        st.completion_result.message=(st.completion_result.message or "日常结束").."；奇遇清空："..st.encounter_message
+    end
+    if st.encounter_clear then self:close_daily_windows() end
     st.running=false
     local ok,report=pcall(function()return self:daily_report(false)end)
     if ok then st.completion_result.dailyReport=report

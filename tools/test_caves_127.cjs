@@ -56,7 +56,7 @@ test('a failure in one troll project leaves the other two playable',`
  caves127({3,4,5},1,1)
  local old=network.event_listener.solve_cave_event_ret
  network.event_listener.solve_cave_event_ret=function(msg)if msg.cave_type==3 then msg.result='not_open' else old(msg)end end
- A:install_task_hooks();local result=run_119(700);assert(not result.done)
+ A:install_task_hooks();local result=run_119(700);assert(result.done and result.partial and A.daily_state.retry_round==8)
  local buys,fights=cave127_counts();assert(fights[3]>2 and fights[4]==2 and fights[5]==2)
 `);
 test('battle defeat downgrades only that project and still consumes all remaining playable attempts',`
@@ -70,10 +70,10 @@ test('battle defeat downgrades only that project and still consumes all remainin
  local high=0;for _,m in ipairs(sent)do if m.solve_cave_event and m.solve_cave_event.cave_type==3 and m.solve_cave_event.cave_lv==2 then high=high+1 end end
  assert(high==1 and mining.cave_challenge_nums[3]==0)
 `);
-test('unchanged counts remain queued without blocking other projects until manually stopped',`
+test('unchanged counts finish as unconfirmed after bounded retries without blocking other projects',`
  caves127({3,4,5},1,0);local old=network.event_listener.solve_cave_event_ret
  network.event_listener.solve_cave_event_ret=function(msg)if msg.cave_type~=3 then old(msg)end end
- A:install_task_hooks();local result=run_119(500);assert(not result.done)
+ A:install_task_hooks();local result=run_119(500);assert(result.done and result.partial and A.daily_state.retry_round==8)
  local buys,fights=cave127_counts();assert(fights[3]>3 and fights[4]==1 and fights[5]==1)
  A:cancel_task();local count=#sent;A.now=1000;assert(A:daily_step().done and #sent==count)
 `);

@@ -32,6 +32,7 @@ def build_edition(edition: str, lua_only: bool = False):
 
     guide = json.loads((src / 'guide-plans.json').read_text(encoding='utf-8'))
     tasks = (src / 'tasks.lua').read_text(encoding='utf-8').replace('-- @GUIDE@', lua_value(guide))
+    tasks = tasks.replace('-- @BATTLE_REPLAY@', (src / 'battle_replay.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @DAILY@', (src / 'daily.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @MINE@', (src / 'research_mine.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @WORKSHOP@', (src / 'workshop_guild.lua').read_text(encoding='utf-8'))
@@ -39,6 +40,7 @@ def build_edition(edition: str, lua_only: bool = False):
     tasks = tasks.replace('-- @FAST_TASKS@', (src / 'fast_tasks.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @REFILL@', (src / 'refill.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @MINING_RUNTIME@', (src / 'mining_runtime.lua').read_text(encoding='utf-8'))
+    tasks = tasks.replace('-- @MINING_RESET@', (src / 'mining_reset.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @MINING_ROUTE@', (src / 'mining_route.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @MINING_CAMERA@', (src / 'mining_camera.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @VOID_PLANNER@', (src / 'void_planner.lua').read_text(encoding='utf-8'))
@@ -46,6 +48,7 @@ def build_edition(edition: str, lua_only: bool = False):
     tasks = tasks.replace('-- @RUNE_LOOP@', (src / 'rune_loop.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @DAILY_TAIL@', (src / 'daily_tail.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @DAILY_COMPLETION@', (src / 'daily_completion.lua').read_text(encoding='utf-8'))
+    tasks = tasks.replace('-- @MYSTERY_SHOP@', (src / 'mystery_shop.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @RUNE_RECOVERY@', (src / 'rune_recovery.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @ORE_PACKS@', (src / 'ore_packs.lua').read_text(encoding='utf-8'))
     tasks = tasks.replace('-- @ADVENTURE_PUSH@', (src / 'adventure_push.lua').read_text(encoding='utf-8'))
@@ -56,8 +59,8 @@ def build_edition(edition: str, lua_only: bool = False):
     lua = (src / 'automation.lua').read_text(encoding='utf-8').replace('-- @TASKS@', tasks)
     if test_pvp:
         for old, new in [
-            ('if __MWA and __MWA.VERSION == "1.0.0" then', 'if __MWA and __MWA.VERSION == "1.0.0-testpvp" then'),
-            ('VERSION = "1.0.0",', 'VERSION = "1.0.0-testpvp",'),
+            ('if __MWA and __MWA.VERSION == "1.1.0" then', 'if __MWA and __MWA.VERSION == "1.1.0-testpvp" then'),
+            ('VERSION = "1.1.0",', 'VERSION = "1.1.0-testpvp",'),
         ]:
             if old not in lua:
                 raise SystemExit(f'Missing test-pvp Lua patch target: {old}')
@@ -74,8 +77,8 @@ def build_edition(edition: str, lua_only: bool = False):
     bridge = (src / 'bridge.js').read_text(encoding='utf-8')
     if test_pvp:
         for old, new in [
-            ("window.__MWA_APP_VERSION === '1.0.0'", "window.__MWA_APP_VERSION === '1.0.0-testpvp'"),
-            ("var VERSION = '1.0.0';", "var VERSION = '1.0.0-testpvp';"),
+            ("window.__MWA_APP_VERSION === '1.1.0'", "window.__MWA_APP_VERSION === '1.1.0-testpvp'"),
+            ("var VERSION = '1.1.0';", "var VERSION = '1.1.0-testpvp';"),
             ('var CORE_TICK_MIN_MS = 40;', 'var CORE_TICK_MIN_MS = 10;'),
             ('var CORE_TICK_INTERVAL_MS = 45;', 'var CORE_TICK_INTERVAL_MS = 15;'),
             ('var BATTLE_SKIP_INTERVAL_MS = 20;', 'var BATTLE_SKIP_INTERVAL_MS = 10;'),
@@ -85,8 +88,8 @@ def build_edition(edition: str, lua_only: bool = False):
             bridge = bridge.replace(old, new, 1)
     elif low_load:
         for old, new in [
-            ("window.__MWA_APP_VERSION === '1.0.0'", "window.__MWA_APP_VERSION === '1.0.0-lowload'"),
-            ("var VERSION = '1.0.0';", "var VERSION = '1.0.0-lowload';"),
+            ("window.__MWA_APP_VERSION === '1.1.0'", "window.__MWA_APP_VERSION === '1.1.0-lowload'"),
+            ("var VERSION = '1.1.0';", "var VERSION = '1.1.0-lowload';"),
             ('var CORE_TICK_MIN_MS = 40;', 'var CORE_TICK_MIN_MS = 110;'),
             ('var CORE_TICK_INTERVAL_MS = 45;', 'var CORE_TICK_INTERVAL_MS = 120;'),
             ('var BATTLE_SKIP_INTERVAL_MS = 20;', 'var BATTLE_SKIP_INTERVAL_MS = 50;'),
@@ -125,7 +128,7 @@ def build_edition(edition: str, lua_only: bool = False):
         else (root / 'dist/冒险与挖矿自动助手-低负载版.exe' if low_load else root / 'dist/冒险与挖矿自动助手-优化版.exe')
     )
     args = [
-        str(compiler), '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/unsafe',
+        str(compiler), '/nologo', '/codepage:65001', '/target:winexe', '/platform:x64', '/optimize+', '/unsafe',
         '/out:' + str(out_exe),
         '/win32icon:' + str(src / 'app.ico'),
         '/win32manifest:' + str(src / 'app.manifest'),

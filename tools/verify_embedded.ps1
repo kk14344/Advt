@@ -22,7 +22,7 @@ function Verify-One([string]$ed){
     $binaryPath = Join-Path (Join-Path $taskRoot 'dist') $exeName
     if(-not (Test-Path -LiteralPath $binaryPath)){throw ('Missing binary: '+$binaryPath)}
     $bytes=[IO.File]::ReadAllBytes($binaryPath)
-    $version='1.0.0.0'
+    $version='1.1.0.0'
     $flat=([Text.Encoding]::ASCII.GetString($bytes)) -replace ([string][char]0),''
     if(-not $flat.Contains($version)){throw ('Assembly version marker missing in '+$exeName)}
     if($flat.Contains('1.44.0.0')){throw ('Stale 1.44 version marker still present in '+$exeName)}
@@ -44,8 +44,8 @@ function Verify-One([string]$ed){
     }
     $luaFile = if($ed -eq 'testpvp'){Join-Path $taskRoot 'dist\automation.testpvp.generated.lua'}else{Join-Path $taskRoot 'dist\automation.generated.lua'}
     $lua=Get-Content -LiteralPath $luaFile -Raw
-    $verMarker = if($ed -eq 'testpvp'){'1.0.0-testpvp'}else{'1.0.0'}
-    foreach($marker in @('refine_sim_taps','daily_adventure_claim','clear_refine_overlays','guild_boss_done_today',$verMarker)){
+    $verMarker = if($ed -eq 'testpvp'){'1.1.0-testpvp'}else{'1.1.0'}
+    foreach($marker in @('refine_sim_taps','daily_adventure_claim','clear_refine_overlays','guild_boss_done_today','battle_replay','mystic_stone','mystery_shop',$verMarker)){
         if($lua.IndexOf($marker) -lt 0){throw ('Generated Lua ('+$ed+') missing: '+$marker)}
     }
     return @{edition=$ed;exe=$exeName;assemblyVersion=$version;resources=$checks}
@@ -56,6 +56,6 @@ $results=@()
 foreach($t in $targets){
     $results += Verify-One $t
 }
-@{result='passed';assemblyVersion='1.0.0.0';editions=$results} |
+@{result='passed';assemblyVersion='1.1.0.0';editions=$results} |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskRoot 'dist\embedded-test-results.json') -Encoding utf8
-Write-Output ('Embedded script, update-config, game font and version match (1.0.0.0) for: '+($targets -join ', '))
+Write-Output ('Embedded script, update-config, game font and version match (1.1.0.0) for: '+($targets -join ', '))

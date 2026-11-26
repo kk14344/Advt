@@ -11,15 +11,23 @@ namespace AandmAuto
 		private Timer sharedWallpaperRefresh;
 		private long lastSharedFrame;
 		private bool sharedLocationHooked;
+		private long sharedPaintSequence;
+		private int sharedPaintX;
 
 		private bool PaintSharedWallpaper(Graphics graphics, Control control)
 		{
-			if (sharedWallpaper == null || dockHost == 0 || !control.IsHandleCreated) return false;
+			if (extremePerformanceMode || sharedWallpaper == null || dockHost == 0 || !control.IsHandleCreated) return false;
 			Rectangle canvas = WindowStyle.ClientAreaOnScreen(new IntPtr(dockHost));
 			if (canvas.IsEmpty) return false;
 			Point origin = control.PointToScreen(Point.Empty);
-			return sharedWallpaper.Paint(graphics, canvas.Size,
-				new Point(origin.X - canvas.Left, origin.Y - canvas.Top), control.ClientRectangle);
+			Point offset = new Point(origin.X - canvas.Left, origin.Y - canvas.Top);
+            bool painted = sharedWallpaper.Paint(graphics, canvas.Size, offset, control.ClientRectangle);
+            if (painted)
+            {
+                sharedPaintSequence = sharedWallpaper.Sequence;
+                sharedPaintX = offset.X;
+            }
+            return painted;
 		}
 
 		private void InvalidateSharedViewport()
@@ -31,6 +39,7 @@ namespace AandmAuto
 
 		private async Task SetSharedWallpaperAsync(string name)
 		{
+			if (extremePerformanceMode) name = "";
 			if (sharedWallpaper != null && sharedWallpaper.Name == name) return;
 			if (sharedWallpaper == null && string.IsNullOrEmpty(name)) return;
 			var next = string.IsNullOrEmpty(name) ? null : new SharedWallpaper(name);

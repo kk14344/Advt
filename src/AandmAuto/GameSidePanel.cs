@@ -20,6 +20,16 @@ namespace AandmAuto
 			Rectangle r = base.ClientRectangle;
 			if (r.Width <= 0 || r.Height <= 0) return;
 
+			if (UiTheme.ExtremePerformanceMode)
+			{
+				graphics.SmoothingMode = SmoothingMode.None;
+				using (var bg = new SolidBrush(Color.FromArgb(244, 243, 239)))
+					graphics.FillRectangle(bg, r);
+				using (var pen = new Pen(Color.FromArgb(204, 200, 190), 1f))
+					graphics.DrawRectangle(pen, 0, 0, Math.Max(0, r.Width - 1), Math.Max(0, r.Height - 1));
+				return;
+			}
+
 			if (UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass)
 			{
 				using (var bg = new SolidBrush(Color.FromArgb(14, 20, 32))) graphics.FillRectangle(bg, r);

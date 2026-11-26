@@ -16,6 +16,7 @@ namespace AandmAuto
 			{
 				if (!coreReady) throw new InvalidOperationException("WebView2 未初始化。");
 				await RunMultiChildFixtureAsync();
+                gameSnapshotReady = true;
 				SwitchUiAppearance(UiLayoutList, UiTheme.ThemeLiquidGlass, "", 65, UiTheme.BgModeStatic, 12, UiTheme.BgFitCover);
 				SwitchBottomTab("log");
 				AddLog("日志选择验收", BlueColor);
@@ -32,12 +33,18 @@ namespace AandmAuto
 				if (!logPassed) throw new InvalidOperationException("日志追加时选择或顺序异常。");
 				int pulsesBefore = runtimePulseCount;
 				WindowState = FormWindowState.Minimized;
-				await Task.Delay(22500);
-				result["idleHeartbeatPulses"] = runtimePulseCount - pulsesBefore;
+                var lowMemoryWait = Stopwatch.StartNew();
+                while ((!browserMemoryLow && !memoryPolicyUnsupported) && lowMemoryWait.ElapsedMilliseconds < 32500)
+                    await Task.Delay(200);
+                result["lowMemoryWaitMs"] = lowMemoryWait.ElapsedMilliseconds;
+                result["idleHeartbeatPulses"] = runtimePulseCount - pulsesBefore;
 				result["lowMemoryRequested"] = browserMemoryLow;
+                result["idleControllerHidden"] = quietGamePresentation && !ControllerIsVisible();
+                if (runtimeControllerVisibility != null && ControllerIsVisible())
+                    throw new InvalidOperationException("最小化空闲后仍在显示游戏画面。");
 				result["memoryPolicyUnsupported"] = memoryPolicyUnsupported;
 				if (!browserMemoryLow && !memoryPolicyUnsupported)
-					throw new InvalidOperationException("空闲最小化后未切换到低内存模式。");
+					throw new InvalidOperationException("空闲最小化后未切换到低内存模式。窗口状态 " + WindowState + "，任务活动 " + AnyTaskRunning() + "，重连 " + autoLoginReconnecting);
 				pulsesBefore = runtimePulseCount;
 				var wake = Stopwatch.StartNew();
 				EnqueueSchedule(new ScheduleRun { PlanId = "idle-smoke", Name = "最小化唤醒验收", Due = DateTime.Now,
@@ -45,7 +52,8 @@ namespace AandmAuto
 				while (!HasActiveTask && wake.ElapsedMilliseconds < 7000) await Task.Delay(100);
 				result["queuedTaskWakeMs"] = wake.ElapsedMilliseconds;
 				result["memoryNormalDuringTask"] = !browserMemoryLow;
-				bool wakePassed = HasActiveTask && !browserMemoryLow;
+                result["controllerVisibleDuringTask"] = ControllerIsVisible();
+				bool wakePassed = HasActiveTask && !browserMemoryLow && ControllerIsVisible();
 				await Task.Delay(2500);
 				result["activeHeartbeatPulses"] = runtimePulseCount - pulsesBefore;
 				string starts = await ExecuteScriptAsync("JSON.stringify(window.multiProbe.starts)");
@@ -59,7 +67,11 @@ namespace AandmAuto
 				WindowState = FormWindowState.Normal;
 				await Task.Delay(400);
 				if (browserMemoryLow || HasActiveTask) throw new InvalidOperationException("停止或还原窗口后状态未恢复。");
-				result["result"] = "passed";
+				int repetitions;
+                if (int.TryParse(Environment.GetEnvironmentVariable("AANDM_ACCEPT_REPEAT"), out repetitions)
+                    && repetitions > 0 && repetitions <= 20)
+                    await RunWakeRestoreTrialsAsync(result, repetitions);
+                result["result"] = "passed";
 			}
 			catch (Exception ex)
 			{

@@ -108,7 +108,19 @@ namespace AandmAuto
 
 		private const int LogCleanupIntervalMs = 10 * 60 * 1000;
 
+		private const int ExtremeLogCleanupIntervalMs = 3 * 60 * 1000;
+
 		private Timer logCleanupTimer;
+
+		private Timer memoryTrimTimer;
+
+		private bool extremePerformanceMode;
+
+		private bool webViewStartedExtremePerf;
+
+		private bool logUiDirty;
+
+		private int LogHistoryLimit { get { return extremePerformanceMode ? 60 : 200; } }
 
 		private WebView2 webView;
 		private BootstrapAssetCache bootstrapAssets;
@@ -136,6 +148,10 @@ namespace AandmAuto
 		private int arenaTarget = 5;
 
         private bool dailyMinePhase;
+        private bool dailyEncounterPhase;
+        private string dailyEncounterRole;
+        private bool resumeEncounterOnPage;
+        private readonly Dictionary<string, long> encounterClearDays = new Dictionary<string, long>();
 
 		private bool muteLogged;
 
@@ -170,12 +186,8 @@ namespace AandmAuto
 					if (!IsDisposed && !Disposing) action();
 				});
 			}
-			catch (ObjectDisposedException)
-			{
-			}
-			catch (InvalidOperationException)
-			{
-			}
+			catch (ObjectDisposedException) { }
+			catch (InvalidOperationException) { }
 		}
 
 		private bool lastRunning;
@@ -241,21 +253,40 @@ namespace AandmAuto
 			DoubleBuffered = true;
 			json.MaxJsonLength = int.MaxValue;
 			LoadOptions();
-			UiTheme.CurrentTheme = GetNumberOption("uiTheme", 0);
-			UiTheme.GlassBlur = GetNumberOption("glassBlur", 12);
-			UiTheme.CustomBackgroundFit = GetNumberOption("customBgFit", 0);
-			UiTheme.SetCustomCrop(
-				GetNumberOption("customBgCropX", 0),
-				GetNumberOption("customBgCropY", 0),
-				GetNumberOption("customBgCropW", 10000),
-				GetNumberOption("customBgCropH", 10000));
-			UiTheme.LoadCustomBackground(customBgPath, GetNumberOption("customBgOpacity", 35), GetNumberOption("customBgMode", 0));
-			UiTheme.SyncCroppedWallpaperFile(DataRoot());
+			extremePerformanceMode = ExtremePerformanceSettings.Load(AppPaths.BaseRoot);
+			webViewStartedExtremePerf = extremePerformanceMode;
+			UiTheme.ExtremePerformanceMode = extremePerformanceMode;
+			if (extremePerformanceMode)
+			{
+				UiTheme.CurrentTheme = UiTheme.ThemeNativeLight;
+				UiTheme.GlassBlur = 0;
+				UiTheme.CustomBackgroundFit = UiTheme.BgFitCover;
+				UiTheme.LoadCustomBackground("", 35, UiTheme.BgModeStatic);
+				UiTheme.ReleasePerformanceCaches();
+			}
+			else
+			{
+				UiTheme.CurrentTheme = GetNumberOption("uiTheme", 0);
+				UiTheme.GlassBlur = GetNumberOption("glassBlur", 12);
+				UiTheme.CustomBackgroundFit = GetNumberOption("customBgFit", 0);
+				UiTheme.SetCustomCrop(
+					GetNumberOption("customBgCropX", 0),
+					GetNumberOption("customBgCropY", 0),
+					GetNumberOption("customBgCropW", 10000),
+					GetNumberOption("customBgCropH", 10000));
+				UiTheme.LoadCustomBackground(customBgPath, GetNumberOption("customBgOpacity", 35), GetNumberOption("customBgMode", 0));
+				UiTheme.SyncCroppedWallpaperFile(DataRoot());
+			}
 			BackColor = BgColor;
 			ForeColor = TextColor;
 			activeUiLayout = GetNumberOption("uiLayout", 0);
 			LoadGuildBossDaily();
-			if (!previewMode && Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE") != "1" && Environment.GetEnvironmentVariable("AANDM_SMOKE") != "1" && Environment.GetEnvironmentVariable("AANDM_PUBLIC_SMOKE") != "1") LoadAccountSettings();
+            LoadEncounterClearDays();
+			if (!previewMode && !Program.QuietResourceTest &&
+                Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE") != "1" &&
+                Environment.GetEnvironmentVariable("AANDM_SMOKE") != "1" &&
+                Environment.GetEnvironmentVariable("AANDM_PUBLIC_SMOKE") != "1" &&
+                Environment.GetEnvironmentVariable("AANDM_PUBLIC_INPUT_SMOKE") != "1") LoadAccountSettings();
 			BuildInterface();
 			LoadInjectScript();
 			LoadIconResource();
@@ -269,9 +300,10 @@ namespace AandmAuto
 				int retentionDays = GetNumberOption("auditRetentionDays", 14);
 				string currentRoot = DataRoot();
 				System.Threading.Tasks.Task.Run(delegate { DiskGovernance.RotateAuditLogs(currentRoot, retentionDays); });
-				logCleanupTimer = new Timer { Interval = LogCleanupIntervalMs };
+				logCleanupTimer = new Timer { Interval = extremePerformanceMode ? ExtremeLogCleanupIntervalMs : LogCleanupIntervalMs };
 				logCleanupTimer.Tick += delegate { ClearAdventureLogs(true); };
 				logCleanupTimer.Start();
+				UpdateMemoryTrimTimer();
 				base.Shown += OnShown;
 			}
 			base.FormClosing += OnFormClosing;
@@ -295,7 +327,7 @@ namespace AandmAuto
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 26f : 24f));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 22f : 20f));
-			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 22f : 18f));
+			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, glass ? 22f : 20f));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, options["showMiningRoute"] ? 22f : 0f));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48f));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -336,7 +368,8 @@ namespace AandmAuto
 				Font = UiTheme.GameFont(7.75f),
 				TextAlign = ContentAlignment.MiddleLeft,
 				AutoEllipsis = true,
-				BackColor = Color.Transparent
+				BackColor = Color.Transparent,
+				Visible = options["showMiningRoute"]
 			};
 
 			TableLayoutPanel tableLayoutPanel2 = new TableLayoutPanel();
@@ -485,26 +518,30 @@ namespace AandmAuto
 			int themeBeforeSettings = UiTheme.CurrentTheme;
 			bool themePreviewed = false;
 			using (var wallpaperSnapshot = UiTheme.EngineFrame == null ? null : new Bitmap(UiTheme.EngineFrame))
-			using (var dialog = new AssistantSettingsForm(options, numberOptions, scheduleCopy, branchTitles, MineResearchMask(), planText, slotsText, initialCategory, customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, wallpaperSnapshot, AddLog, () => txtLog != null ? txtLog.Text : "", delegate(int previewTheme)
+			using (var dialog = new AssistantSettingsForm(options, numberOptions, scheduleCopy, branchTitles, MineResearchMask(), planText, slotsText, initialCategory, customBgPath, DataRoot(), customBgLabel, wallpaperEngineDir, ClientSize, wallpaperEngineProject, playbackStatus, wallpaperSnapshot, extremePerformanceMode, webViewStartedExtremePerf, RetryIndependentWallpaper, () => playbackStatus, AddLog, () => txtLog != null ? txtLog.Text : "", delegate(int previewTheme)
 			{
-				if (previewTheme != UiTheme.CurrentTheme)
+				if (!extremePerformanceMode && previewTheme != UiTheme.CurrentTheme)
 				{
 					themePreviewed = true;
 					SwitchUiAppearance(activeUiLayout, previewTheme, customBgPath, UiTheme.CustomBackgroundOpacity, UiTheme.CustomBackgroundMode, UiTheme.GlassBlur, UiTheme.CustomBackgroundFit);
 				}
 			}))
 			{
+				dialog.BindMysteryShop(mysteryProducts);
 				if (dialog.ShowDialog(this) != DialogResult.OK)
 				{
-					if (themePreviewed && UiTheme.CurrentTheme != themeBeforeSettings)
+					if (themePreviewed && !extremePerformanceMode && UiTheme.CurrentTheme != themeBeforeSettings)
 					{
 						SwitchUiAppearance(activeUiLayout, themeBeforeSettings, customBgPath, UiTheme.CustomBackgroundOpacity, UiTheme.CustomBackgroundMode, UiTheme.GlassBlur, UiTheme.CustomBackgroundFit);
 					}
 					return;
 				}
 
+				bool prevExtreme = extremePerformanceMode;
+				bool nextExtreme = dialog.ExtremePerformanceMode;
 				int prevLayout = activeUiLayout;
 				int prevTheme = UiTheme.CurrentTheme;
+				int prevSavedTheme = GetNumberOption("uiTheme", 0);
 				string prevBg = customBgPath ?? "";
 				string prevProject = wallpaperEngineProject;
 				int prevOpacity = UiTheme.CustomBackgroundOpacity;
@@ -518,12 +555,17 @@ namespace AandmAuto
 				bool prevStage = !options.ContainsKey("stageWallpaperBg") || options["stageWallpaperBg"];
 				foreach (var pair in dialog.Values) options[pair.Key] = pair.Value;
 				foreach (var pair in dialog.Numbers) numberOptions[pair.Key] = pair.Value;
+				mysteryProducts = dialog.SelectedMysteryProducts();
 				customBgPath = dialog.CustomBackgroundPath ?? "";
 				customBgLabel = dialog.CustomBackgroundLabel ?? "";
 				wallpaperEngineDir = dialog.WallpaperEngineDir ?? "";
 				wallpaperEngineProject = dialog.WallpaperEngineProject ?? "";
 				bool projectChanged = !string.Equals(wallpaperEngineProject, prevProject, StringComparison.OrdinalIgnoreCase);
-				if (projectChanged || dialog.WallpaperEngineSelectionChanged) playbackFailed = false;
+				if (projectChanged || dialog.WallpaperEngineSelectionChanged)
+                {
+                    playbackFailed = false;
+                    forceWallpaperRetry = dialog.WallpaperEngineSelectionChanged;
+                }
 				ClampNumberOptions();
 				int nextLayout = GetNumberOption("uiLayout", 0);
 				int nextTheme = GetNumberOption("uiTheme", 0);
@@ -542,8 +584,39 @@ namespace AandmAuto
 
 				ClearWorkshopBlock();
 				SaveOptions();
+                if (dialog.WallpaperTrayIconSetting.HasValue)
+                {
+                    try
+                    {
+                        WallpaperEngineLocator.SetTrayIconHidden(dialog.WallpaperTrayIconSetting.Value);
+                        AddLog("已保存托盘图标设置，重启 Wallpaper Engine 后生效。", BlueColor);
+                    }
+                    catch (Exception error)
+                    {
+                        AddLog("未能保存 Wallpaper Engine 托盘设置 · " + error.Message, YellowColor);
+                    }
+                }
+				ExtremePerformanceSettings.Save(AppPaths.BaseRoot, nextExtreme);
 				bool cropChanged = nextCropX != prevCropX || nextCropY != prevCropY || nextCropW != prevCropW || nextCropH != prevCropH;
-				if (projectChanged || dialog.WallpaperEngineSelectionChanged || nextLayout != prevLayout || nextTheme != prevTheme || !string.Equals(customBgPath, prevBg, StringComparison.OrdinalIgnoreCase) || nextOpacity != prevOpacity || nextBgMode != prevBgMode || nextBgFit != prevBgFit || cropChanged || nextBlur != prevBlur || nextStage != prevStage)
+				if (nextExtreme != prevExtreme)
+				{
+					activeUiLayout = nextLayout;
+					await ApplyExtremePerformanceModeAsync(nextExtreme, true);
+					if (nextLayout != prevLayout) AddLog("已切换主面板版本：" + UiLayoutName(nextLayout), BlueColor);
+				}
+				else if (nextExtreme)
+				{
+					if (nextLayout != prevLayout)
+					{
+						SwitchUiAppearance(nextLayout, UiTheme.ThemeNativeLight, "", nextOpacity, UiTheme.BgModeStatic, 0, nextBgFit);
+						AddLog("已切换主面板版本：" + UiLayoutName(nextLayout), BlueColor);
+					}
+					if (projectChanged || dialog.WallpaperEngineSelectionChanged || nextTheme != prevSavedTheme || !string.Equals(customBgPath, prevBg, StringComparison.OrdinalIgnoreCase) || nextBgMode != prevBgMode || cropChanged)
+					{
+						AddLog("主题与壁纸配置已保存，关闭极致性能模式后将恢复生效。", BlueColor);
+					}
+				}
+				else if (projectChanged || dialog.WallpaperEngineSelectionChanged || nextLayout != prevLayout || nextTheme != prevTheme || !string.Equals(customBgPath, prevBg, StringComparison.OrdinalIgnoreCase) || nextOpacity != prevOpacity || nextBgMode != prevBgMode || nextBgFit != prevBgFit || cropChanged || nextBlur != prevBlur || nextStage != prevStage)
 				{
 					UiTheme.SetCustomCrop(nextCropX, nextCropY, nextCropW, nextCropH);
 					SwitchUiAppearance(nextLayout, nextTheme, customBgPath, nextOpacity, nextBgMode, nextBlur, nextBgFit);
@@ -576,9 +649,195 @@ namespace AandmAuto
 				UpdateSettingsSummary();
 				AddLog("助手设置已保存：横挖层 " + GetNumberOption("horizontalStartDepth", 150) + " 层，工坊 " + GetNumberOption("workshopDepth", 150) + " 层/" + GetNumberOption("workshopMinutes", 120) + " 分。", BlueColor);
 
+				if (nextExtreme != webViewStartedExtremePerf && !previewMode && !Program.QuietResourceTest)
+				{
+					string promptText = nextExtreme
+						? "极致性能模式的极简外观与后台渲染暂停已即时生效。\r\n\r\n是否立即重启本窗口，以启用浏览器底层低内存启动参数（进一步降低 2GB 运存占用）？"
+						: "已关闭极致性能模式并恢复原主题与壁纸。\r\n\r\n是否立即重启本窗口，以恢复浏览器默认缓存与内存参数？";
+					DialogResult restartChoice = MessageBox.Show(
+						this,
+						promptText,
+						"重启生效底层内存参数",
+						MessageBoxButtons.YesNo,
+						MessageBoxIcon.Question);
+					if (restartChoice == DialogResult.Yes)
+					{
+						await RestartCurrentProfileAsync();
+						return;
+					}
+				}
+
 				if (dialog.OpenDevTools) BtnDevTools_Click(this, EventArgs.Empty);
-				if (dialog.OpenAccounts) BtnAccount_Click(this, EventArgs.Empty);
 			}
+		}
+
+		private async Task ApplyExtremePerformanceModeAsync(bool enabled, bool notifyPeers)
+		{
+			bool changed = extremePerformanceMode != enabled;
+			extremePerformanceMode = enabled;
+			UiTheme.ExtremePerformanceMode = enabled;
+
+			if (enabled)
+			{
+				ReleaseSharedWallpaper();
+				StopIndependentWallpaper();
+				if (bgRuntimeTimer != null) bgRuntimeTimer.Stop();
+				if (desktopCapture != null)
+				{
+					desktopCapture.Dispose();
+					desktopCapture = null;
+				}
+				UiTheme.ClearLiveDesktopFrame();
+				UiTheme.ReleasePerformanceCaches();
+				GameText.ClearCache();
+			}
+
+			int targetTheme = enabled ? UiTheme.ThemeNativeLight : GetNumberOption("uiTheme", 0);
+			string targetBgPath = enabled ? "" : customBgPath;
+			int targetOpacity = GetNumberOption("customBgOpacity", 35);
+			int targetBgMode = enabled ? UiTheme.BgModeStatic : GetNumberOption("customBgMode", 0);
+			int targetBlur = enabled ? 0 : GetNumberOption("glassBlur", 12);
+			int targetFit = GetNumberOption("customBgFit", 0);
+
+			if (!enabled)
+			{
+				UiTheme.SetCustomCrop(
+					GetNumberOption("customBgCropX", 0),
+					GetNumberOption("customBgCropY", 0),
+					GetNumberOption("customBgCropW", 10000),
+					GetNumberOption("customBgCropH", 10000));
+				playbackFailed = false;
+			}
+
+			SwitchUiAppearance(activeUiLayout, targetTheme, targetBgPath, targetOpacity, targetBgMode, targetBlur, targetFit);
+			if (detachedSidebar != null && !detachedSidebar.IsDisposed) detachedSidebar.BackColor = SideColor;
+
+			UpdateLogRuntimePolicy();
+			UpdateMemoryTrimTimer();
+			UpdateGamePollInterval();
+			await ApplyStageWallpaperAsync();
+			if (!enabled) FlushDeferredLogUi();
+			KeepPageRunning();
+
+			if (MultiAccountForm.Current != null && !MultiAccountForm.Current.IsDisposed)
+			{
+				MultiAccountForm.Current.OnExtremePerformanceChanged(enabled);
+			}
+
+			if (enabled)
+			{
+				TrimRuntimeMemory();
+			}
+
+			if (changed)
+			{
+				AddLog(enabled
+					? "已开启极致性能模式（全局生效：极简外观、低内存目标、挂机暂停画面渲染，自动任务原速无损）。"
+					: "已关闭极致性能模式，已恢复原界面主题与壁纸配置。", BlueColor);
+				if (notifyPeers)
+				{
+					NotifyOtherProfilesExtremePerf(enabled);
+				}
+			}
+		}
+
+		private async Task RestartCurrentProfileAsync()
+		{
+			try
+			{
+				string profileId = AppPaths.ValidateProfileId(AppPaths.ProfileId ?? "main");
+				string baseRoot = Path.GetFullPath(AppPaths.BaseRoot);
+				string exe = Application.ExecutablePath;
+				var argBuilder = new StringBuilder();
+				argBuilder.Append("--profile ").Append(profileId);
+				argBuilder.Append(" --data-root ").Append(AppPaths.QuoteArgument(baseRoot));
+				if (Program.NoWindowsTaskRegistration) argBuilder.Append(" --no-schtasks");
+				var info = new ProcessStartInfo(exe, argBuilder.ToString())
+				{
+					UseShellExecute = false,
+					WorkingDirectory = Path.GetDirectoryName(exe) ?? Environment.CurrentDirectory
+				};
+				info.EnvironmentVariables["AANDM_DATA_DIR"] = baseRoot;
+
+				ResetAllTaskStates();
+				coreReady = false;
+				if (pollTimer != null) pollTimer.Stop();
+				if (dailyTaskTimer != null) dailyTaskTimer.Stop();
+				if (runtimeHeartbeat != null) runtimeHeartbeat.Stop();
+				if (memoryTrimTimer != null) memoryTrimTimer.Stop();
+				if (logCleanupTimer != null) logCleanupTimer.Stop();
+				if (webView != null)
+				{
+					try { ((Component)webView).Dispose(); }
+					catch { }
+					webView = null;
+				}
+				await Task.Delay(500);
+				Program.ReleaseSingleInstanceForRestart();
+				using (var proc = Process.Start(info)) { }
+				Close();
+			}
+			catch (Exception ex)
+			{
+				AddLog("重启失败，请手动重启助手：" + ex.Message, RedColor);
+			}
+		}
+
+		private void UpdateLogRuntimePolicy()
+		{
+			int interval = extremePerformanceMode ? ExtremeLogCleanupIntervalMs : LogCleanupIntervalMs;
+			if (logCleanupTimer != null && logCleanupTimer.Interval != interval)
+			{
+				logCleanupTimer.Interval = interval;
+			}
+			int limit = LogHistoryLimit;
+			if (logHistoryLines.Count > limit)
+			{
+				int excess = logHistoryLines.Count - limit;
+				logHistoryLines.RemoveRange(0, excess);
+				logHistoryColors.RemoveRange(0, excess);
+				if (extremePerformanceMode) logUiDirty = true;
+			}
+		}
+
+		private void UpdateMemoryTrimTimer()
+		{
+			if (previewMode || IsDisposed) return;
+			if (extremePerformanceMode)
+			{
+				if (memoryTrimTimer == null)
+				{
+					memoryTrimTimer = new Timer { Interval = 45000 };
+					memoryTrimTimer.Tick += delegate { TrimRuntimeMemory(); };
+				}
+				if (!memoryTrimTimer.Enabled) memoryTrimTimer.Start();
+			}
+			else if (memoryTrimTimer != null)
+			{
+				memoryTrimTimer.Stop();
+			}
+		}
+
+		private void TrimRuntimeMemory()
+		{
+			if (!extremePerformanceMode || previewMode || IsDisposed) return;
+			UiTheme.ReleasePerformanceCaches();
+			GameText.ClearCache();
+			ExtremePerformanceSettings.TrimCurrentProcessMemory();
+		}
+
+		private bool ShouldDeferLogUi()
+		{
+			return extremePerformanceMode && (IsMinimizedOrHostMinimized() || currentBottomTab != "log");
+		}
+
+		private void FlushDeferredLogUi()
+		{
+			if (!logUiDirty || txtLog == null || txtLog.IsDisposed) return;
+			logUiDirty = false;
+			txtLog.Clear();
+			ReplayLogHistoryToRtb();
+			UpdateRecentLogView();
 		}
 
 		private async void ApplyScheduleChanges(ScheduleBook updated, string runPlanId)
@@ -613,6 +872,7 @@ namespace AandmAuto
 					|| updated.RefineFollowup != scheduleBook.RefineFollowup
 					|| checkinChanged;
 				bool removed = updated.RemoveDisabledHarvests();
+				updated.Checkpoint = scheduleBook.Checkpoint;
 				scheduleBook = updated;
 				SaveSchedule();
 				if (removed || switches) SyncHarvestWindowsTask();
@@ -644,13 +904,19 @@ namespace AandmAuto
 			txtLog.ReadOnly = true;
 			txtLog.ForeColor = (UiTheme.IsLightTheme || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass) ? TextColor : Color.FromArgb(188, 205, 166);
 			txtLog.BorderStyle = BorderStyle.None;
-			txtLog.Font = UiTheme.GameFont(8.25f, FontStyle.Regular);
 			txtLog.WordWrap = true;
 			txtLog.DetectUrls = false;
 			txtLog.HideSelection = false;
 			txtLog.ScrollBars = RichTextBoxScrollBars.Vertical;
 			txtLog.ShortcutsEnabled = true;
 			txtLog.Margin = new Padding(0, 2, 0, 0);
+			txtLog.VisibleChanged += delegate
+			{
+				if (txtLog != null && !txtLog.IsDisposed && txtLog.Visible && logUiDirty && !IsMinimizedOrHostMinimized())
+				{
+					FlushDeferredLogUi();
+				}
+			};
 			return GlassRichTextBox.WithBackdrop(txtLog);
 		}
 
@@ -901,7 +1167,7 @@ namespace AandmAuto
 
 		private void StartSilentUpdateCheck()
 		{
-			if (previewMode || Program.ScheduledLaunch || WindowState == FormWindowState.Minimized) return;
+			if (previewMode || Program.ScheduledLaunch || Program.QuietResourceTest || WindowState == FormWindowState.Minimized) return;
 			if (Environment.GetEnvironmentVariable("AANDM_SMOKE") == "1"
 				|| Environment.GetEnvironmentVariable("AANDM_PUBLIC_SMOKE") == "1"
 				|| Environment.GetEnvironmentVariable("AANDM_PUBLIC_INPUT_SMOKE") == "1"
@@ -919,18 +1185,13 @@ namespace AandmAuto
 					UpdateCheckResult res = UpdateManager.CheckForUpdates(System.Threading.CancellationToken.None);
 					if (res != null && res.State == UpdateCheckState.UpdateAvailable && !IsDisposed && IsHandleCreated)
 					{
-						BeginInvoke((MethodInvoker)delegate
+						SafeBeginInvoke(delegate
 						{
-							if (!IsDisposed)
-							{
-								AddLog("检测到新版本 v" + res.LatestVersion + "（当前 v" + res.CurrentVersion + "），可在「设置 → 检查更新」按需下载更新。", GoldColor);
-							}
+							AddLog("检测到新版本 v" + res.LatestVersion + "（当前 v" + res.CurrentVersion + "），可在「设置 → 检查更新」按需下载更新。", GoldColor);
 						});
 					}
 				}
-				catch
-				{
-				}
+				catch { }
 			});
 		}
 
@@ -957,6 +1218,7 @@ namespace AandmAuto
 				// minimized or covered by another window. Chromium otherwise applies
 				// occlusion and renderer background throttling, which makes the
 				// automation appear to stop when it is sent to the background.
+				webViewStartedExtremePerf = extremePerformanceMode;
 				string browserArgs = "--ignore-certificate-errors --autoplay-policy=no-user-gesture-required" +
 					" --disable-backgrounding-occluded-windows --disable-renderer-backgrounding" +
 					" --disable-background-timer-throttling";
@@ -965,13 +1227,22 @@ namespace AandmAuto
 				string disabledFeatures = "CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,TimerThrottling";
 				if (!baselineOptions)
 				{
-					// 资源占用：限制磁盘/媒体缓存，关闭用不到的后台特性与 JS 大对象预留。
-					browserArgs += " --disk-cache-size=268435456 --media-cache-size=33554432";
-					disabledFeatures += ",BackForwardCache,BackgroundFetch,OptimizationHints,Translate";
+					if (webViewStartedExtremePerf)
+					{
+						browserArgs += " --disk-cache-size=33554432 --media-cache-size=8388608" +
+							" --js-flags=--max-old-space-size=192 --optimize-for-size" +
+							" --renderer-process-limit=1 --disable-gpu-shader-disk-cache --disable-software-rasterizer";
+						disabledFeatures += ",BackForwardCache,BackgroundFetch,OptimizationHints,Translate,MediaRouter,HardwareMediaKeyHandling,PaintHolding,SpellCheck";
+					}
+					else
+					{
+						// 资源占用：限制磁盘/媒体缓存，关闭用不到的后台特性与 JS 大对象预留。
+						browserArgs += " --disk-cache-size=268435456 --media-cache-size=33554432";
+						disabledFeatures += ",BackForwardCache,BackgroundFetch,OptimizationHints,Translate";
+					}
 				}
 				browserArgs += " --disable-features=" + disabledFeatures;
 #if TEST_PVP_EDITION
-				// 测试服 PvP 专项版默认开启 19341 热连端口 + 静音，彻底免外部脚本与冷启动
 				string extraEnv = Environment.GetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") ?? "";
 				if (extraEnv.IndexOf("--remote-debugging-port", StringComparison.OrdinalIgnoreCase) < 0)
 				{
@@ -1006,6 +1277,10 @@ namespace AandmAuto
 					catch { }
 				};
 #endif
+				if (extremePerformanceMode)
+				{
+					UpdateBrowserMemoryPolicy(core, DateTime.UtcNow, false);
+				}
 				try
 				{
 					Directory.CreateDirectory(DataRoot());
@@ -1037,6 +1312,7 @@ namespace AandmAuto
 				core.NewWindowRequested += Core_NewWindowRequested;
 				core.ProcessFailed += Core_ProcessFailed;
                 core.WebMessageReceived += ContractCaptureReceived;
+                core.WebMessageReceived += MysteryBudgetReceived;
 				AddLog("内置浏览器初始化成功，正在打开游戏页面…", BlueColor);
 				if (autoLoginEnabled && !string.IsNullOrEmpty(accountUsername) && !string.IsNullOrEmpty(accountPassword))
 				{
@@ -1066,7 +1342,18 @@ namespace AandmAuto
 		private void Core_NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
         {
             ClearWorkshopBlock();
-            StopDaily(); StopArena(); StopVoid(); StopMine(); StopWorkshop(); StopGuild(); StopGrowth(); StopVoidExchange();
+            if (IsTaskRunning(AssistantTaskKind.Daily) && dailyEncounterPhase && !string.IsNullOrEmpty(dailyEncounterRole))
+            {
+                resumeEncounterOnPage = true;
+                taskGeneration++;
+                taskBusy = false;
+                taskInitializing = false;
+                taskNextAt = DateTime.Now.AddSeconds(1);
+            }
+            else
+            {
+                StopDaily(); StopArena(); StopVoid(); StopMine(); StopWorkshop(); StopGuild(); StopGrowth(); StopVoidExchange();
+            }
 			seenLogs.Clear();
 			lastSnapshotLogs.Clear();
 			adventureLogCursor = 0;
@@ -1082,7 +1369,8 @@ namespace AandmAuto
 				SetBadge("加载中", YellowColor);
 				UpdateMainButton(false);
 			}
-			AddLog("正在加载游戏页面：" + e.Uri, BlueColor);
+			AddLog(e.Uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                ? "正在加载内置页面…" : "正在加载游戏页面：" + e.Uri, BlueColor);
 		}
 
 		private async void Core_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
@@ -1140,7 +1428,7 @@ namespace AandmAuto
 
 		private bool IsSelfHealEnabled()
 		{
-			if (previewMode || Environment.GetEnvironmentVariable("AANDM_SMOKE") == "1" || Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE") == "1") return false;
+			if (previewMode || Program.QuietResourceTest || Environment.GetEnvironmentVariable("AANDM_SMOKE") == "1" || Environment.GetEnvironmentVariable("AANDM_MULTI_SMOKE") == "1") return false;
 			bool enabled;
 			return !options.TryGetValue("autoSelfHeal", out enabled) || enabled;
 		}
@@ -1174,14 +1462,8 @@ namespace AandmAuto
 				}
 				selfHeal.ReloadScheduled = false;
 				if (IsDisposed || !coreReady || webView == null || webView.CoreWebView2 == null) return;
-				try
-				{
-					webView.CoreWebView2.Reload();
-				}
-				catch (Exception ex)
-				{
-					AddLog("挂机自愈重载失败：" + ex.Message, RedColor);
-				}
+				try { webView.CoreWebView2.Reload(); }
+				catch (Exception ex) { AddLog("挂机自愈重载失败：" + ex.Message, RedColor); }
 			};
 			selfHealTimer.Start();
 		}
@@ -1224,6 +1506,7 @@ namespace AandmAuto
 				{
 					injectedPage = generation;
 					AddLog("自动助手脚本注入成功。", BlueColor);
+					if (extremePerformanceMode) KeepPageRunning();
 				}
 			}
 			catch (Exception ex)
@@ -1251,14 +1534,22 @@ namespace AandmAuto
 		private void UpdateGamePollInterval()
 		{
 			if (pollTimer == null || IsDisposed) return;
+			if (extremePerformanceMode)
+			{
+				bool active = AnyTaskRunning() || autoLoginReconnecting || !gameSnapshotReady || (autoLoginEnabled && !autoLoginDone);
+				bool backgroundOrMin = IsMinimizedOrHostMinimized() || quietGamePresentation || backgroundSinceUtc != DateTime.MinValue;
+				int extremeInterval = active ? 2000 : (backgroundOrMin ? 8000 : 4000);
+				if (pollTimer.Interval != extremeInterval) pollTimer.Interval = extremeInterval;
+				return;
+			}
 			bool idle = gameSnapshotReady && !AnyTaskRunning() && !autoLoginEnabled;
-			int interval = idle ? (WindowState == FormWindowState.Minimized || !Visible ? 3000 : 2000) : 1000;
+			int interval = idle ? (quietGamePresentation ? 5000 : IsMinimizedOrHostMinimized() ? 3000 : 2000) : 1000;
 			if (pollTimer.Interval != interval) pollTimer.Interval = interval;
 		}
 
 		private async Task PollOnce()
 		{
-			if (!coreReady || polling)
+			if (!coreReady || polling || webView.CoreWebView2.IsSuspended)
 			{
 				return;
 			}
@@ -1501,7 +1792,7 @@ namespace AandmAuto
 					btnMain.Text = "取消启动";
 					btnMain.Skin = GameButtonSkin.Gold;
 				}
-				else if (running)
+				else if (running || dailyEncounterPhase)
 				{
 					btnMain.Text = "Ⅱ  暂停挖矿";
 					btnMain.Skin = GameButtonSkin.Orange;
@@ -1527,17 +1818,17 @@ namespace AandmAuto
 		}
 
         private bool escortFollowupRunning,mineFollowupRunning,dailyRetryRunning;
-        protected override bool ShowWithoutActivation {get{return Program.ScheduledLaunch&&WindowState==FormWindowState.Minimized;}}
+        protected override bool ShowWithoutActivation {get{return Program.QuietResourceTest||(Program.ScheduledLaunch&&WindowState==FormWindowState.Minimized);}}
 		private async void BtnDaily_Click(object sender, EventArgs e)
 		{
 			if (IsTaskRunning(AssistantTaskKind.Daily))
             {
                 if(escortFollowupRunning)CancelHarvest("escort");else CancelScheduledQueue();
-                int generation=taskGeneration;
+                int generation=++taskGeneration;
                 taskBusy=true;
                 try{
                     if(!escortFollowupRunning&&coreReady){
-                        string raw=await ExecuteLuaAsync("return __MWA:daily_report(true)");
+                        string raw=await ExecuteLuaAsync("local report=__MWA:daily_report(true); __MWA:cancel_task(); return report");
                         if(generation==taskGeneration&&raw!="null")RecordDailyReview(json.DeserializeObject(raw),dailyRetryRunning);
                     }
                 }catch(Exception ex){AddLog("日常结果暂未保存 · "+ex.Message,YellowColor);}
@@ -1570,7 +1861,15 @@ namespace AandmAuto
                 }else if (!await InitializeTaskAsync(escortFollowup ? "__MWA:start_escort_followup(); return true" :
                     refineFollowup ? "__MWA:start_daily(true,false,true); return true" :
                     scheduledCheckin ? "__MWA:start_daily(true,true); return true" : "__MWA:start_daily(true); return true")) return;
-                if (!escortFollowup && !refineFollowup) await SyncGuildBossDailyAsync();
+                if (!escortFollowup && !refineFollowup)
+                {
+                    taskInitializing = true;
+                    await SyncGuildBossDailyAsync();
+                    if (generation != taskGeneration) return;
+                    await SyncEncounterClearDaysAsync();
+                    if (generation != taskGeneration) return;
+                    taskInitializing = false;
+                }
                 if (generation != taskGeneration) return;
 				await TryDailyStepAsync();
 			}
@@ -1592,6 +1891,24 @@ namespace AandmAuto
             int generation = taskGeneration;
 			try
 			{
+                if (resumeEncounterOnPage)
+                {
+                    if (injectedPage != pageGeneration)
+                    {
+                        taskNextAt = DateTime.Now.AddSeconds(1);
+                        return;
+                    }
+                    await SyncEncounterClearDaysAsync();
+                    if (generation != taskGeneration) return;
+                    string resumed = await ExecuteLuaAsync("return __MWA:start_daily_encounter_resume(" + LuaStringLiteral(dailyEncounterRole) + ")");
+                    if (generation != taskGeneration) return;
+                    if (resumed != "true")
+                    {
+                        taskNextAt = DateTime.Now.AddSeconds(1);
+                        return;
+                    }
+                    resumeEncounterOnPage = false;
+                }
 				string resultJson = await ExecuteLuaAsync(escortFollowupRunning
                     ? "return __MWA:harvest_result(__MWA:escort_followup_step())"
                     : "return __MWA:harvest_result(__MWA:daily_step())");
@@ -1608,11 +1925,24 @@ namespace AandmAuto
 					return;
 				}
 				string message = GetString(result, "message");
-                if(GetString(result,"phase")=="mine")dailyMinePhase=true;
+                string phase = GetString(result, "phase");
+                if (phase == "mine") dailyMinePhase = true;
+                if (phase == "encounter")
+                {
+                    string role = GetString(result, "encounterRole");
+                    if (!string.IsNullOrEmpty(role)) dailyEncounterRole = role;
+                    if (!dailyEncounterPhase)
+                    {
+                        dailyEncounterPhase = true;
+                        RefreshTaskControls();
+                        UpdateMainButton(false);
+                    }
+                }
                     ReportTaskMessage(TaskWaitText(message,GetBool(result,"wait"),result),GetBool(result,"wait"));
 				RecordWorkshopBlock(result);
                 RecordHarvestUpdates(result);
                 RecordGuildBossDone(result);
+                RecordEncounterClearDone(result);
                 if(GetBool(result,"refineTap"))await SendRefineTapAsync(result,generation);
                 await HandleRuneChoiceAsync(result,generation);
                 if(generation!=taskGeneration)return;
@@ -1658,6 +1988,10 @@ namespace AandmAuto
             dailyRetryRunning=false;
             if(runePrompt!=null)runePrompt.Close();
             dailyMinePhase=false;
+            dailyEncounterPhase=false;
+            dailyEncounterRole=null;
+            resumeEncounterOnPage=false;
+            UpdateMainButton(lastRunning);
             EndTask(AssistantTaskKind.Daily);
 			ShowWorkshopBlock();
 		}
@@ -1930,6 +2264,11 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 
 		private async void BtnMain_Click(object sender, EventArgs e)
 		{
+            if (IsTaskRunning(AssistantTaskKind.Daily) && dailyEncounterPhase)
+            {
+                BtnDaily_Click(sender, e);
+                return;
+            }
             if (HasActiveTask) { AddLog("请先停止当前任务，再启动挖矿。",YellowColor); return; }
 			if (startRequested)
 			{
@@ -2019,8 +2358,12 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			var values = new Dictionary<string, object>(options.Count + numberOptions.Count);
 			foreach (var pair in options) values[pair.Key] = pair.Value;
 			foreach (var pair in numberOptions) values[pair.Key] = pair.Value;
-			try { await ExecuteScriptAsync("window.__MWA_APP && __MWA_APP.setOptions(" + json.Serialize(values) + ")"); }
+			try {
+				await ExecuteScriptAsync("window.__MWA_APP && (__MWA_APP.setOptions(" + json.Serialize(values)
+					+ "),__MWA_APP.setMysteryProducts&&__MWA_APP.setMysteryProducts(" + json.Serialize(mysteryProducts) + "))");
+			}
 			catch (InvalidOperationException) { }
+			KeepPageRunning();
 			await SyncGuildBossDailyAsync();
 			ApplyMute();
 			await ApplyStageWallpaperAsync();
@@ -2029,6 +2372,14 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 		internal async Task ApplyStageWallpaperAsync(string liveDataUri = null)
 		{
 			if (!coreReady || IsDisposed || previewMode || webView == null || webView.CoreWebView2 == null) return;
+			if (extremePerformanceMode)
+			{
+				webView.DefaultBackgroundColor = BgColor;
+				string clearJs = "(function(){try{window.__aandmStageCfg={active:false};var oldBg=document.getElementById('__aandm_stage_bg');var oldSt=document.getElementById('__aandm_stage_bg_style');if(oldBg)oldBg.remove();if(oldSt)oldSt.remove();}catch(e){}})();";
+				try { await ExecuteScriptAsync(clearJs); }
+				catch { }
+				return;
+			}
 			bool nativeBackdrop = UseNativeStageBackdrop;
 			webView.DefaultBackgroundColor = nativeBackdrop ? Color.Transparent : BgColor;
 			bool stageEnabled = !options.ContainsKey("stageWallpaperBg") || options["stageWallpaperBg"];
@@ -2067,7 +2418,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 				: UiTheme.Palette.SideOuterColor;
 			string veilRgba = string.Format(System.Globalization.CultureInfo.InvariantCulture,
 				"rgba({0},{1},{2},{3:0.00})", baseVeil.R, baseVeil.G, baseVeil.B, veilA / 255.0);
-			bool active = stageEnabled && (!string.IsNullOrEmpty(url) || glassFallback);
+			bool active = nativeBackdrop || stageEnabled && (!string.IsNullOrEmpty(url) || glassFallback);
 
 			int formW = Math.Max(1, ClientSize.Width);
 			int formH = Math.Max(1, ClientSize.Height);
@@ -2814,10 +3165,11 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 				SafeBeginInvoke(delegate { ClearAdventureLogs(automatic); });
 				return;
 			}
-			if (automatic && txtLog.TextLength == 0)
+			if (automatic && txtLog.TextLength == 0 && logHistoryLines.Count == 0)
 			{
 				return;
 			}
+			logUiDirty = false;
 			txtLog.Clear();
 			seenLogs.Clear();
 			logHistoryLines.Clear();
@@ -2832,7 +3184,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 			if (automatic)
 			{
-				AddLog("冒险日志已定时清理（每 10 分钟自动防溢出）。", MutedColor);
+				AddLog(extremePerformanceMode ? "冒险日志已定时清理（极致性能模式每 3 分钟自动防溢出）。" : "冒险日志已定时清理（每 10 分钟自动防溢出）。", MutedColor);
 			}
 		}
 
@@ -2853,12 +3205,6 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 		private void AppendAdventureLogs(IList<string> entries, Color color)
 		{
 			if (txtLog == null || txtLog.IsDisposed || entries.Count == 0) return;
-			int selectionStart = txtLog.SelectionStart;
-			int selectionLength = txtLog.SelectionLength;
-			bool followTail = selectionLength == 0 && (txtLog.TextLength == 0 ||
-				txtLog.GetCharIndexFromPosition(new Point(Math.Max(0, txtLog.ClientSize.Width - 3),
-					Math.Max(0, txtLog.ClientSize.Height - 3))) >= txtLog.TextLength - 2);
-			Point scroll = followTail ? Point.Empty : WindowStyle.GetRichEditScroll(txtLog.Handle);
 			var block = new StringBuilder();
 			string stamp = DateTime.Now.ToString("HH:mm:ss");
 			foreach (string entry in entries)
@@ -2868,15 +3214,40 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 				RecordLogHistoryLine(line, color);
 				block.Append(line);
 			}
-			UpdateRecentLogView();
+			if (!extremePerformanceMode || !IsMinimizedOrHostMinimized())
+			{
+				UpdateRecentLogView();
+			}
+			if (ShouldDeferLogUi())
+			{
+				logUiDirty = true;
+				return;
+			}
+			if (logUiDirty)
+			{
+				FlushDeferredLogUi();
+				return;
+			}
+			int selectionStart = txtLog.SelectionStart;
+			int selectionLength = txtLog.SelectionLength;
+			bool followTail = selectionLength == 0 && (txtLog.TextLength == 0 ||
+				txtLog.GetCharIndexFromPosition(new Point(Math.Max(0, txtLog.ClientSize.Width - 3),
+					Math.Max(0, txtLog.ClientSize.Height - 3))) >= txtLog.TextLength - 2);
+			Point scroll = followTail ? Point.Empty : WindowStyle.GetRichEditScroll(txtLog.Handle);
 			txtLog.SelectionStart = txtLog.TextLength;
 			txtLog.SelectionLength = 0;
-			txtLog.SelectionColor = color;
+			if (!extremePerformanceMode)
+			{
+				txtLog.SelectionColor = color;
+			}
 			txtLog.AppendText(block.ToString());
 			int removed = 0;
-			if (txtLog.TextLength > 60000)
+			int maxLen = extremePerformanceMode ? 12000 : 60000;
+			if (txtLog.TextLength > maxLen)
 			{
-				int cut = Math.Min(25000, txtLog.TextLength);
+				int cut = extremePerformanceMode
+					? Math.Min(Math.Max(6000, txtLog.TextLength - 6000), txtLog.TextLength)
+					: Math.Min(25000, txtLog.TextLength);
 				int nl = txtLog.Text.IndexOf('\n', cut);
 				if (nl > cut && nl < txtLog.TextLength) cut = nl + 1;
 				removed = cut;
@@ -3044,16 +3415,18 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 
 		private void LoadOptions()
 		{
-			string[] array = new string[25]
+			string[] array = new string[27]
 			{
 				"autoMine", "autoGolem", "autoBoss", "autoEnter", "refuseEvents", "autoChest", "autoCaveBoss", "useTntOnLong", "allowLongOre", "autoSkipBattle",
 				"autoUseMiningBag", "autoTreasureEvent", "autoMute", "arenaAllowBloodRefresh", "autoChest40", "autoChest41", "autoChest42", "autoChest43", "autoChest44", "autoChest45",
 				"autoChest48", "waitNightmareCooldown", "autoUseEarthHeart", "runeUseFlashGold",
-				"spendAllowCaveBuy"
+				"spendAllowCaveBuy", "autoMiningTnt", "workshopShallowMining"
 			};
             var optionKeys=new List<string>(array);
             for(int id=1;id<=15;id++)optionKeys.Add("dailyTask"+id);
             optionKeys.AddRange(new[]{"dailyRewards","dailyFreePrayer","dailyFreeAlchemy","dailyIncludeMine",
+                "dailyMysteryShop",
+                "autoMysticStoneReset","lowDefinitionLive",
                 "cartUpgradeMax","cartBuyEscort","cartPaidTargetRefresh",
                 "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg","autoSelfHeal"});
             array=optionKeys.ToArray();
@@ -3063,6 +3436,8 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 			options["collapseStatus"]=options["collapseStats"]=options["collapseLog"]=false;
             options["showMiningRoute"]=false;
+            options["dailyMysteryShop"]=false;
+            options["autoMysticStoneReset"]=options["lowDefinitionLive"]=false;
 			options["earthUseAll"]=false;
             options["voidExchangeGoldSoul"]=options["voidExchangePurpleSoul"]=false;
             options["autoChest"] = false;
@@ -3074,7 +3449,13 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			options["autoSkipBattle"] = true;
 			options["arenaAllowBloodRefresh"] = true;
             options["arenaPaidRefreshChoiceV11"] = true;
+            numberOptions[BattleReplaySpeedOption] = 100;
             numberOptions["horizontalStartDepth"] = 150;
+			numberOptions["miningTntMinSaving"] = 2;
+			numberOptions["mysticStoneThreshold"] = 150;
+			numberOptions["mysticStoneResetTier"] = 1;
+			numberOptions["mysteryBuyBudget"] = 0;
+			numberOptions["mysteryRefreshBudget"] = 0;
 			numberOptions["workshopDepth"] = 150;
 			numberOptions["workshopMinutes"] = 120;
 			numberOptions["guildBossCount"] = 3;
@@ -3128,7 +3509,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 						options[key] = (bool)value;
 					}
 				}
-				foreach (string key in new[] { "horizontalStartDepth", "workshopDepth", "workshopMinutes", "guildBossCount", "refineReserve", "spendBase", "spendDay", "mineResearch", "mineResearchMask", "dailyAlchemyTier", "dailyTrollLevel", "dailyUndergroundLevel", "uiLayout", "uiTheme", "pvpUiStyle", "customBgOpacity", "customBgMode", "customBgFit", "customBgCropX", "customBgCropY", "customBgCropW", "customBgCropH", "glassBlur", "auditRetentionDays" })
+				foreach (string key in new[] { BattleReplaySpeedOption, "horizontalStartDepth", "miningTntMinSaving", "mysteryBuyBudget", "mysteryRefreshBudget", "mysticStoneThreshold", "mysticStoneResetTier", "workshopDepth", "workshopMinutes", "guildBossCount", "refineReserve", "spendBase", "spendDay", "mineResearch", "mineResearchMask", "dailyAlchemyTier", "dailyTrollLevel", "dailyUndergroundLevel", "uiLayout", "uiTheme", "pvpUiStyle", "customBgOpacity", "customBgMode", "customBgFit", "customBgCropX", "customBgCropY", "customBgCropW", "customBgCropH", "glassBlur", "wallpaperQuality", "wallpaperFps", "wallpaperPauseHidden", "auditRetentionDays" })
 				{
 					object value;
 					if (dictionary.TryGetValue(key, out value) && value != null)
@@ -3156,6 +3537,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 					wallpaperEngineDir = Convert.ToString(weDirVal) ?? "";
 				}
 				ClampNumberOptions();
+				LoadMysteryShopOptions(dictionary);
 			}
 			catch
 			{
@@ -3164,7 +3546,13 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 
 		private void ClampNumberOptions()
 		{
+            if (Array.IndexOf(BattleReplaySpeeds, GetNumberOption(BattleReplaySpeedOption, 100)) < 0)
+                numberOptions[BattleReplaySpeedOption] = 100;
             numberOptions["horizontalStartDepth"] = Math.Max(1,Math.Min(9999,GetNumberOption("horizontalStartDepth",150)));
+			numberOptions["miningTntMinSaving"] = Math.Max(1, Math.Min(90, GetNumberOption("miningTntMinSaving", 2)));
+			numberOptions["mysteryBuyBudget"] = Math.Max(0, Math.Min(1000000000, GetNumberOption("mysteryBuyBudget", 0)));
+			numberOptions["mysteryRefreshBudget"] = Math.Max(0, Math.Min(1000000000, GetNumberOption("mysteryRefreshBudget", 0)));
+			ClampMysticStoneOptions();
 			numberOptions["workshopDepth"] = Math.Max(0, Math.Min(999, GetNumberOption("workshopDepth", 150)));
 			int minutes = GetNumberOption("workshopMinutes", 120);
 			if (minutes != 60 && minutes != 120 && minutes != 240) minutes = 120;
@@ -3195,7 +3583,17 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
             numberOptions["customBgCropW"] = cw;
             numberOptions["customBgCropH"] = ch;
             numberOptions["glassBlur"] = Math.Max(0, Math.Min(24, GetNumberOption("glassBlur", 12)));
+            numberOptions["wallpaperQuality"] = Math.Max(0, Math.Min(2, GetNumberOption("wallpaperQuality", 0)));
+            numberOptions["wallpaperFps"] = Math.Max(5, Math.Min(60, GetNumberOption("wallpaperFps", 30)));
+            numberOptions["wallpaperPauseHidden"] = GetNumberOption("wallpaperPauseHidden", 1) == 0 ? 0 : 1;
             numberOptions["auditRetentionDays"] = Math.Max(3, Math.Min(90, GetNumberOption("auditRetentionDays", 14)));
+		}
+
+		private void ClampMysticStoneOptions()
+		{
+			numberOptions["mysticStoneThreshold"] = Math.Max(2, Math.Min(9999, GetNumberOption("mysticStoneThreshold", 150)));
+			int tier = GetNumberOption("mysticStoneResetTier", 1);
+			numberOptions["mysticStoneResetTier"] = (tier==100 || tier==200 || tier==300 || tier==350) ? tier : 1;
 		}
 
 		private int GetNumberOption(string key, int fallback)
@@ -3212,6 +3610,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 				var payload = new Dictionary<string, object>();
 				foreach (KeyValuePair<string, bool> pair in options) payload[pair.Key] = pair.Value;
 				foreach (KeyValuePair<string, int> pair in numberOptions) payload[pair.Key] = pair.Value;
+				payload["mysteryProducts"] = mysteryProducts;
 				payload["customBgPath"] = customBgPath ?? "";
 				payload["customBgLabel"] = customBgLabel ?? "";
 				payload["wallpaperEngineProject"] = wallpaperEngineProject ?? "";
@@ -3325,6 +3724,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
             try { if(scheduleTimer!=null){scheduleTimer.Stop();scheduleTimer.Dispose();} } catch { }
             try { if(dailyTaskTimer!=null){dailyTaskTimer.Stop();dailyTaskTimer.Dispose();} } catch { }
             try { if(logCleanupTimer!=null){logCleanupTimer.Stop();logCleanupTimer.Dispose();logCleanupTimer=null;} } catch { }
+            try { if(memoryTrimTimer!=null){memoryTrimTimer.Stop();memoryTrimTimer.Dispose();memoryTrimTimer=null;} } catch { }
             try { if(selfHealTimer!=null){selfHealTimer.Stop();selfHealTimer.Dispose();selfHealTimer=null;} } catch { }
             try { if(hints!=null){hints.RemoveAll();hints.Dispose();hints=null;} } catch { }
             try

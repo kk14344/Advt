@@ -1,5 +1,5 @@
--- Automatic digging has a deliberately separate refill policy. Daily and
--- workshop tasks retain their existing heart-first, planned batch refill.
+-- Ordinary digging refills only to its current threshold. Daily and workshop
+-- production retain their planned batch refill.
 local batch_mining_refill=A.try_use_mining_bag
 local previous_mining_response=A.mining_on_response
 local previous_random_event=A.try_refuse_event
@@ -12,7 +12,70 @@ function A:automatic_mining_depth_ready()
 end
 
 local function in_daily(self)
-    return self.daily_state and self.daily_state.running
+    return self.daily_state and self.daily_state.running and not self.daily_state.encounter_clear
+end
+
+function A:try_cave_boss()
+    if not self.cfg.autoCaveBoss or self.inBattle or self.fight or self._task_pending
+        or (self.daily_state and self.daily_state.running)
+        or self.now<(self.next_cave_boss or 0) then return false end
+    if mining.cave_boss_lv==nil then
+        if self.now>=(self.next_cave_query or 0) and self:request_channel_available() then
+            self.next_cave_query=self.now+30
+            pcall(function() mining:RefreshRandomEvents() end)
+        end
+        return false
+    end
+    local level=tonumber(mining.cave_boss_lv) or 0
+    local bp=tonumber(mining.cave_boss_bp) or 0
+    local expiry=tonumber(mining.cave_boss_end_time) or 0
+    if level<=0 or bp<=0 or (expiry>0 and expiry<=time_logic:Now()) then return false end
+    local medal=(constants.RESOURCE_TYPE or {}).demon_medal
+    local cost=tonumber(constants.CAVE_BOSS_CHALLANGE_SUB)
+    if not medal or not cost or cost<=0 or not self:can_act(2)
+        or not self:request_channel_available() then return false end
+    local known,eligible=pcall(function()
+        return resource_logic:GetResourceNum(medal)>=cost
+            and bag_logic:GetSpaceCount()>=(tonumber(constants.EVENT_MAX_BAG_SPACE_COUNT) or 1)
+    end)
+    if not known or not eligible then self.next_cave_boss=self.now+60;return false end
+    self:install_task_hooks()
+    if not self._task_hooks.challenge_cave_boss_ret then return false end
+    self.next_cave_boss=self.now+(tonumber(self.cfg.caveBossInterval) or 120)
+    local pending=self:bounded_request("challenge_cave_boss_ret","mine_cave_boss","challenge_cave_boss",{},
+        "挑战矿区副本 BOSS")
+    if pending._sent then self:mark_action() end
+    return self:advance_auto_cave_boss()
+end
+
+function A:advance_auto_cave_boss()
+    local p=self._task_pending
+    if not p or (p.kind~="mine_cave_boss" and p.kind~="mine_cave_boss_check") then return false end
+    local state=self:bounded_request_state(p,p.kind=="mine_cave_boss" and 3 or 1.5)
+    if state=="waiting" and self.cfg.autoCaveBoss then
+        self.status=p.kind=="mine_cave_boss_check" and "正在核对矿区副本 BOSS" or "等待矿区副本 BOSS 回执"
+        self.detail=p._sent and "收到回执后继续挖掘" or "游戏通道暂未接受请求"
+        return true
+    end
+    self._task_pending=nil
+    if p.kind=="mine_cave_boss_check" then return false end
+    if state=="response" then
+        if p.response.result=="success" or p.response.result==0 then
+            self.stats.caveBoss=self.stats.caveBoss+1
+            self.close_reward_until=self.now+8
+            self:log("矿区副本 BOSS 已确认，继续挖掘")
+        else
+            self:log("矿区副本 BOSS 请求未接受："..tostring(p.response.result))
+        end
+    elseif p._sent or state=="uncertain" then
+        self:log("矿区副本 BOSS 回执未确认，跳过本轮挑战")
+        if self:request_channel_available() and self._task_hooks.query_mining_info_ret then
+            self:bounded_request("query_mining_info_ret","mine_cave_boss_check","query_mining_info",{},
+                "核对矿区副本 BOSS 状态")
+            return true
+        end
+    end
+    return false
 end
 local function event_key(event)
     local pos=event.position or {}
@@ -28,6 +91,15 @@ function A:mine_tool_target(extra)
     if self.cfg.refuseEvents==false then target=math.max(41,target) end
     return target
 end
+function A:mine_refill_unavailable(st,message)
+    st.error=message
+    st.unavailable=true
+    if not (self.daily_state and self.daily_state.encounter_clear) then
+        self:set("enabled",false)
+        self.status=message
+        self:log(message)
+    end
+end
 function A:mine_single_bag_send()
     local st=self.mine_refill
     if not st or self._task_pending then return end
@@ -35,14 +107,45 @@ function A:mine_single_bag_send()
     local have=tonumber(mining.dig_count) or 0
     if have>=st.target then self.mine_refill=nil;return end
     local cap=tonumber(mining.dig_max_count) or 0
-    if cap>0 and st.target>cap then st.error="矿镐上限不足以维持所需次数";return end
+    if cap>0 and st.target>cap then
+        self:mine_refill_unavailable(st,"矿镐上限不足以维持所需次数")
+        return
+    end
+    if self.cfg.autoUseEarthHeart~=false then
+        local ok,bag=pcall(require,"logic.bag")
+        if ok and bag then
+            local items=type(bag.item_list)=="table" and bag.item_list or nil
+            if not st.inventory_read and (not items or self:earth_inventory_unknown()) then
+                st.inventory_read=true
+                st.phase="inventory"
+                self:task_request("query_bag_info_ret","mine_heart_inventory",function()
+                    return network:Send({query_bag_info={}})
+                end)
+                return
+            end
+            for _,item in pairs(items or {})do
+                local id=tonumber(item.item_id)
+                if id and tonumber(item.template_id)==6000005 and (tonumber(item.count) or 1)>0
+                    then
+                    st.error=nil;st.phase="use";st.before=have;st.reads=0;st.unavailable=nil
+                    bag.quick_use_item=false
+                    local p=self:task_request("use_item_ret","mine_single_heart",function()
+                        return network:Send({use_item={item_id=id}})
+                    end)
+                    p.accept_response=function(msg)return tonumber(msg.item_id)==id end
+                    self.status="使用大地之心";self.detail="矿镐 "..have.." / "..st.target
+                    return
+                end
+            end
+        end
+    end
     local tool=constants.RESOURCE_TYPE and constants.RESOURCE_TYPE.ultimate_tool
     local stock=tool and tonumber(resource_logic:GetResourceNum(tool)) or 0
     if not self.cfg.autoUseMiningBag or not tool or stock<1 then
-        st.error=self.cfg.autoUseMiningBag and "矿镐不足，等待补充矿工包" or "矿镐不足，请开启自动使用矿工包"
-        st.next_at=self.now+2;return
+        self:mine_refill_unavailable(st,"矿镐不足，且没有可用的大地之心或矿工包")
+        return
     end
-    st.error=nil;st.before=have;st.phase="use";st.reads=0
+    st.error=nil;st.unavailable=nil;st.before=have;st.phase="use";st.reads=0
     local p=self:task_request("use_mining_tool_ret","mine_single_bag",function()
         network:Send({use_mining_tool={resource_id=tool,num=1}})
     end)
@@ -62,9 +165,12 @@ function A:mine_bag_step()
     if not st then return false end
     local p=self._task_pending
     if p and not p.response then
-        if self.now-p.sent_at>3 and p.kind=="mine_single_bag" then
+        if self.now-p.sent_at>3 and (p.kind=="mine_single_bag" or p.kind=="mine_single_heart") then
             -- Read back state instead of repeating an uncertain use.
             self._task_pending=nil;st.uncertain=p;self:mine_bag_query()
+        elseif self.now-p.sent_at>5 and p.kind=="mine_heart_inventory" then
+            self._task_pending=nil
+            st.phase="failed";st.error="大地之心库存读取超时";st.unavailable=true
         elseif self.now-p.sent_at>5 and p.kind=="mine_bag_snapshot" then
             self._task_pending=nil;st.next_at=self.now+1;st.phase="read_wait"
         end
@@ -72,7 +178,7 @@ function A:mine_bag_step()
         if st.phase=="read_wait" then self:mine_bag_query()
         elseif not st.phase then self:mine_single_bag_send() end
     end
-    self.status=st.error or "逐个矿工包补充，等待次数确认"
+    self.status=st.error or "优先使用大地之心补充矿镐，等待次数确认"
     self.detail="当前 "..tostring(mining.dig_count).."，目标 "..self:mine_tool_target(st.extra)
     return true
 end
@@ -169,20 +275,29 @@ function A:mining_on_response(name,msg)
     if name=="query_mining_info_ret" then self:mine_sync_response(msg) end
     if not self.pending_dig then self._mine_sync=nil end
     local st=self.mine_refill;local p=self._task_pending
-    if st and p and p.response and (p.kind=="mine_single_bag" or p.kind=="mine_bag_snapshot") then
+    if st and p and p.response and p.kind=="mine_heart_inventory" then
+        self._task_pending=nil
+        local bag=require("logic.bag")
+        if (not msg.result or msg.result=="success") and type(msg.item_list)=="table" then
+            bag.item_list=msg.item_list
+            self:mine_single_bag_send()
+        else
+            st.error="未能确认大地之心库存";st.phase="failed";st.unavailable=true
+        end
+    elseif st and p and p.response and (p.kind=="mine_single_bag" or p.kind=="mine_single_heart" or p.kind=="mine_bag_snapshot") then
         self._task_pending=nil
         if msg.result and msg.result~="success" then
-            st.error="矿工包补充失败："..tostring(msg.result);st.phase="failed";self:log(st.error)
+            st.error="补充矿镐失败："..tostring(msg.result);st.phase="failed";st.unavailable=true;self:log(st.error)
         else
             if msg.dig_count~=nil then mining.dig_count=msg.dig_count end
             if (tonumber(mining.dig_count) or 0)>st.before then
                 st.uncertain=nil
                 local gap=tonumber(self.cfg.refillInterval) or 0
                 if gap>0 then st.phase=nil;st.next_at=self.now+gap
-                else self:mine_single_bag_send() end -- next use is always num=1
-            elseif p.kind=="mine_single_bag" then self:mine_bag_query()
+                else self:mine_single_bag_send() end
+            elseif p.kind=="mine_single_bag" or p.kind=="mine_single_heart" then self:mine_bag_query()
             elseif (st.reads or 0)<3 then st.phase="read_wait";st.next_at=self.now+0.5
-            else st.error="补充后矿镐尚未增加，停止重复消耗并等待同步";st.phase="read_wait";st.next_at=self.now+3 end
+            else st.error="补充后矿镐尚未增加，停止重复消耗并等待同步";st.phase="read_wait";st.next_at=self.now+3;st.unavailable=true end
         end
     end
     p=self._task_pending

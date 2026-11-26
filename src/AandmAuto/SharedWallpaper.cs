@@ -88,6 +88,25 @@ namespace AandmAuto
 			finally { sync.ReleaseMutex(); }
 		}
 
+        internal int SampleHash()
+        {
+            if (!TryEnter(25)) return 0;
+            try
+            {
+                int width = view.ReadInt32(8), height = view.ReadInt32(12);
+                if (width < 1 || height < 1 || Sequence == 0) return 0;
+                int hash = 17;
+                for (int y = 1; y <= 8; y++)
+                    for (int x = 1; x <= 12; x++)
+                    {
+                        int offset = (y * height / 9 * width + x * width / 13) * 4;
+                        hash = unchecked(hash * 31 + (Marshal.ReadInt32(Pixels, offset) & 0xffffff));
+                    }
+                return hash;
+            }
+            finally { sync.ReleaseMutex(); }
+        }
+
 		internal bool Paint(Graphics graphics, Size canvas, Point offset, Rectangle bounds)
 		{
 			if (bounds.Width < 1 || bounds.Height < 1 || canvas.Width < 1 || canvas.Height < 1 || !TryEnter(25)) return false;
@@ -132,6 +151,8 @@ namespace AandmAuto
 		private readonly Form owner;
 		private readonly System.Windows.Forms.Timer timer;
 		private WallpaperEnginePlayback engine;
+		private WallpaperEnginePlayback captureInFlight;
+		internal string WindowTitle { get { return engine == null ? "" : engine.WindowTitle; } }
 		private string executable;
 		private string source;
 		private bool capturing;
@@ -157,7 +178,16 @@ namespace AandmAuto
 			lastFrameUtc = DateTime.UtcNow;
 			long previous = Frames.Sequence;
 			timer.Start();
-			while (!disposed && Error == null && Frames.Sequence == previous) await Task.Delay(100);
+			DateTime deadline = DateTime.UtcNow.AddSeconds(20);
+            while (!disposed && Error == null && Frames.Sequence == previous && DateTime.UtcNow < deadline)
+                await Task.Delay(100);
+            if (disposed) throw new ObjectDisposedException("SharedWallpaperPlayer");
+            if (Frames.Sequence == previous && Error == null)
+            {
+                timer.Stop();
+                StopEngine();
+                throw new TimeoutException("同屏壁纸未能出帧。");
+            }
 			if (Error != null) throw new InvalidOperationException(Error);
 		}
 
@@ -182,6 +212,7 @@ namespace AandmAuto
 					lastFrameUtc = DateTime.UtcNow;
 				}
 				WallpaperEnginePlayback current = engine;
+				captureInFlight = current;
 				using (Bitmap frame = await Task.Run(() => current.Capture(size)))
 				{
 					if (disposed || owner.IsDisposed || current != engine) return;
@@ -203,7 +234,13 @@ namespace AandmAuto
 					StopEngine();
 				}
 			}
-			finally { capturing = false; }
+			finally
+            {
+                WallpaperEnginePlayback completed = captureInFlight;
+                captureInFlight = null;
+                capturing = false;
+                if (completed != null && completed != engine) completed.Dispose();
+            }
 		}
 
 		internal void PublishStatic(string imagePath)
@@ -237,8 +274,9 @@ namespace AandmAuto
 		private void StopEngine()
 		{
 			if (engine == null) return;
-			engine.Dispose();
-			engine = null;
+			WallpaperEnginePlayback previous = engine;
+            engine = null;
+            if (previous != captureInFlight) previous.Dispose();
 		}
 
 		public void Dispose()

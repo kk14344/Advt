@@ -2,7 +2,8 @@ const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('ass
 const root=path.resolve(__dirname,'..');
 function trial(file){
   let time=0,loaded=false,installed=false,heavy=0,bulk=0,options=0,ticks=0,calls=0;
-  const intervals=[];
+  const intervals=[], timeouts=new Map();
+  let nextTimeout=0;
   const lua={execute(code){calls++;
     if(code.length>100000){heavy++;if(!loaded)throw Error('modules still loading');installed=true;return;}
     if(code.includes('VERSION or nil'))return installed?'1.38.0':null;
@@ -13,9 +14,16 @@ function trial(file){
     if(code.includes('pending_contract_captures'))return [];
     return null;
   }};
-  const context={window:{__AANDM:{vm:lua,engine:{hasVisibleBattle:()=>false}}},performance:{now:()=>time},setInterval:(f,ms)=>{intervals.push({f,ms});}};
+  const context={window:{__AANDM:{vm:lua,engine:{hasVisibleBattle:()=>false}}},performance:{now:()=>time},
+    setInterval:(f,ms)=>{intervals.push({f,ms});},
+    setTimeout:(f,ms)=>{const id=++nextTimeout;timeouts.set(id,{f,at:time+ms});return id;},
+    clearTimeout:id=>timeouts.delete(id)};
   vm.runInNewContext(fs.readFileSync(file,'utf8'),context);
-  function advance(ms){for(let t=0;t<ms;t+=10){time+=10;for(const i of intervals)if(time%i.ms===0)i.f();}}
+  function advance(ms){for(let t=0;t<ms;t+=10){
+    time+=10;
+    for(const i of intervals)if(time%i.ms===0)i.f();
+    for(const [id,task] of timeouts)if(time>=task.at){timeouts.delete(id);task.f();}
+  }}
   const app=context.window.__MWA_APP;
   if(app.setOptions){
     const before=calls;

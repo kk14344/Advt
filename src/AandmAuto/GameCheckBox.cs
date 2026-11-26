@@ -7,7 +7,15 @@ namespace AandmAuto
 {
 	internal sealed class GameCheckBox : CheckBox
 	{
-		private bool hovered;
+        private bool hovered;
+        private const int MarkWidth = 14;
+        private const int MarkX = 2;
+        internal Rectangle LabelBounds
+        {
+            get { return new Rectangle(MarkX + MarkWidth + 7, 0, Math.Max(0, Width - MarkX - MarkWidth - 9), Height); }
+        }
+
+        internal Color? LabelColorOverride { get; set; }
 
 		public GameCheckBox()
 		{
@@ -30,8 +38,8 @@ namespace AandmAuto
 		{
 			UiSurface.PaintBackdrop(this, graphics);
 			graphics.SmoothingMode = SmoothingMode.AntiAlias;
-			int num = 14;
-			int num2 = 2;
+			int num = MarkWidth;
+			int num2 = MarkX;
 			int num3 = Math.Max(1, (base.Height - num) / 2);
 			Rectangle rectangle = new Rectangle(num2, num3, num, num);
 
@@ -100,11 +108,10 @@ namespace AandmAuto
 				}
 			}
 
-			Rectangle bounds = new Rectangle(rectangle.Right + 7, 0, base.Width - rectangle.Right - 9, base.Height);
 			Color foreColor = base.Enabled
-				? ((UiTheme.IsLightTheme || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass) ? UiTheme.Palette.TextColor : ForeColor)
+				? (LabelColorOverride ?? ((UiTheme.IsLightTheme || UiTheme.CurrentTheme == UiTheme.ThemeLiquidGlass) ? UiTheme.Palette.TextColor : ForeColor))
 				: UiTheme.Palette.MutedColor;
-			GameText.Draw(graphics, Text, Font, bounds, foreColor, UiSurface.TextFlags | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+			GameText.Draw(graphics, Text, Font, LabelBounds, foreColor, UiSurface.TextFlags | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
 			if (Focused)
 			{
 				Rectangle rectangle2 = new Rectangle(0, 0, base.Width - 1, base.Height - 1);

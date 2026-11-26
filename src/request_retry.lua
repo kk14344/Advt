@@ -312,6 +312,31 @@ local function request_backoff(p)
     p.retries=(p.retries or 0)+1
     return math.min(10,0.5*2^math.min(5,p.retries-1))
 end
+
+-- These requests belong to a controller which validates each operation before
+-- sending and deals with ambiguous writes by reading server state.
+function A:bounded_request(event,kind,key,payload,description,accept_response)
+    return self:task_request(event,kind,function()
+        local pending=self._task_pending
+        pending._no_retry=true
+        pending.started_at=task_now(self)
+        pending.description=description
+        pending.accept_response=accept_response
+        local accepted=network:Send({[key]=payload or {}})
+        if accepted==false then pending.blocked=true end
+        return true
+    end)
+end
+
+function A:bounded_request_state(pending,timeout)
+    if pending.response then return "response" end
+    if pending.blocked then return "unsent" end
+    if pending.transport_uncertain then return "uncertain" end
+    if pending._sent then
+        if task_now(self)-pending.sent_at>=timeout then return "uncertain" end
+    elseif task_now(self)-pending.started_at>=1 then return "unsent" end
+    return "waiting"
+end
 function A:request_retry_gate(owner)
     local p=self._task_pending;if not p or p._no_retry then return nil end
     local st=self.daily_state
@@ -486,7 +511,7 @@ local request_tick=A.tick
 if request_tick then
     function A:tick(now,...)
         local p=self._task_pending
-        if p and p.queued and not (self.daily_state and self.daily_state.running) then
+        if p and p.queued and not p._no_retry and not (self.daily_state and self.daily_state.running) then
             self.now=tonumber(now) or self.now;p.sent_at=task_now(self)
             if request_channel_free() then network:Send(request_copy(p._transport_message or p.message)) end
         end

@@ -1116,10 +1116,11 @@ namespace AandmAuto
 			Rectangle track = new Rectangle(0, 0, Width - 1, Height - 1);
 			int trackRad = Math.Max(6, track.Height / 2);
 
-			// Recessed glass track
+			// Recessed glass track (Direction C ultra-clean depth)
+			bool bright = LiquidGlassEngine.IsBrightBackdrop();
 			using (GraphicsPath tp = UiTheme.RoundedRect(track, trackRad))
-			using (var tb = new SolidBrush(LiquidGlassEngine.GlassTrackFill()))
-			using (var tpen = new Pen(LiquidGlassEngine.GlassHairline(), 1f))
+			using (var tb = new SolidBrush(bright ? Color.FromArgb(24, 18, 28, 48) : Color.FromArgb(72, 0, 0, 0)))
+			using (var tpen = new Pen(bright ? Color.FromArgb(22, 18, 28, 48) : Color.FromArgb(20, 255, 255, 255), 0.85f))
 			{
 				g.FillPath(tb, tp);
 				g.DrawPath(tpen, tp);
@@ -1137,9 +1138,8 @@ namespace AandmAuto
 			int thumbRad = Math.Max(5, thumbRect.Height / 2);
 
 			// Sliding crystal lens thumb (live wallpaper refraction while sliding, cached when settled!)
-			bool bright = LiquidGlassEngine.IsBrightBackdrop();
-			Color thumbTint = bright ? Color.White : Color.FromArgb(245, 250, 255);
-			int thumbAlpha = bright ? 95 : 42;
+			Color thumbTint = bright ? Color.White : Color.FromArgb(235, 245, 255);
+			int thumbAlpha = bright ? 92 : 34;
 			UiTheme.DrawLiquidGlassPill(
 				g, this, thumbRect, thumbRad,
 				thumbTint, thumbAlpha, Color.White,

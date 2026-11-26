@@ -25,9 +25,10 @@ namespace AandmAuto
 				UiSurface.PaintBackdrop(this, graphics);
 				Rectangle gb = new Rectangle(0, 0, base.Width - 1, base.Height - 1);
 				bool activeState = !string.IsNullOrEmpty(Text) && (Text.Contains("运行") || Text.Contains("挖矿") || Text.Contains("日常") || Text.Contains("竞技") || Text.Contains("首领") || Text.Contains("推进") || Text.Contains("执行") || Text.Contains("强化") || Text.Contains("连抽") || Text.Contains("采集"));
-				Color tintC = activeState ? Color.FromArgb(28, 178, 102) : Color.White;
-				int tintA = activeState ? 78 : 0;
-				UiTheme.DrawLiquidGlassPill(graphics, this, gb, gb.Height / 2, tintC, tintA, Color.White, false, false, activeState, base.Enabled);
+				Color tintC = activeState ? Color.FromArgb(24, 168, 96) : Color.White;
+				int tintA = activeState ? 96 : 0;
+				UiTheme.DrawLiquidGlassPill(graphics, this, gb, gb.Height / 2, tintC, tintA, Color.White, false, false, activeState, base.Enabled,
+					0f, 0f, 0f, new Point(-999, -999), !activeState);
 
 				Color ink = activeState ? Color.White : LiquidGlassEngine.GlassInk(base.Enabled);
 				Color shadow = activeState ? Color.FromArgb(145, 0, 0, 0) : LiquidGlassEngine.GlassTextShadow();

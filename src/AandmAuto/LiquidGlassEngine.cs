@@ -260,22 +260,23 @@ namespace AandmAuto
 					UiTheme.DrawGlassSamplePublic(g, sample, bounds, width, height, x, y);
 				}
 
+				// Direction C quiet seamless sheet: lets wallpaper breathe with restrained depth, zero chalky fog
 				int baseAlpha;
 				Color fillBase;
 				if (Preset == PresetCrystal)
 				{
-					baseAlpha = bright ? (subtle ? 26 : 38) : (subtle ? 12 : 20);
-					fillBase = bright ? Color.White : Color.FromArgb(240, 248, 255);
+					baseAlpha = bright ? (subtle ? 38 : 54) : (subtle ? 34 : 52);
+					fillBase = bright ? Color.White : Color.FromArgb(8, 12, 20);
 				}
 				else if (Preset == PresetDeep)
 				{
-					baseAlpha = subtle ? 102 : 126;
-					fillBase = Color.FromArgb(12, 18, 30);
+					baseAlpha = subtle ? 96 : 122;
+					fillBase = Color.FromArgb(8, 12, 22);
 				}
 				else
 				{
-					baseAlpha = bright ? (subtle ? 46 : 62) : (subtle ? 28 : 42);
-					fillBase = bright ? Color.White : Color.FromArgb(16, 24, 38);
+					baseAlpha = bright ? (subtle ? 56 : 74) : (subtle ? 52 : 68);
+					fillBase = bright ? Color.White : Color.FromArgb(8, 12, 20);
 				}
 				using (var tint = new SolidBrush(Color.FromArgb(baseAlpha, fillBase)))
 				{
@@ -288,13 +289,18 @@ namespace AandmAuto
 			g.SmoothingMode = SmoothingMode.HighQuality;
 			g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-			// Crisp 315° / 135° Apple meniscus rim
-			int hiA = bright ? (subtle ? 165 : 225) : (subtle ? 68 : 112);
-			int loA = bright ? (subtle ? 70 : 120) : (subtle ? 22 : 44);
-			using (var rim = new LinearGradientBrush(bounds, Color.FromArgb(hiA, Color.White), Color.FromArgb(loA, Color.White), 135f))
-			using (var pen = new Pen(rim, 1.1f))
+			// Ultra-refined hairline border (no thick bright plastic outline) + delicate top micro-catchlight
+			Color borderColor = bright ? Color.FromArgb(30, 20, 32, 52) : Color.FromArgb(28, 255, 255, 255);
+			using (var pen = new Pen(borderColor, 0.9f))
 			{
 				g.DrawPath(pen, clipPath);
+			}
+			int r = Math.Max(4, Math.Min(cornerRadius, Math.Min(bounds.Width / 2, bounds.Height / 2)));
+			if (bounds.Width > r * 2 + 6)
+			{
+				Color topHi = bright ? Color.FromArgb(155, 255, 255, 255) : Color.FromArgb(52, 255, 255, 255);
+				using (var hiPen = new Pen(topHi, 0.85f))
+					g.DrawLine(hiPen, bounds.Left + r, bounds.Top + 1, bounds.Right - r, bounds.Top + 1);
 			}
 		}
 
@@ -344,81 +350,120 @@ namespace AandmAuto
 			float hoverT,
 			float pressT,
 			float sheenT,
-			Point pointerLocal)
+			Point pointerLocal,
+			bool quietAtRest = false)
 		{
 			if (rect.Width < 4 || rect.Height < 4) return;
 			int radius = Math.Max(3, Math.Min(cornerRadius, Math.Min(rect.Width, rect.Height) / 2));
 			bool bright = IsBrightBackdrop();
 
-			int canvasW = rect.Width, canvasH = rect.Height, ox = 0, oy = 0;
-			if (ctrl != null) UiTheme.GetWindowCanvasMetrics(ctrl, out canvasW, out canvasH, out ox, out oy);
-			ox += rect.X;
-			oy += rect.Y;
+			float effectiveHover = Math.Max(hoverT, hovered && !GlassAnimator.Enabled ? 1f : 0f);
+			float effectivePress = Math.Max(pressT, pressed && !GlassAnimator.Enabled ? 1f : 0f);
+			float sheenGlow = (sheenT > 0.005f && sheenT < 0.995f) ? (float)Math.Sin(sheenT * Math.PI) : 0f;
 
-			Bitmap source = ctrl != null ? ResolvePillBackdropSample(ctrl) : null;
-			long seq = UiTheme.WallpaperFrameSequence;
+			// Direction C: Quiet seamless borderless surface at rest; physical liquid lens awakens on hover/active/hero!
+			bool alwaysLens = !quietAtRest || selected || (tintAlpha > 0 && tintColor != Color.White);
+			float awaken = alwaysLens ? 1f : Math.Max(effectiveHover, Math.Max(effectivePress, sheenGlow * 0.85f));
+			if (!enabled && quietAtRest) awaken = 0f;
 
-			// Use cached refracted pill bitmap when control is provided so 60fps hover/sheen costs ~0.05ms!
-			Bitmap rendered = null;
-			bool disposeRendered = false;
-			if (ctrl != null)
+			g.SmoothingMode = SmoothingMode.HighQuality;
+			if (awaken < 0.99f)
 			{
-				PillCache cache = pillCaches.GetValue(ctrl, c =>
+				using (GraphicsPath qPath = UiTheme.RoundedRect(rect, radius))
 				{
-					var pc = new PillCache();
-					c.Disposed += delegate { pc.Release(); };
-					return pc;
-				});
-				bool match = cache.Image != null
-					&& cache.W == rect.Width && cache.H == rect.Height && cache.Radius == radius
-					&& cache.Ox == ox && cache.Oy == oy && cache.CanvasW == canvasW && cache.CanvasH == canvasH
-					&& cache.Seq == seq && cache.Preset == Preset && cache.Blur == UiTheme.GlassBlur
-					&& cache.TintArgb == tintColor.ToArgb() && cache.TintAlpha == tintAlpha
-					&& cache.Selected == selected && cache.Enabled == enabled && cache.IsLight == bright
-					&& cache.HasSource == (source != null);
-				if (!match)
+					int qAlpha = bright
+						? (int)((enabled ? 13f : 8f) * (1f - awaken * 0.45f))
+						: (int)((enabled ? 15f : 9f) * (1f - awaken * 0.45f));
+					Color qColor = bright ? Color.FromArgb(qAlpha, 18, 30, 52) : Color.FromArgb(qAlpha, 255, 255, 255);
+					using (var qb = new SolidBrush(qColor))
+						g.FillPath(qb, qPath);
+				}
+			}
+
+			if (awaken > 0.01f)
+			{
+				int canvasW = rect.Width, canvasH = rect.Height, ox = 0, oy = 0;
+				if (ctrl != null) UiTheme.GetWindowCanvasMetrics(ctrl, out canvasW, out canvasH, out ox, out oy);
+				ox += rect.X;
+				oy += rect.Y;
+
+				Bitmap source = ctrl != null ? ResolvePillBackdropSample(ctrl) : null;
+				long seq = UiTheme.WallpaperFrameSequence;
+
+				Bitmap rendered = null;
+				bool disposeRendered = false;
+				if (ctrl != null)
 				{
-					cache.Release();
-					cache.Image = BakeRefractedPillBitmap(
+					PillCache cache = pillCaches.GetValue(ctrl, c =>
+					{
+						var pc = new PillCache();
+						c.Disposed += delegate { pc.Release(); };
+						return pc;
+					});
+					bool match = cache.Image != null
+						&& cache.W == rect.Width && cache.H == rect.Height && cache.Radius == radius
+						&& cache.Ox == ox && cache.Oy == oy && cache.CanvasW == canvasW && cache.CanvasH == canvasH
+						&& cache.Seq == seq && cache.Preset == Preset && cache.Blur == UiTheme.GlassBlur
+						&& cache.TintArgb == tintColor.ToArgb() && cache.TintAlpha == tintAlpha
+						&& cache.Selected == selected && cache.Enabled == enabled && cache.IsLight == bright
+						&& cache.HasSource == (source != null);
+					if (!match)
+					{
+						cache.Release();
+						cache.Image = BakeRefractedPillBitmap(
+							rect.Width, rect.Height, radius,
+							source, canvasW, canvasH, ox, oy,
+							tintColor, tintAlpha, selected, enabled, bright);
+						cache.W = rect.Width; cache.H = rect.Height; cache.Radius = radius;
+						cache.Ox = ox; cache.Oy = oy; cache.CanvasW = canvasW; cache.CanvasH = canvasH;
+						cache.Seq = seq; cache.Preset = Preset; cache.Blur = UiTheme.GlassBlur;
+						cache.TintArgb = tintColor.ToArgb(); cache.TintAlpha = tintAlpha;
+						cache.Selected = selected; cache.Enabled = enabled; cache.IsLight = bright;
+						cache.HasSource = (source != null);
+					}
+					rendered = cache.Image;
+				}
+				else
+				{
+					rendered = BakeRefractedPillBitmap(
 						rect.Width, rect.Height, radius,
 						source, canvasW, canvasH, ox, oy,
 						tintColor, tintAlpha, selected, enabled, bright);
-					cache.W = rect.Width; cache.H = rect.Height; cache.Radius = radius;
-					cache.Ox = ox; cache.Oy = oy; cache.CanvasW = canvasW; cache.CanvasH = canvasH;
-					cache.Seq = seq; cache.Preset = Preset; cache.Blur = UiTheme.GlassBlur;
-					cache.TintArgb = tintColor.ToArgb(); cache.TintAlpha = tintAlpha;
-					cache.Selected = selected; cache.Enabled = enabled; cache.IsLight = bright;
-					cache.HasSource = (source != null);
+					disposeRendered = true;
 				}
-				rendered = cache.Image;
-			}
-			else
-			{
-				rendered = BakeRefractedPillBitmap(
-					rect.Width, rect.Height, radius,
-					source, canvasW, canvasH, ox, oy,
-					tintColor, tintAlpha, selected, enabled, bright);
-				disposeRendered = true;
+
+				// Grounded tight contact shadow scaled by awaken (zero muddy float)
+				int shA = (int)((bright ? 20f : 44f) * awaken);
+				if (shA > 2)
+				{
+					using (GraphicsPath shadowPath = UiTheme.RoundedRect(new Rectangle(rect.X, rect.Y + 2, rect.Width, rect.Height), radius))
+					using (var shadowBrush = new SolidBrush(Color.FromArgb(shA, 0, 0, 0)))
+					{
+						g.FillPath(shadowBrush, shadowPath);
+					}
+				}
+
+				if (rendered != null)
+				{
+					if (awaken >= 0.99f)
+					{
+						g.DrawImageUnscaled(rendered, rect.X, rect.Y);
+					}
+					else
+					{
+						using (var ia = new ImageAttributes())
+						{
+							var cm = new ColorMatrix { Matrix33 = awaken };
+							ia.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+							g.DrawImage(rendered, rect, 0, 0, rendered.Width, rendered.Height, GraphicsUnit.Pixel, ia);
+						}
+					}
+					if (disposeRendered) rendered.Dispose();
+				}
 			}
 
-			// Subtle outer ambient drop shadow
-			g.SmoothingMode = SmoothingMode.HighQuality;
-			using (GraphicsPath shadowPath = UiTheme.RoundedRect(new Rectangle(rect.X, rect.Y + 2, rect.Width, rect.Height), radius))
-			using (var shadowBrush = new SolidBrush(Color.FromArgb(bright ? 22 : 44, 0, 0, 0)))
-			{
-				g.FillPath(shadowBrush, shadowPath);
-			}
-
-			if (rendered != null)
-			{
-				g.DrawImageUnscaled(rendered, rect.X, rect.Y);
-				if (disposeRendered) rendered.Dispose();
-			}
-
-			// Fast dynamic interactive overlays (hover lift, press depth, cursor specular spot, click liquid sheen)
-			float effectiveHover = Math.Max(hoverT, hovered && !GlassAnimator.Enabled ? 1f : 0f);
-			float effectivePress = Math.Max(pressT, pressed && !GlassAnimator.Enabled ? 1f : 0f);
-			if (effectiveHover > 0.01f || effectivePress > 0.01f || (sheenT > 0.005f && sheenT < 0.995f))
+			// Fast dynamic interactive overlays (subtle cursor specular spot, press depth, soft liquid sheen)
+			if (effectiveHover > 0.01f || effectivePress > 0.01f || sheenGlow > 0.01f)
 			{
 				using (GraphicsPath path = UiTheme.RoundedRect(rect, radius))
 				{
@@ -428,14 +473,14 @@ namespace AandmAuto
 						g.SetClip(path, CombineMode.Intersect);
 						if (effectiveHover > 0.01f && enabled)
 						{
-							int ha = (int)(effectiveHover * (bright ? 48f : 32f));
+							int ha = (int)(effectiveHover * (bright ? 34f : 18f));
 							using (var hb = new SolidBrush(Color.FromArgb(ha, Color.White)))
 								g.FillRectangle(hb, rect);
 
-							// Cursor-tracked subtle optical reflection
+							// Cursor-tracked delicate optical reflection
 							if (pointerLocal.X >= 0 && pointerLocal.Y >= 0 && pointerLocal.X <= rect.Width + 20)
 							{
-								int spotR = Math.Max(36, Math.Min(96, rect.Width / 2));
+								int spotR = Math.Max(32, Math.Min(86, rect.Width / 2));
 								Rectangle spotRect = new Rectangle(
 									rect.X + pointerLocal.X - spotR,
 									rect.Y + pointerLocal.Y - spotR,
@@ -445,7 +490,7 @@ namespace AandmAuto
 									gp.AddEllipse(spotRect);
 									using (var pgb = new PathGradientBrush(gp))
 									{
-										pgb.CenterColor = Color.FromArgb((int)(effectiveHover * 54f), Color.White);
+										pgb.CenterColor = Color.FromArgb((int)(effectiveHover * 42f), Color.White);
 										pgb.SurroundColors = new[] { Color.FromArgb(0, Color.White) };
 										g.FillPath(pgb, gp);
 									}
@@ -454,17 +499,16 @@ namespace AandmAuto
 						}
 						if (effectivePress > 0.01f && enabled)
 						{
-							int pa = (int)(effectivePress * 34f);
+							int pa = (int)(effectivePress * 36f);
 							using (var pb = new SolidBrush(Color.FromArgb(pa, 0, 0, 0)))
 								g.FillRectangle(pb, rect);
 						}
-						if (sheenT > 0.005f && sheenT < 0.995f)
+						if (sheenGlow > 0.01f)
 						{
-							float bandW = Math.Max(38f, rect.Width * 0.42f);
+							float bandW = Math.Max(36f, rect.Width * 0.40f);
 							float cx = rect.X - bandW + (rect.Width + bandW * 2f) * sheenT;
 							RectangleF sheenRect = new RectangleF(cx, rect.Y - 4, bandW, rect.Height + 8);
-							float fade = (float)Math.Sin(sheenT * Math.PI);
-							int sa = Math.Max(0, Math.Min(110, (int)(fade * 95f)));
+							int sa = Math.Max(0, Math.Min(78, (int)(sheenGlow * 68f)));
 							using (var sb = new LinearGradientBrush(sheenRect, Color.FromArgb(0, Color.White), Color.FromArgb(0, Color.White), 20f))
 							{
 								var cb = new ColorBlend(3);
@@ -476,20 +520,15 @@ namespace AandmAuto
 						}
 					}
 					finally { g.Restore(st); }
-
-					if (effectiveHover > 0.01f && enabled)
-					{
-						using (var hp = new Pen(Color.FromArgb((int)(effectiveHover * 115f), Color.White), 1.15f))
-							g.DrawPath(hp, path);
-					}
 				}
 			}
 		}
 
 		/// <summary>
-		/// Exact /unsafe LockBits port of the 4-layer thick Apple Liquid Glass pill shader:
-		/// 4-tap bilinear convex rim refraction + subtle chromatic fringe + translucent tint UNDER specular
-		/// + outer optical lip + 315/135 liquid-mercury rim + inner caustic bounce + hero dome gloss + SDF AA.
+		/// Zero-plastic optical liquid lens shader (Direction C):
+		/// - Cubic convex rim refraction + subtle chromatic dispersion
+		/// - Preserved & enriched background vibrancy (NO milky white wash!)
+		/// - 0.95px dark cut-edge glass absorption + razor-thin directional Fresnel glint (NO chalky halo, NO jelly dome!)
 		/// </summary>
 		private static unsafe Bitmap BakeRefractedPillBitmap(
 			int pw, int ph, int radius,
@@ -500,39 +539,38 @@ namespace AandmAuto
 			var result = new Bitmap(pw, ph, PixelFormat.Format32bppPArgb);
 			bool isBigHero = ph >= 42;
 			float rad = Math.Max(3f, Math.Min(radius, Math.Min(pw, ph) * 0.5f));
-			float rimThick = isBigHero ? Math.Min(rad * 0.92f, 14.5f) : Math.Min(rad * 0.88f, 10.5f);
-			float baseStrength = Preset == PresetCrystal ? 9.5f : (Preset == PresetDeep ? 5.0f : 7.8f);
-			float strength = isBigHero ? baseStrength * 1.22f : baseStrength;
-			float chroma = Preset == PresetDeep ? 0.45f : 0.95f;
+			float rimThick = isBigHero ? Math.Min(rad * 0.85f, 10.5f) : Math.Min(rad * 0.85f, 8.8f);
+			float baseStrength = Preset == PresetCrystal ? 7.4f : (Preset == PresetDeep ? 4.8f : 6.4f);
+			float strength = isBigHero ? baseStrength * 1.12f : baseStrength;
+			float chroma = Preset == PresetDeep ? 0.35f : 0.62f;
+			float satBoost = Preset == PresetDeep ? 1.08f : 1.18f;
 			float halfBoxW = Math.Max(0f, pw * 0.5f - rad);
 			float halfBoxH = Math.Max(0f, ph * 0.5f - rad);
 			float cx = pw * 0.5f;
 			float cy = ph * 0.5f;
 
-			// Determine translucent tint blended UNDERNEATH the 4-layer crystal specular rim
-			float tintA;
+			// Restrained tint ONLY on primary CTA / active states; ZERO milky white veil on clear optical lenses!
+			float tintA = 0f;
 			if (!enabled)
 			{
-				tintA = bright ? 0.14f : 0.10f;
+				tintA = bright ? 0.12f : 0.08f;
 			}
 			else if (tintAlpha > 0 && tintColor != Color.White)
 			{
-				tintA = Math.Max(0.16f, Math.Min(0.50f, tintAlpha / 255f));
+				tintA = Math.Max(0.16f, Math.Min(0.48f, tintAlpha / 255f));
 			}
 			else if (selected)
 			{
-				tintA = bright ? 0.46f : 0.24f;
+				tintA = bright ? 0.36f : 0.13f;
 			}
-			else
+			else if (Preset == PresetDeep)
 			{
-				tintA = Preset == PresetCrystal ? (bright ? 0.14f : 0.055f)
-					: (Preset == PresetDeep ? 0.36f : (bright ? 0.20f : 0.10f));
+				tintA = 0.24f;
 			}
-			float tR = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 14f : tintColor.R;
-			float tG = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 22f : tintColor.G;
-			float tB = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 36f : tintColor.B;
+			float tR = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 10f : tintColor.R;
+			float tG = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 16f : tintColor.G;
+			float tB = (Preset == PresetDeep && tintColor == Color.White && !selected) ? 28f : tintColor.B;
 
-			// Compute source mapping rectangle (cover alignment matching UiTheme)
 			int sw = 0, sh = 0;
 			Rectangle srcMap = Rectangle.Empty;
 			BitmapData srcData = null;
@@ -561,15 +599,18 @@ namespace AandmAuto
 					float mapScaleX = srcMap.Width > 0 ? (float)sw / srcMap.Width : 0f;
 					float mapScaleY = srcMap.Height > 0 ? (float)sh / srcMap.Height : 0f;
 
-					float fallbackR = bright ? 225f : 26f;
-					float fallbackG = bright ? 236f : 38f;
-					float fallbackB = bright ? 246f : 56f;
+					float fallbackR = bright ? 225f : 22f;
+					float fallbackG = bright ? 236f : 32f;
+					float fallbackB = bright ? 246f : 48f;
+					float specGain = !enabled ? 0.50f : (isBigHero ? 1.12f : 1.0f);
 
 					for (int y = 0; y < ph; y++)
 					{
 						byte* row = dstBase + y * dstStride;
 						float py = y + 0.5f - cy;
 						float yNorm = (y + 0.5f) / ph;
+						// Subtle vertical depth grounding (zero jelly white dome on top!)
+						float ground = 1f - yNorm * (bright ? 0.03f : 0.08f);
 
 						for (int x = 0; x < pw; x++)
 						{
@@ -594,47 +635,35 @@ namespace AandmAuto
 							if (edgeAlpha < 0f) edgeAlpha = 0f;
 							else if (edgeAlpha > 1f) edgeAlpha = 1f;
 
-							float dx = 0f, dy = 0f, rimAdd = 0f, rimDark = 1f, caustic = 0f, domeGloss = 0f;
+							float dx = 0f, dy = 0f, rimSpec = 0f, rimAbsorb = 1f, caustic = 0f;
 							if (distToEdge < rimThick)
 							{
 								float d = distToEdge > 0f ? distToEdge : 0f;
 								float t = 1f - d / rimThick;
-								float bend = t * t * (3f - 2f * t) * strength;
+								// Smooth cubic optical bend right near the cut bevel
+								float bend = t * t * t * strength;
 								float nx = distCore > 0.001f ? ((px < 0f ? -qx : qx) / distCore) : 0f;
 								float ny = distCore > 0.001f ? ((py < 0f ? -qy : qy) / distCore) : 0f;
 								dx = -nx * bend;
 								dy = -ny * bend;
 
-								// Layer 1: subtle 0.9px outer optical boundary lip
-								if (d < 0.95f) rimDark = 1f - (1f - d / 0.95f) * (bright ? 0.14f : 0.24f);
+								// 1) Physical dark cut-edge glass absorption (eliminates plastic sticker edge!)
+								if (d < 0.95f) rimAbsorb = 1f - (1f - d / 0.95f) * (bright ? 0.16f : 0.30f);
 
-								// Layer 2: razor-bright 315° / 135° liquid-mercury specular meniscus arc
-								float dirTL = -(nx * 0.72f + ny * 0.69f);
+								// 2) Razor-thin directional Fresnel highlight (strictly top-left & tiny bottom-right, ZERO chalky base!)
+								float dirTL = -(nx * 0.65f + ny * 0.76f);
 								if (dirTL < 0f) dirTL = 0f;
-								float dirBR = (nx * 0.72f + ny * 0.69f);
+								float dirBR = (nx * 0.65f + ny * 0.76f);
 								if (dirBR < 0f) dirBR = 0f;
 
-								float arcCenter = isBigHero ? 1.15f : 1.0f;
-								float arcSpread = isBigHero ? 1.05f : 0.85f;
-								float u = (d - arcCenter) / arcSpread;
-								float sharpArc = (float)Math.Exp(-(u * u));
-								float arcDir = (float)Math.Pow(dirTL, 1.15) + (float)Math.Pow(dirBR, 1.45) * 0.62f + (selected ? 0.28f : 0.15f);
-								float arcBoost = !enabled ? 0.55f : (selected ? 1.15f : 1.0f);
-								rimAdd = sharpArc * arcDir * (isBigHero ? 228f : 196f) * arcBoost;
+								float u = (d - 1.05f) / 0.52f;
+								float glint = (float)Math.Exp(-(u * u));
+								float dirGain = (float)Math.Pow(dirTL, 2.15) + (float)Math.Pow(dirBR, 3.0) * 0.42f;
+								rimSpec = glint * dirGain * (bright ? 155f : 138f) * specGain;
 
-								// Layer 3: internal glass caustic bounce
-								float cCenter = isBigHero ? 5.0f : 3.4f;
-								float cSpread = isBigHero ? 3.0f : 2.1f;
-								float cu = (d - cCenter) / cSpread;
-								float cBand = (float)Math.Exp(-(cu * cu));
-								caustic = cBand * (dirTL * dirTL * 32f + dirBR * dirBR * 40f);
-							}
-
-							// Layer 4: tall hero button sculpted top dome reflection
-							if (isBigHero && yNorm < 0.44f && distToEdge > 1.6f)
-							{
-								float df = 1f - yNorm / 0.44f;
-								domeGloss = df * df * 24f;
+								// 3) Restrained internal corner caustic bounce
+								float cu = (d - 3.6f) / 1.8f;
+								caustic = (float)Math.Exp(-(cu * cu)) * (dirTL * dirTL * 14f + dirBR * dirBR * 18f) * specGain;
 							}
 
 							float rS = fallbackR, gS = fallbackG, bS = fallbackB;
@@ -642,23 +671,35 @@ namespace AandmAuto
 							{
 								float fy = (y + dy - srcMap.Top) * mapScaleY;
 								float fxG = (x + dx - srcMap.Left) * mapScaleX;
-								float fxR = (x + dx * (1f + chroma * 0.09f) - srcMap.Left) * mapScaleX;
-								float fxB = (x + dx * (1f - chroma * 0.09f) - srcMap.Left) * mapScaleX;
+								float fxR = (x + dx * (1f + chroma * 0.07f) - srcMap.Left) * mapScaleX;
+								float fxB = (x + dx * (1f - chroma * 0.07f) - srcMap.Left) * mapScaleX;
 								rS = SampleChannel(srcBase, srcStride, sw, sh, fxR, fy, 2);
 								gS = SampleChannel(srcBase, srcStride, sw, sh, fxG, fy, 1);
 								bS = SampleChannel(srcBase, srcStride, sw, sh, fxB, fy, 0);
 							}
 
-							float invT = 1f - tintA;
-							float rOut = (rS * invT + tR * tintA) * rimDark + rimAdd + caustic + domeGloss;
-							float gOut = (gS * invT + tG * tintA) * rimDark + rimAdd + caustic + domeGloss;
-							float bOut = (bS * invT + tB * tintA) * rimDark + rimAdd + caustic + domeGloss;
+							// Enrich background vibrancy so glass never looks washed-out or milky
+							float lum = 0.2126f * rS + 0.7152f * gS + 0.0722f * bS;
+							rS = (lum + (rS - lum) * satBoost) * ground;
+							gS = (lum + (gS - lum) * satBoost) * ground;
+							bS = (lum + (bS - lum) * satBoost) * ground;
+
+							if (tintA > 0f)
+							{
+								float invT = 1f - tintA;
+								rS = rS * invT + tR * tintA;
+								gS = gS * invT + tG * tintA;
+								bS = bS * invT + tB * tintA;
+							}
+
+							float rOut = rS * rimAbsorb + rimSpec + caustic;
+							float gOut = gS * rimAbsorb + rimSpec + caustic;
+							float bOut = bS * rimAbsorb + rimSpec + caustic;
 
 							if (rOut > 255f) rOut = 255f; else if (rOut < 0f) rOut = 0f;
 							if (gOut > 255f) gOut = 255f; else if (gOut < 0f) gOut = 0f;
 							if (bOut > 255f) bOut = 255f; else if (bOut < 0f) bOut = 0f;
 
-							// Premultiplied ARGB output for crisp GDI+ alpha compositing
 							byte aByte = (byte)(edgeAlpha * 255f + 0.5f);
 							row[x * 4 + 0] = (byte)(bOut * edgeAlpha + 0.5f);
 							row[x * 4 + 1] = (byte)(gOut * edgeAlpha + 0.5f);

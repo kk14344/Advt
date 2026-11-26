@@ -89,7 +89,7 @@ namespace AandmAuto
 					g, this, face, face.Height / 2,
 					Color.White, 0, Color.White,
 					hovered, pressed, false, Enabled,
-					hoverT, pressT, sheenActive ? sheenT : 0f, new Point(face.Width / 2, face.Height / 2));
+					hoverT, pressT, sheenActive ? sheenT : 0f, new Point(face.Width / 2, face.Height / 2), true);
 				DrawGlyph(g, face, LiquidGlassEngine.GlassInk(Enabled));
 				return;
 			}

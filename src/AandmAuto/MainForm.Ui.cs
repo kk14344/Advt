@@ -455,6 +455,7 @@ namespace AandmAuto
 				Margin = new Padding(5, 0, 0, 0),
 				Text = "一键日常",
 				Skin = GameButtonSkin.Gold,
+				AlwaysGlass = glass,
 				SemanticDotColor = glass ? Color.FromArgb(245, 198, 72) : Color.Empty,
 				Enabled = false
 			};

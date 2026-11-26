@@ -1143,10 +1143,10 @@ namespace AandmAuto
 
 		internal static void DrawLiquidGlassPill(Graphics g, System.Windows.Forms.Control ctrl, Rectangle rect, int cornerRadius, Color tintColor, int tintAlpha, Color rimAccent, bool hovered, bool pressed, bool selected, bool enabled)
 		{
-			DrawLiquidGlassPill(g, ctrl, rect, cornerRadius, tintColor, tintAlpha, rimAccent, hovered, pressed, selected, enabled, hovered ? 1f : 0f, pressed ? 1f : 0f, 0f, new Point(-100, -100));
+			DrawLiquidGlassPill(g, ctrl, rect, cornerRadius, tintColor, tintAlpha, rimAccent, hovered, pressed, selected, enabled, hovered ? 1f : 0f, pressed ? 1f : 0f, 0f, new Point(-100, -100), false);
 		}
 
-		internal static void DrawLiquidGlassPill(Graphics g, System.Windows.Forms.Control ctrl, Rectangle rect, int cornerRadius, Color tintColor, int tintAlpha, Color rimAccent, bool hovered, bool pressed, bool selected, bool enabled, float hoverT, float pressT, float sheenT, Point pointerLocal)
+		internal static void DrawLiquidGlassPill(Graphics g, System.Windows.Forms.Control ctrl, Rectangle rect, int cornerRadius, Color tintColor, int tintAlpha, Color rimAccent, bool hovered, bool pressed, bool selected, bool enabled, float hoverT, float pressT, float sheenT, Point pointerLocal, bool quietAtRest = false)
 		{
 			if (rect.Width < 4 || rect.Height < 4) return;
 			if (ExtremePerformanceMode)
@@ -1177,7 +1177,7 @@ namespace AandmAuto
 					g.DrawRectangle(p, rect.X, rect.Y, Math.Max(1, rect.Width - 1), Math.Max(1, rect.Height - 1));
 				return;
 			}
-			LiquidGlassEngine.DrawCrystalPill(g, ctrl, rect, cornerRadius, tintColor, tintAlpha, hovered, pressed, selected, enabled, hoverT, pressT, sheenT, pointerLocal);
+			LiquidGlassEngine.DrawCrystalPill(g, ctrl, rect, cornerRadius, tintColor, tintAlpha, hovered, pressed, selected, enabled, hoverT, pressT, sheenT, pointerLocal, quietAtRest);
 		}
 
 		private static System.Windows.Forms.Control FindRootBackdropOwner(System.Windows.Forms.Control ctrl)

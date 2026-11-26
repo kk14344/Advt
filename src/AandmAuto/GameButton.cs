@@ -58,6 +58,11 @@ namespace AandmAuto
 		/// </summary>
 		public bool PrimaryHero { get; set; }
 
+		/// <summary>
+		/// Keeps a non-primary hero pill (e.g. 一键日常) rendered as an optical liquid lens even at rest.
+		/// </summary>
+		public bool AlwaysGlass { get; set; }
+
 		public GameButton()
 		{
 			SetStyle(ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
@@ -268,38 +273,42 @@ namespace AandmAuto
 			{
 				if (isStop)
 				{
-					tintColor = Color.FromArgb(235, 78, 56);
-					tintAlpha = 108;
+					tintColor = Color.FromArgb(228, 68, 52);
+					tintAlpha = 112;
 					useWhiteInk = true;
 				}
 				else if (isPrimary)
 				{
-					tintColor = Color.FromArgb(28, 178, 102);
-					tintAlpha = 94;
+					tintColor = Color.FromArgb(24, 168, 96);
+					tintAlpha = 106;
 					useWhiteInk = true;
 				}
 				else if (selected)
 				{
 					tintColor = Color.FromArgb(14, 132, 255);
-					tintAlpha = 96;
+					tintAlpha = 116;
 					useWhiteInk = true;
 				}
 			}
+
+			// Direction C: Hero buttons, active/selected states, and primary CTAs always show physical liquid-lens glass;
+			// all secondary task & nav buttons sit quietly borderless at rest and awaken smoothly on hover/click!
+			bool quietAtRest = !PrimaryHero && !AlwaysGlass && !isPrimary && !activeState;
 
 			Color ink = useWhiteInk
 				? Color.White
 				: LiquidGlassEngine.GlassInk(Enabled);
 			Color shadowInk = useWhiteInk
-				? Color.FromArgb(150, 0, 0, 0)
+				? Color.FromArgb(135, 0, 0, 0)
 				: LiquidGlassEngine.GlassTextShadow();
 
-			int rad = Math.Min(target.Height / 2, target.Height >= 42 ? 18 : 14);
+			int rad = Math.Min(target.Height / 2, target.Height >= 42 ? 16 : 12);
 			Rectangle rect = new Rectangle(target.X, target.Y, Math.Max(4, target.Width - 1), Math.Max(4, target.Height));
 			UiTheme.DrawLiquidGlassPill(
 				graphics, this, rect, rad,
 				tintColor, tintAlpha, Color.White,
 				hovered, pressed, activeState, Enabled,
-				hoverT, pressT, sheenActive ? sheenT : 0f, pointerLocal);
+				hoverT, pressT, sheenActive ? sheenT : 0f, pointerLocal, quietAtRest);
 
 			bool showDot = SemanticDotColor.A > 0 && Enabled && !isStop && !isPrimary && !selected;
 			if (showDot)

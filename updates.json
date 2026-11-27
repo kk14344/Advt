@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-26T15:56:18Z",
+  "updatedAt": "2026-11-27T09:38:24Z",
   "channels": {
     "official": {
       "version": "1.1.0",
@@ -15,16 +15,16 @@
       "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/official-v1.1.0"
     },
     "testpvp": {
-      "version": "1.1.0",
-      "tag": "testpvp-v1.1.0",
+      "version": "1.1.1",
+      "tag": "testpvp-v1.1.1",
       "fileName": "冒险与挖矿自动助手-测试服PvP版.exe",
       "assetName": "AandmAuto-TestPvP.exe",
-      "sha256": "3352de091d27baaeaca3c5caf56f7bad6248ca32f79b6d561aedc57b10539fd4",
-      "size": 6476800,
-      "publishedAt": "2026-11-26T15:56:18Z",
-      "notes": "feat(ui): DWM VSync 90fps+ dialog ghost transitions and full-app frosted glass overhaul",
-      "downloadUrl": "https://github.com/kk14344/Advt/releases/download/testpvp-v1.1.0/AandmAuto-TestPvP.exe",
-      "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/testpvp-v1.1.0"
+      "sha256": "f67d7f72177d4e3622bd36070bce1d97535b7d6896c2a6a551da29402764309d",
+      "size": 6487040,
+      "publishedAt": "2026-11-27T09:38:24Z",
+      "notes": "chore(release): bump version to v1.1.1 and make version checks dynamic",
+      "downloadUrl": "https://github.com/kk14344/Advt/releases/download/testpvp-v1.1.1/AandmAuto-TestPvP.exe",
+      "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/testpvp-v1.1.1"
     }
   },
   "mirrors": [

@@ -59,8 +59,8 @@ def build_edition(edition: str, lua_only: bool = False):
     lua = (src / 'automation.lua').read_text(encoding='utf-8').replace('-- @TASKS@', tasks)
     if test_pvp:
         for old, new in [
-            ('if __MWA and __MWA.VERSION == "1.1.0" then', 'if __MWA and __MWA.VERSION == "1.1.0-testpvp" then'),
-            ('VERSION = "1.1.0",', 'VERSION = "1.1.0-testpvp",'),
+            ('if __MWA and __MWA.VERSION == "1.1.1" then', 'if __MWA and __MWA.VERSION == "1.1.1-testpvp" then'),
+            ('VERSION = "1.1.1",', 'VERSION = "1.1.1-testpvp",'),
         ]:
             if old not in lua:
                 raise SystemExit(f'Missing test-pvp Lua patch target: {old}')
@@ -77,8 +77,8 @@ def build_edition(edition: str, lua_only: bool = False):
     bridge = (src / 'bridge.js').read_text(encoding='utf-8')
     if test_pvp:
         for old, new in [
-            ("window.__MWA_APP_VERSION === '1.1.0'", "window.__MWA_APP_VERSION === '1.1.0-testpvp'"),
-            ("var VERSION = '1.1.0';", "var VERSION = '1.1.0-testpvp';"),
+            ("window.__MWA_APP_VERSION === '1.1.1'", "window.__MWA_APP_VERSION === '1.1.1-testpvp'"),
+            ("var VERSION = '1.1.1';", "var VERSION = '1.1.1-testpvp';"),
             ('var CORE_TICK_MIN_MS = 24;', 'var CORE_TICK_MIN_MS = 10;'),
             ('var CORE_TICK_INTERVAL_MS = 28;', 'var CORE_TICK_INTERVAL_MS = 15;'),
             ('var BATTLE_SKIP_INTERVAL_MS = 20;', 'var BATTLE_SKIP_INTERVAL_MS = 10;'),
@@ -88,8 +88,8 @@ def build_edition(edition: str, lua_only: bool = False):
             bridge = bridge.replace(old, new, 1)
     elif low_load:
         for old, new in [
-            ("window.__MWA_APP_VERSION === '1.1.0'", "window.__MWA_APP_VERSION === '1.1.0-lowload'"),
-            ("var VERSION = '1.1.0';", "var VERSION = '1.1.0-lowload';"),
+            ("window.__MWA_APP_VERSION === '1.1.1'", "window.__MWA_APP_VERSION === '1.1.1-lowload'"),
+            ("var VERSION = '1.1.1';", "var VERSION = '1.1.1-lowload';"),
             ('var CORE_TICK_MIN_MS = 24;', 'var CORE_TICK_MIN_MS = 110;'),
             ('var CORE_TICK_INTERVAL_MS = 28;', 'var CORE_TICK_INTERVAL_MS = 120;'),
             ('var BATTLE_SKIP_INTERVAL_MS = 20;', 'var BATTLE_SKIP_INTERVAL_MS = 50;'),

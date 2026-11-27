@@ -177,7 +177,7 @@ test('bridge idle tick slows to 500ms in extreme performance while active tasks 
  let now=0,ticks=0,extreme=false,nextId=0;
  const intervals=[],timeouts=new Map();
  const lua={execute(code){
-  if(code.includes('VERSION or nil'))return '1.1.0';
+  if(code.includes('VERSION or nil'))return '1.1.1';
   if(code.includes('__MWA:tick(')){ticks++;return null;}
   if(code.includes('pending_contract_captures'))return [];
   if(code.includes(':start_'))return true;

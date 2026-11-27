@@ -1,11 +1,11 @@
 (function () {
   'use strict';
 
-  if (window.__MWA_APP && window.__MWA_APP_VERSION === '1.1.0') {
+  if (window.__MWA_APP && window.__MWA_APP_VERSION === '1.1.1') {
     return;
   }
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.1.1';
   var CORE_TICK_MIN_MS = 24;
   var CORE_TICK_INTERVAL_MS = 28;
   var BATTLE_SKIP_INTERVAL_MS = 20;

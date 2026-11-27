@@ -2,7 +2,7 @@ namespace AandmAuto
 {
 	internal static class BuildEdition
 	{
-		internal const string AppVersion = "1.1.0";
+		internal const string AppVersion = "1.1.1";
 #if TEST_PVP_EDITION
 		internal static readonly bool IsLowLoad = false;
 		internal static readonly bool IsTestPvp = true;

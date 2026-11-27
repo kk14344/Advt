@@ -17,12 +17,16 @@ function Test-Contains([byte[]]$hay,[byte[]]$needle){
     return $false
 }
 
+$buildEdText = Get-Content -LiteralPath (Join-Path $taskRoot 'src\AandmAuto\BuildEdition.cs') -Raw -Encoding utf8
+$appVersion = if($buildEdText -match 'AppVersion\s*=\s*"([^"]+)"'){$Matches[1]}else{'1.1.1'}
+$assemblyVersion = $appVersion + '.0'
+
 function Verify-One([string]$ed){
     $exeName = if($ed -eq 'testpvp'){'冒险与挖矿自动助手-测试服PvP版.exe'}else{'冒险与挖矿自动助手-优化版.exe'}
     $binaryPath = Join-Path (Join-Path $taskRoot 'dist') $exeName
     if(-not (Test-Path -LiteralPath $binaryPath)){throw ('Missing binary: '+$binaryPath)}
     $bytes=[IO.File]::ReadAllBytes($binaryPath)
-    $version='1.1.0.0'
+    $version=$assemblyVersion
     $flat=([Text.Encoding]::ASCII.GetString($bytes)) -replace ([string][char]0),''
     if(-not $flat.Contains($version)){throw ('Assembly version marker missing in '+$exeName)}
     if($flat.Contains('1.44.0.0')){throw ('Stale 1.44 version marker still present in '+$exeName)}
@@ -44,7 +48,7 @@ function Verify-One([string]$ed){
     }
     $luaFile = if($ed -eq 'testpvp'){Join-Path $taskRoot 'dist\automation.testpvp.generated.lua'}else{Join-Path $taskRoot 'dist\automation.generated.lua'}
     $lua=Get-Content -LiteralPath $luaFile -Raw
-    $verMarker = if($ed -eq 'testpvp'){'1.1.0-testpvp'}else{'1.1.0'}
+    $verMarker = if($ed -eq 'testpvp'){$appVersion + '-testpvp'}else{$appVersion}
     foreach($marker in @('refine_sim_taps','daily_adventure_claim','clear_refine_overlays','guild_boss_done_today','battle_replay','mystic_stone','mystery_shop',$verMarker)){
         if($lua.IndexOf($marker) -lt 0){throw ('Generated Lua ('+$ed+') missing: '+$marker)}
     }
@@ -56,6 +60,6 @@ $results=@()
 foreach($t in $targets){
     $results += Verify-One $t
 }
-@{result='passed';assemblyVersion='1.1.0.0';editions=$results} |
+@{result='passed';assemblyVersion=$assemblyVersion;editions=$results} |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskRoot 'dist\embedded-test-results.json') -Encoding utf8
-Write-Output ('Embedded script, update-config, game font and version match (1.1.0.0) for: '+($targets -join ', '))
+Write-Output ('Embedded script, update-config, game font and version match ('+$assemblyVersion+') for: '+($targets -join ', '))

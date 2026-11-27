@@ -87,10 +87,10 @@ jobs:
           txt = re.sub(r'AssemblyFileVersion\("[^"]+"\)', f'AssemblyFileVersion("{ver}.0")', txt)
           txt = re.sub(r'AssemblyVersion\("[^"]+"\)', f'AssemblyVersion("{ver}.0")', txt)
           p.write_text(txt, 'utf-8')
-          for rel in ['src/automation.lua', 'src/bridge.js', 'tools/build.py']:
+          for rel in ['src/automation.lua', 'src/bridge.js', 'tools/build.py', 'tools/test_background_133.cjs']:
               fp = root / rel
               t = fp.read_text('utf-8')
-              t = re.sub(r'1\.0\.0', ver, t)
+              t = re.sub(r'\b1\.\d+\.\d+\b', ver, t)
               fp.write_text(t, 'utf-8')
 
       - name: Build executables & generate updates.json

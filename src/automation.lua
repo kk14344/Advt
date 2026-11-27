@@ -2,7 +2,7 @@
 -- 冒险与挖矿 · 矿区自动助手 (Lua core)
 -- 只调用游戏客户端已有的正常操作接口，不修改服务器数据。
 -- ============================================================
-if __MWA and __MWA.VERSION == "1.1.0" then
+if __MWA and __MWA.VERSION == "1.1.1" then
     return __MWA
 end
 
@@ -38,7 +38,7 @@ local function now_text()
 end
 
 local A = {
-	VERSION = "1.1.0",
+	VERSION = "1.1.1",
     cfg = {
         enabled = false,
         autoMine = true,

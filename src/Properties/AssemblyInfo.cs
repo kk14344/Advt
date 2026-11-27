@@ -6,6 +6,6 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyCompany("local")]
 [assembly: AssemblyProduct("冒险与挖矿自动助手")]
 #if !VERSIONED_RELEASE
-[assembly: AssemblyFileVersion("1.1.0.0")]
-[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
 #endif

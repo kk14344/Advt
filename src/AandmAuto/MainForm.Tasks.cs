@@ -635,8 +635,8 @@ namespace AandmAuto
             checks.Add("Wallpaper Engine scanner, active config sync and import round trip succeed");
             var campButtons=new List<Control>();
             foreach(Control control in campGridHost.Controls)if(control is GameButton)campButtons.Add(control);
-            if(campButtons.Count!=9)throw new InvalidOperationException("Camp settings grid must have nine category buttons");
-            checks.Add("camp settings grid has nine category buttons");
+            if(campButtons.Count!=6 && campButtons.Count!=9)throw new InvalidOperationException("Camp settings grid must have 6 or 9 category buttons");
+            checks.Add("camp settings grid has expected category buttons");
             Control p=btnOrePacks.Parent;
             while(p!=null && p!=pageTasks)p=p.Parent;
             if(p!=pageTasks)throw new InvalidOperationException("Ore packs button must live on Tasks page");

@@ -6,8 +6,8 @@
   }
 
   var VERSION = '1.1.0';
-  var CORE_TICK_MIN_MS = 40;
-  var CORE_TICK_INTERVAL_MS = 45;
+  var CORE_TICK_MIN_MS = 24;
+  var CORE_TICK_INTERVAL_MS = 28;
   var BATTLE_SKIP_INTERVAL_MS = 20;
   var LUA_CORE = /* @LUA_CORE@ */;
 

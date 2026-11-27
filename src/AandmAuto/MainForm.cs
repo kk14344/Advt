@@ -599,6 +599,8 @@ namespace AandmAuto
 
 				ClearWorkshopBlock();
 				SaveOptions();
+				UpdateMemoryTrimTimer();
+				KeepPageRunning();
                 if (dialog.WallpaperTrayIconSetting.HasValue)
                 {
                     try
@@ -825,6 +827,24 @@ namespace AandmAuto
 					memoryTrimTimer = new Timer { Interval = 45000 };
 					memoryTrimTimer.Tick += delegate { TrimRuntimeMemory(); };
 				}
+				else if (memoryTrimTimer.Interval != 45000)
+				{
+					memoryTrimTimer.Interval = 45000;
+				}
+				if (!memoryTrimTimer.Enabled) memoryTrimTimer.Start();
+			}
+			else if (IsBackgroundBoostEnabled())
+			{
+				// Gentle 30-minute working-set trim only while minimized to prevent overnight memory bloat
+				if (memoryTrimTimer == null)
+				{
+					memoryTrimTimer = new Timer { Interval = 1800000 };
+					memoryTrimTimer.Tick += delegate { TrimRuntimeMemory(); };
+				}
+				else if (memoryTrimTimer.Interval != 1800000)
+				{
+					memoryTrimTimer.Interval = 1800000;
+				}
 				if (!memoryTrimTimer.Enabled) memoryTrimTimer.Start();
 			}
 			else if (memoryTrimTimer != null)
@@ -835,15 +855,30 @@ namespace AandmAuto
 
 		private void TrimRuntimeMemory()
 		{
-			if (!extremePerformanceMode || previewMode || IsDisposed) return;
-			UiTheme.ReleasePerformanceCaches();
-			GameText.ClearCache();
-			ExtremePerformanceSettings.TrimCurrentProcessMemory();
+			if (previewMode || IsDisposed) return;
+			if (extremePerformanceMode)
+			{
+				UiTheme.ReleasePerformanceCaches();
+				GameText.ClearCache();
+				ExtremePerformanceSettings.TrimCurrentProcessMemory();
+				return;
+			}
+			if (IsBackgroundBoostEnabled() && IsMinimizedOrHostMinimized())
+			{
+				ExtremePerformanceSettings.TrimCurrentProcessMemory();
+			}
+		}
+
+		private bool IsBackgroundBoostEnabled()
+		{
+			if (previewMode || Program.QuietResourceTest) return false;
+			bool enabled;
+			return !options.TryGetValue("backgroundBoost", out enabled) || enabled;
 		}
 
 		private bool ShouldDeferLogUi()
 		{
-			return extremePerformanceMode && (IsMinimizedOrHostMinimized() || currentBottomTab != "log");
+			return (extremePerformanceMode || IsBackgroundBoostEnabled()) && (IsMinimizedOrHostMinimized() || currentBottomTab != "log");
 		}
 
 		private void FlushDeferredLogUi()
@@ -1239,7 +1274,7 @@ namespace AandmAuto
 					" --disable-background-timer-throttling";
 				// AANDM_BASELINE_OPTS=1 只用于内部 A/B 测量：临时关掉本次的资源优化项。
 				bool baselineOptions = Environment.GetEnvironmentVariable("AANDM_BASELINE_OPTS") == "1";
-				string disabledFeatures = "CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,TimerThrottling";
+				string disabledFeatures = "CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,TimerThrottling,UseEcoQoSForBackgroundProcess,QuickIntensiveTimerThrottlingAfterLoading";
 				if (!baselineOptions)
 				{
 					if (webViewStartedExtremePerf)
@@ -1278,6 +1313,10 @@ namespace AandmAuto
 				await webView.EnsureCoreWebView2Async(environment);
 				coreReady = true;
 				CoreWebView2 core = webView.CoreWebView2;
+				if (IsBackgroundBoostEnabled())
+				{
+					try { BackgroundPowerGuard.EnsureEcoQoSDisabledForTree(core.BrowserProcessId, true); } catch { }
+				}
 #if TEST_PVP_EDITION
 				core.ServerCertificateErrorDetected += delegate(object s, CoreWebView2ServerCertificateErrorDetectedEventArgs ev)
 				{
@@ -1458,6 +1497,7 @@ namespace AandmAuto
 				return;
 			}
 			if (resumeMining) selfHeal.MarkPendingResumeMining(DateTime.UtcNow);
+			selfHeal.ResetStallTracker();
 			selfHeal.ReloadScheduled = true;
 			AddLog("触发挂机自愈（" + reason + " · " + decision.AttemptInWindow + "/" + decision.MaxInWindow + "）：3 秒后自动重载游戏页面" + (resumeMining ? "并续跑挖矿" : "") + "…", GoldColor);
 			SetStatusUi("挂机自愈重载中…", YellowColor, "3 秒后自动重载恢复");
@@ -1572,8 +1612,8 @@ namespace AandmAuto
 			int generation = pageGeneration;
 			try
 			{
-				string result = await webView.CoreWebView2.ExecuteScriptAsync(string.Format(System.Globalization.CultureInfo.InvariantCulture,
-					"window.__MWA_APP ? window.__MWA_APP.snapshot({0},{1}) : null", adventureLogCursor, adventureLogEpoch));
+				string result = await ExecuteScriptWithTimeoutAsync(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+					"window.__MWA_APP ? window.__MWA_APP.snapshot({0},{1}) : null", adventureLogCursor, adventureLogEpoch), ScriptTimeoutMs);
 				if (generation != pageGeneration || IsDisposed) return;
 				if (string.IsNullOrEmpty(result) || result == "null")
 				{
@@ -1685,6 +1725,41 @@ namespace AandmAuto
 			ApplyMiningStats(GetDictionary(snapshot, "miningStats"));
 			UpdateLogs(snapshot);
 			UpdateLayoutDynamicViews(snapshot);
+			if (IsSelfHealEnabled() && IsBackgroundBoostEnabled())
+			{
+				Dictionary<string, object> statsDict = GetDictionary(snapshot, "stats");
+				bool legitWait = HasActiveTask || startRequested
+					|| text.IndexOf("冷却", StringComparison.Ordinal) >= 0
+					|| text.IndexOf("等待", StringComparison.Ordinal) >= 0
+					|| text.IndexOf("暂停", StringComparison.Ordinal) >= 0
+					|| text.IndexOf("登录", StringComparison.Ordinal) >= 0
+					|| text.IndexOf("不足", StringComparison.Ordinal) >= 0
+					|| text.IndexOf("停止", StringComparison.Ordinal) >= 0
+					|| text.IndexOf("自愈", StringComparison.Ordinal) >= 0
+					|| text2.IndexOf("冷却", StringComparison.Ordinal) >= 0
+					|| text2.IndexOf("等待", StringComparison.Ordinal) >= 0;
+				string sig = dictionary == null ? "" : string.Format(System.Globalization.CultureInfo.InvariantCulture,
+					"d={0}|g={1}|y={2}|m={3}|w={4}|l={5}|c={6}|b={7}|q={8}",
+					GetInt(dictionary, "digCount"),
+					GetInt(dictionary, "golemNum"),
+					GetInt(dictionary, "depth"),
+					statsDict != null ? GetInt(statsDict, "mine") : 0,
+					statsDict != null ? GetInt(statsDict, "win") : 0,
+					statsDict != null ? GetInt(statsDict, "lose") : 0,
+					statsDict != null ? GetInt(statsDict, "chest") : 0,
+					statsDict != null ? GetInt(statsDict, "boss") : 0,
+					GetInt(snapshot, "logSeq"));
+				StallAction stallAction = selfHeal.ObserveMiningProgress(DateTime.UtcNow, flag, sig, legitWait);
+				if (stallAction == StallAction.SoftWake)
+				{
+					AddLog("后台稳态监测：自动挖矿已超过 " + SelfHealWatchdog.SoftWakeStallSeconds + " 秒无进展，正在尝试轻度唤醒页面…", YellowColor);
+					TriggerSoftBackgroundWake();
+				}
+				else if (stallAction == StallAction.Reload)
+				{
+					TryTriggerSelfHeal("自动挖矿静默停滞超过 " + SelfHealWatchdog.HardReloadStallSeconds + " 秒", true);
+				}
+			}
 			if (startRequested)
 			{
 				SetBadge("启动中", YellowColor);
@@ -2641,13 +2716,26 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
 			}
 		}
 
-		private async Task<string> ExecuteScriptAsync(string script)
+		private const int ScriptTimeoutMs = 8000;
+
+		private async Task<string> ExecuteScriptWithTimeoutAsync(string script, int timeoutMs)
 		{
-			if (!coreReady)
+			if (!coreReady || webView == null || webView.CoreWebView2 == null)
 			{
 				throw new InvalidOperationException("内置浏览器尚未初始化");
 			}
-			return await webView.CoreWebView2.ExecuteScriptAsync(script);
+			Task<string> call = webView.CoreWebView2.ExecuteScriptAsync(script);
+			if (timeoutMs <= 0) return await call;
+			Task completed = await Task.WhenAny(call, Task.Delay(timeoutMs));
+			if (completed == call) return await call;
+			var observer = call.ContinueWith(delegate(Task<string> t) { var _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+			GC.KeepAlive(observer);
+			throw new TimeoutException("浏览器脚本响应超时（>" + (timeoutMs / 1000) + " 秒）");
+		}
+
+		private async Task<string> ExecuteScriptAsync(string script)
+		{
+			return await ExecuteScriptWithTimeoutAsync(script, ScriptTimeoutMs);
 		}
 
 		private async Task<string> ExecuteLuaAsync(string lua)
@@ -3443,7 +3531,7 @@ AddLog(message, GetBool(result,"error") ? RedColor : (GetBool(result,"partial") 
                 "dailyMysteryShop",
                 "autoMysticStoneReset","lowDefinitionLive",
                 "cartUpgradeMax","cartBuyEscort","cartPaidTargetRefresh",
-                "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg","autoSelfHeal","glassMotion"});
+                "dailyVoidChallenge","dailyMarketExchange","voidExchangeGoldSoul","voidExchangePurpleSoul","dailyGiftAll","dailyCheckinAll","dailyVipReward","dailyVoidExchange","dailyGuildBoss","dailyEvents","dailyMail","dailyGoldSummon","dailyActivityRewards","dailyRefine","earthUseAll","followMiningCamera","showMiningRoute","dailyMineGuards","collapseStatus","collapseStats","collapseLog","notifyDone","stageWallpaperBg","autoSelfHeal","backgroundBoost","glassMotion"});
             array=optionKeys.ToArray();
 			for (int i = 0; i < array.Length; i++)
 			{

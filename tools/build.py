@@ -79,8 +79,8 @@ def build_edition(edition: str, lua_only: bool = False):
         for old, new in [
             ("window.__MWA_APP_VERSION === '1.1.0'", "window.__MWA_APP_VERSION === '1.1.0-testpvp'"),
             ("var VERSION = '1.1.0';", "var VERSION = '1.1.0-testpvp';"),
-            ('var CORE_TICK_MIN_MS = 40;', 'var CORE_TICK_MIN_MS = 10;'),
-            ('var CORE_TICK_INTERVAL_MS = 45;', 'var CORE_TICK_INTERVAL_MS = 15;'),
+            ('var CORE_TICK_MIN_MS = 24;', 'var CORE_TICK_MIN_MS = 10;'),
+            ('var CORE_TICK_INTERVAL_MS = 28;', 'var CORE_TICK_INTERVAL_MS = 15;'),
             ('var BATTLE_SKIP_INTERVAL_MS = 20;', 'var BATTLE_SKIP_INTERVAL_MS = 10;'),
         ]:
             if old not in bridge:
@@ -90,8 +90,8 @@ def build_edition(edition: str, lua_only: bool = False):
         for old, new in [
             ("window.__MWA_APP_VERSION === '1.1.0'", "window.__MWA_APP_VERSION === '1.1.0-lowload'"),
             ("var VERSION = '1.1.0';", "var VERSION = '1.1.0-lowload';"),
-            ('var CORE_TICK_MIN_MS = 40;', 'var CORE_TICK_MIN_MS = 110;'),
-            ('var CORE_TICK_INTERVAL_MS = 45;', 'var CORE_TICK_INTERVAL_MS = 120;'),
+            ('var CORE_TICK_MIN_MS = 24;', 'var CORE_TICK_MIN_MS = 110;'),
+            ('var CORE_TICK_INTERVAL_MS = 28;', 'var CORE_TICK_INTERVAL_MS = 120;'),
             ('var BATTLE_SKIP_INTERVAL_MS = 20;', 'var BATTLE_SKIP_INTERVAL_MS = 50;'),
         ]:
             if old not in bridge:

@@ -40,6 +40,8 @@ namespace AandmAuto
 		private bool extremePerfJsSuspend;
 		private bool extremePerfJsTask;
         private bool lowDefinitionJsActive;
+		private bool bgBoostJsActive;
+		private bool bgBoostJsLowRes;
 		private bool pendingImmediatePulse;
 
         private bool wasMinimized;
@@ -94,9 +96,9 @@ namespace AandmAuto
 		{
 			if (previewMode || IsDisposed) return;
 			backgroundSinceUtc = DateTime.MinValue;
-			if (extremePerformanceMode)
+			if (logUiDirty && currentBottomTab == "log") FlushDeferredLogUi();
+			if (extremePerformanceMode || IsBackgroundBoostEnabled())
 			{
-				if (logUiDirty && currentBottomTab == "log") FlushDeferredLogUi();
 				UpdateGamePollInterval();
 				KeepPageRunning();
 			}
@@ -106,7 +108,7 @@ namespace AandmAuto
 		{
 			if (previewMode || IsDisposed) return;
 			if (backgroundSinceUtc == DateTime.MinValue) backgroundSinceUtc = DateTime.UtcNow;
-			if (extremePerformanceMode)
+			if (extremePerformanceMode || IsBackgroundBoostEnabled())
 			{
 				UpdateGamePollInterval();
 				KeepPageRunning();
@@ -190,6 +192,12 @@ namespace AandmAuto
                 backgroundSinceUtc = DateTime.MinValue;
             }
             bool active = AnyTaskRunning() || autoLoginReconnecting;
+            bool boost = IsBackgroundBoostEnabled();
+            BackgroundPowerGuard.SetSystemSleepPrevention(boost && active);
+            if (boost && (active || background))
+            {
+                try { BackgroundPowerGuard.EnsureEcoQoSDisabledForTree(core.BrowserProcessId); } catch { }
+            }
             UpdateBrowserMemoryPolicy(core, stamp, active);
             bool extreme = extremePerformanceMode;
             bool lowDefinition = LowDefinitionLiveEnabled;
@@ -197,8 +205,10 @@ namespace AandmAuto
                 (background && !autoLoginReconnecting && backgroundSinceUtc != DateTime.MinValue &&
                  stamp - backgroundSinceUtc >= TimeSpan.FromSeconds(5)));
             bool slowFrames = !lowDefinition && (extreme ? (suspendRender && !active) : (gameSnapshotReady && !active && minimized));
+            bool boostActive = boost && active && background;
+            bool boostLowRes = boost && !lowDefinition && gameSnapshotReady && minimized;
             bool quiet = extreme
-                ? suspendRender
+                ? (suspendRender && !boostActive)
                 : (slowFrames && !autoLoginEnabled && minimizedIdleSinceUtc != DateTime.MinValue &&
                    stamp - minimizedIdleSinceUtc >= TimeSpan.FromSeconds(20));
             bool canSleepLogin = CanSleepLogin(stamp);
@@ -210,10 +220,11 @@ namespace AandmAuto
             }
             bool presentationChanged = quiet != quietGamePresentation;
             bool extremePolicyChanged = extreme != extremePerfJsActive || suspendRender != extremePerfJsSuspend || active != extremePerfJsTask;
-            bool framePolicyChanged = lowDefinition != lowDefinitionJsActive || slowFrames != slowIdleFrames || extremePolicyChanged || pageGeneration != runtimeFramePolicyPage;
+            bool boostPolicyChanged = boostActive != bgBoostJsActive || boostLowRes != bgBoostJsLowRes;
+            bool framePolicyChanged = lowDefinition != lowDefinitionJsActive || slowFrames != slowIdleFrames || extremePolicyChanged || boostPolicyChanged || pageGeneration != runtimeFramePolicyPage;
             int interval = extreme
-                ? (suspendRender ? (active ? 250 : 1500) : (active ? 200 : 1000))
-                : (quiet ? 1500 : (active ? 100 : 400));
+                ? (suspendRender ? (active ? (boostActive ? 400 : 250) : 1500) : (active ? 400 : 1000))
+                : (quiet ? 1500 : (active ? (boost ? 400 : 100) : 500));
             if (runtimeHeartbeat != null && runtimeHeartbeat.Interval != interval) runtimeHeartbeat.Interval = interval;
 
             // Restore the WebView immediately on task start or window restore,
@@ -231,12 +242,14 @@ namespace AandmAuto
             }
             if (runtimePulseBusy)
             {
-                if ((presentationChanged && !quiet) || extremePolicyChanged || lowDefinition != lowDefinitionJsActive) pendingImmediatePulse = true;
+                if ((presentationChanged && !quiet) || extremePolicyChanged || boostPolicyChanged || lowDefinition != lowDefinitionJsActive) pendingImmediatePulse = true;
                 return;
             }
+            // When background boost is active, JS drives its own ~33Hz timer; avoid 100ms C# IPC contention
+            // and push policy immediately on transitions + lightweight 1.2s keepalive heartbeat!
             int minimumGap = extreme
-                ? (suspendRender ? (active ? 220 : 1400) : (active ? 180 : 900))
-                : (quiet ? 1400 : (active ? 90 : (background ? 600 : 1000)));
+                ? (suspendRender ? (active ? (boostActive ? 1200 : 220) : 1400) : (active ? (boost ? 1200 : 180) : 900))
+                : (quiet ? 1400 : (active ? (boost ? 1200 : 90) : (background ? 900 : 1200)));
             if (!presentationChanged && !framePolicyChanged &&
                 (stamp - lastRuntimePulse).TotalMilliseconds < minimumGap) return;
             lastRuntimePulse = stamp;
@@ -246,7 +259,8 @@ namespace AandmAuto
                 SetRuntimeControllerVisible(!quiet);
                 if (core.IsSuspended) { core.Resume(); runtimeResumeCount++; }
                 bool needActiveLifecycle = !quiet || (extreme && active);
-                bool repairLifecycle = needActiveLifecycle && (stamp - lastLifecyclePulse).TotalSeconds >= 2;
+                double lifecycleGapSec = boost ? 5.0 : 2.0;
+                bool repairLifecycle = needActiveLifecycle && (stamp - lastLifecyclePulse).TotalSeconds >= lifecycleGapSec;
                 if (repairLifecycle)
                 {
                     lastLifecyclePulse = stamp;
@@ -268,12 +282,15 @@ namespace AandmAuto
                     + (suspendRender ? "true" : "false") + ","
                     + (active ? "true" : "false")
                     + ");if(b.setLowDefinition)b.setLowDefinition(" + (lowDefinition ? "true" : "false")
+                    + ");if(b.setBackgroundBoost)b.setBackgroundBoost(" + (boostActive ? "true" : "false") + "," + (boostLowRes ? "true" : "false")
                     + ");b.pulse(performance.now());}var a=window.__MWA_APP;if(a&&typeof a.backgroundPulse==='function')a.backgroundPulse();})()"));
                 lowDefinitionJsActive = lowDefinition;
                 slowIdleFrames = slowFrames;
                 extremePerfJsActive = extreme;
                 extremePerfJsSuspend = suspendRender;
                 extremePerfJsTask = active;
+                bgBoostJsActive = boostActive;
+                bgBoostJsLowRes = boostLowRes;
                 runtimeFramePolicyPage = generation;
                 runtimePulseCount++;
             }
@@ -516,8 +533,18 @@ namespace AandmAuto
 			}
 		}
 
+		private void TriggerSoftBackgroundWake()
+		{
+			if (previewMode || IsDisposed || webView == null || webView.CoreWebView2 == null) return;
+			lastRuntimePulse = DateTime.MinValue;
+			lastLifecyclePulse = DateTime.MinValue;
+			try { BackgroundPowerGuard.EnsureEcoQoSDisabledForTree(webView.CoreWebView2.BrowserProcessId, true); } catch { }
+			KeepPageRunning();
+		}
+
 		private void DisposeBackgroundMode()
 		{
+			BackgroundPowerGuard.SetSystemSleepPrevention(false);
             if(runtimeHeartbeat!=null){runtimeHeartbeat.Stop();runtimeHeartbeat.Dispose();runtimeHeartbeat=null;}
 			if (trayIcon != null)
 			{

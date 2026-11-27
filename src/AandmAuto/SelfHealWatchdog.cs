@@ -14,11 +14,19 @@ namespace AandmAuto
 		public string Reason = "";
 	}
 
+	internal enum StallAction
+	{
+		None,
+		SoftWake,
+		Reload
+	}
+
 	/// <summary>
 	/// 挂机异常自愈控制器：
 	/// 1. 滑动窗口配额保护（10 分钟内最多自动重载恢复 3 次，两次至少间隔 30 秒），防止无限重载死循环；
 	/// 2. 仅记录崩溃/断线前正在运行的自动挖矿意图（180 秒有效），页面恢复就绪后自动续跑，绝不无故触发消费型任务；
-	/// 3. 统计连续脚本轮询异常次数，持续失联达到阈值才升级为重载自愈。
+	/// 3. 统计连续脚本轮询异常次数，持续失联达到阈值才升级为重载自愈；
+	/// 4. 监控自动挖矿静默停滞：连续 60 秒无进展先轻度唤醒，90 秒仍无进展则按配额重载并自动续跑。
 	/// </summary>
 	internal sealed class SelfHealWatchdog
 	{
@@ -27,15 +35,55 @@ namespace AandmAuto
 		internal const int MinCooldownSeconds = 30;
 		internal const int ResumeExpireSeconds = 180;
 		internal const int PollErrorReloadThreshold = 10;
+		internal const int SoftWakeStallSeconds = 60;
+		internal const int HardReloadStallSeconds = 90;
 
 		private readonly List<DateTime> recoveryTimestamps = new List<DateTime>();
 		private int consecutivePollErrors;
 		private bool pendingResumeMining;
 		private DateTime pendingResumeUntilUtc = DateTime.MinValue;
 		private bool reloadScheduled;
+		private string lastProgressSignature;
+		private DateTime lastProgressAtUtc = DateTime.MinValue;
+		private bool softWakeSentForCurrentStall;
 
 		internal int ConsecutivePollErrors { get { return consecutivePollErrors; } }
 		internal bool ReloadScheduled { get { return reloadScheduled; } set { reloadScheduled = value; } }
+
+		internal void ResetStallTracker()
+		{
+			lastProgressSignature = null;
+			lastProgressAtUtc = DateTime.MinValue;
+			softWakeSentForCurrentStall = false;
+		}
+
+		internal StallAction ObserveMiningProgress(DateTime nowUtc, bool activeMining, string signature, bool legitWait)
+		{
+			if (!activeMining || legitWait || string.IsNullOrEmpty(signature))
+			{
+				ResetStallTracker();
+				return StallAction.None;
+			}
+			if (lastProgressSignature != signature || lastProgressAtUtc == DateTime.MinValue)
+			{
+				lastProgressSignature = signature;
+				lastProgressAtUtc = nowUtc;
+				softWakeSentForCurrentStall = false;
+				return StallAction.None;
+			}
+			double stalledSeconds = (nowUtc - lastProgressAtUtc).TotalSeconds;
+			if (stalledSeconds >= HardReloadStallSeconds)
+			{
+				ResetStallTracker();
+				return StallAction.Reload;
+			}
+			if (stalledSeconds >= SoftWakeStallSeconds && !softWakeSentForCurrentStall)
+			{
+				softWakeSentForCurrentStall = true;
+				return StallAction.SoftWake;
+			}
+			return StallAction.None;
+		}
 
 		internal void RecordPollSuccess()
 		{
@@ -156,9 +204,17 @@ namespace AandmAuto
 			wd.RecordPollSuccess();
 			bool pollResetOk = wd.ConsecutivePollErrors == 0;
 
+			// Silent stall detection smoke: none at 0s/30s, SoftWake once at 65s, Reload at 95s, legitWait resets
+			bool stallOk = wd.ObserveMiningProgress(t0, true, "sig1", false) == StallAction.None
+				&& wd.ObserveMiningProgress(t0.AddSeconds(30), true, "sig1", false) == StallAction.None
+				&& wd.ObserveMiningProgress(t0.AddSeconds(65), true, "sig1", false) == StallAction.SoftWake
+				&& wd.ObserveMiningProgress(t0.AddSeconds(70), true, "sig1", false) == StallAction.None
+				&& wd.ObserveMiningProgress(t0.AddSeconds(95), true, "sig1", false) == StallAction.Reload
+				&& wd.ObserveMiningProgress(t0.AddSeconds(96), true, "sig1", true) == StallAction.None;
+
 			bool passed = d1.Allowed && !dCooldown.Allowed && d2.Allowed && d3.Allowed && !d4.Allowed && dAfterWindow.Allowed
 				&& resumeActive && resumeConsumed && !resumeSecond && resumeExpired
-				&& pollThresholdReached && pollResetOk;
+				&& pollThresholdReached && pollResetOk && stallOk;
 
 			var report = new Dictionary<string, object>
 			{
@@ -166,6 +222,7 @@ namespace AandmAuto
 				{ "quotaOk", d1.Allowed && !dCooldown.Allowed && d2.Allowed && d3.Allowed && !d4.Allowed && dAfterWindow.Allowed },
 				{ "resumeOk", resumeActive && resumeConsumed && !resumeSecond && resumeExpired },
 				{ "pollEscalationOk", pollThresholdReached && pollResetOk },
+				{ "stallDetectionOk", stallOk },
 				{ "passed", passed }
 			};
 			var js = new JavaScriptSerializer();

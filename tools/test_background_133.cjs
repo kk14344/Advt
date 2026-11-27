@@ -201,5 +201,31 @@ test('bridge idle tick slows to 500ms in extreme performance while active tasks 
  ticks=0;advance(1000);
  assert(ticks>=20,'active one-shot task must stay at 45ms full speed under extremePerf, got '+ticks);
 });
+test('background boost accelerates fallback cadence to ~33Hz and scales hidden DPR to 0.5x cleanly',()=>{
+ const s=setup(),window=s.context.window,guard=window.__MWA_BACKGROUND;
+ let ratio=2.0,frames=0,canvas={width:0,height:0,clientWidth:640,clientHeight:1136};
+ Object.defineProperty(window,'devicePixelRatio',{configurable:true,get:()=>ratio});
+ const original=Object.getOwnPropertyDescriptor(window,'devicePixelRatio').get;
+ const engine={running:true,background:false,canvas,setBackground(){},root:{},visibleClippingDepth(){return 0;},
+   context:{setTransform(){}},frame(stamp){
+     const t=((dpr)=>({width:Math.floor(this.canvas.clientWidth*dpr),scaleX:dpr}))(
+       [window.devicePixelRatio,this.visibleClippingDepth(this.root)][0]);
+     this.canvas.width=t.width;
+     this.context.setTransform(t.scaleX,0,0,-t.scaleX,0,0);
+     frames++;
+   }};
+ window.__AANDM.engine=engine;
+ guard.pulse(0);
+ guard.setExtremePerf(true,true,true);
+ guard.setBackgroundBoost(true,true);
+ for(let ms=30;ms<=1000;ms+=30){s.setTime(ms);guard.pulse(ms);}
+ assert(frames>=28,'expected >=28Hz boosted fallback frames even under extremePerf suspend, got '+frames);
+ assert.equal(canvas.width,640,'expected 0.5x DPR (640*2*0.5=640) while bgLowRes is active');
+ assert.equal(window.devicePixelRatio,2.0,'external DPR getter must stay untouched');
+ guard.setBackgroundBoost(false,false);
+ assert.strictEqual(Object.getOwnPropertyDescriptor(window,'devicePixelRatio').get,original);
+ engine.frame(1030);
+ assert.equal(canvas.width,1280,'restoring foreground must immediately restore full HD canvas width');
+});
 fs.mkdirSync(path.join(root,'dist'),{recursive:true});
 fs.writeFileSync(path.join(root,'dist/background-js-test-results.json'),JSON.stringify({result:'passed',checks,simulatedHiddenSeconds:180},null,2));

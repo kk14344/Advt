@@ -2370,7 +2370,8 @@ namespace AandmAuto
 			{
 				OptionCheck(page, opts[i, 0], opts[i, 1], 12 + (i % 2) * 390, 36 + (i / 2) * 34, 370);
 			}
-			OptionCheck(page, "autoSelfHeal", "挂机异常自愈（渲染崩溃/连续失联自动重载并续跑挖矿）", 12, 106, 620);
+			OptionCheck(page, "autoSelfHeal", "挂机异常自愈（崩溃/停滞自动续跑）", 12, 106, 375);
+			OptionCheck(page, "backgroundBoost", "后台高速稳态增强（防降频/防休眠）", 402, 106, 388);
 
 			page.Controls.Add(SectionTitle("极致性能模式（适配 2GB 运存 · 全局生效）", 8, 144, 780));
 			var perfCard = new CardPanel

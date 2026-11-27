@@ -11,12 +11,13 @@
   var watched=null,manual=false,idle=false,lastFallbackFrame=-Infinity;
   var extremePerf=false,suspendRender=false,extremeTaskActive=false,lastExecutedFrame=-Infinity;
   var lowDefinition=false,scaleCapable=false,scaledFrame=false,nativeRatioOwn,ratioGetter;
+  var bgBoost=false,bgLowRes=false,boostTimer=0;
   // The game sizes its 2D backing canvas using DPR, then transforms the same
   // design coordinates into that canvas. Pointer mapping uses its CSS rect.
   function setRenderRatio() {
     var own=Object.getOwnPropertyDescriptor(window,'devicePixelRatio');
     if(ratioGetter && (!own || own.get!==ratioGetter))ratioGetter=null;
-    if(!lowDefinition || !scaleCapable) {
+    if((!lowDefinition && !bgLowRes) || !scaleCapable) {
       if(ratioGetter) {
         if(nativeRatioOwn)Object.defineProperty(window,'devicePixelRatio',nativeRatioOwn);
         else delete window.devicePixelRatio;
@@ -31,7 +32,8 @@
     if(!native || typeof native.get!=='function')return;
     var getter=function(){
       var ratio=native.get.call(window);
-      return scaledFrame ? ratio*0.67 : ratio;
+      if(!scaledFrame)return ratio;
+      return lowDefinition ? ratio*0.67 : ratio*0.5;
     };
     try {
       Object.defineProperty(window,'devicePixelRatio',{configurable:true,enumerable:native.enumerable,get:getter});
@@ -76,7 +78,7 @@
           stats.nativeFrames++;
         }
         lastExecutedFrame=now;
-        if(!lowDefinition || !ratioGetter || this!==engine)return frame.apply(this,arguments);
+        if((!lowDefinition && !bgLowRes) || !ratioGetter || this!==engine)return frame.apply(this,arguments);
         var previous=scaledFrame;
         scaledFrame=true;
         try{return frame.apply(this,arguments);}
@@ -92,9 +94,12 @@
       // Native rAF may remain suspended even though JS reports visible. Only
       // supply frames while native callbacks are absent; the game's own frame
       // deadlines prevent duplicate logical updates when native rAF returns.
-      if(stamp-stats.lastNativeFrame>=150) {
+      var deadband = bgBoost ? 45 : 150;
+      if(stamp-stats.lastNativeFrame>=deadband) {
         var shouldFallback;
-        if(extremePerf && !lowDefinition) {
+        if(bgBoost) {
+          shouldFallback=stamp-lastFallbackFrame>=28;
+        } else if(extremePerf && !lowDefinition) {
           var fallbackGap=suspendRender?(extremeTaskActive?250:500):(idle?400:66);
           shouldFallback=stamp-lastFallbackFrame>=fallbackGap;
         } else {
@@ -105,11 +110,28 @@
           lastFallbackFrame=stamp;
           try{engine.frame(stamp);stats.fallbackFrames++;}finally{manual=false;}
         }
+        if(bgBoost && !boostTimer && typeof setTimeout==='function') {
+          boostTimer=setTimeout(function(){
+            boostTimer=0;
+            if(bgBoost)pulse(performance.now());
+          },30);
+        }
       }
     } catch(e){manual=false;stats.errors++;stats.lastError=String(e&&e.message||e);}
   }
   stats.pulse=pulse;
   stats.setIdle=function(value){idle=value===true;};
+  stats.setBackgroundBoost=function(boostActive,lowResBackground){
+    var nextBoost=boostActive===true;
+    var nextLowRes=lowResBackground===true;
+    if(nextBoost===bgBoost && nextLowRes===bgLowRes)return;
+    bgBoost=nextBoost;
+    bgLowRes=nextLowRes;
+    if(!bgBoost && boostTimer && typeof clearTimeout==='function'){clearTimeout(boostTimer);boostTimer=0;}
+    lastFallbackFrame=-Infinity;
+    lastExecutedFrame=-Infinity;
+    setRenderRatio();
+  };
   stats.setExtremePerf=function(enabled,suspend,taskActive){
     var nextExtreme=enabled===true;
     var nextSuspend=nextExtreme && suspend===true;

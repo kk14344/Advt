@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-27T09:38:24Z",
+  "updatedAt": "2026-11-27T09:38:56Z",
   "channels": {
     "official": {
-      "version": "1.1.0",
-      "tag": "official-v1.1.0",
+      "version": "1.1.1",
+      "tag": "official-v1.1.1",
       "fileName": "冒险与挖矿自动助手-优化版.exe",
       "assetName": "AandmAuto-Official.exe",
-      "sha256": "dd8200268f758dab39d96187af5bada96095e4df428dc546e49d29fcc80ca711",
-      "size": 6184448,
-      "publishedAt": "2026-11-26T15:55:35Z",
-      "notes": "feat(ui): DWM VSync 90fps+ dialog ghost transitions and full-app frosted glass overhaul",
-      "downloadUrl": "https://github.com/kk14344/Advt/releases/download/official-v1.1.0/AandmAuto-Official.exe",
-      "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/official-v1.1.0"
+      "sha256": "6b213b27e3b7da652801f7d2e46d20ee0251dd91de7583b19d30f15030db0763",
+      "size": 6194688,
+      "publishedAt": "2026-11-27T09:38:56Z",
+      "notes": "chore(release): bump version to v1.1.1 and make version checks dynamic",
+      "downloadUrl": "https://github.com/kk14344/Advt/releases/download/official-v1.1.1/AandmAuto-Official.exe",
+      "releaseUrl": "https://github.com/kk14344/Advt/releases/tag/official-v1.1.1"
     },
     "testpvp": {
       "version": "1.1.1",

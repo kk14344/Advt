@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "format": "aam-hot-patch-index",
+  "channel": "apk_pro",
+  "baseVersion": "aam-r10-base",
+  "latestVersion": "r10.7",
+  "latestVersionCode": 7,
+  "mode": "diff",
+  "fileName": "aam_patch_r10.7.zip",
+  "sizeBytes": 1046723,
+  "zipSha256": "ead2a9a540cb58f12c79169f203811e45d923fd5e545cb24a2be6f8dacc55f62",
+  "contentSha256": "e26f260702d7f13b8e4a91bf597fbf754467405076ec6c97cf4fd5cd19cdbb40",
+  "fileCount": 62,
+  "changelog": "彩虹卡面皇家鎏金升级; 建议反馈接入腾讯问卷直达; 修复freestyle动画/心愿切换/同源置换; 全量佣兵与组合技条件逻辑修正",
+  "downloadUrl": "https://raw.githubusercontent.com/kk14344/Advt/apk-patches/aam_patch_r10.7.zip",
+  "mirrors": [
+    "https://ghfast.top/",
+    "https://gh-proxy.com/",
+    "https://mirror.ghproxy.com/"
+  ],
+  "publishedAt": "2026-11-27T18:09:56Z"
+}
